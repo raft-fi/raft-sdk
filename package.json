@@ -16,6 +16,7 @@
     "prepare": "husky install && chmod +x .husky/* && rollup -c"
   },
   "dependencies": {
+    "@tempusfinance/decimal": "https://github.com/tempusfinance/decimal",
     "ethers": "^6.3.0"
   },
   "devDependencies": {
