@@ -1,8 +1,28 @@
 import Decimal from '@tempusfinance/decimal';
-import { ContractRunner, Provider, Signer } from 'ethers';
-import { MIN_COLLATERAL_RATIO } from './constants';
+import { Contract, ContractRunner, ContractTransaction, Provider, Signer, ethers } from 'ethers';
+import erc20PermitAbi from './abi/ERC20Permit.json';
+import positionManagerAbi from './abi/PositionManager.json';
+import { COLLATERAL_TOKEN_ADDRESSES, MIN_COLLATERAL_RATIO, POSITION_MANAGER_ADDRESS } from './constants';
 import { RaftCollateralToken, RaftDebtToken } from './tokens';
 import { CollateralTokenType } from './types';
+
+const PERMIT_DEADLINE_SHIFT = 30 * 60; // 30 minutes
+
+/**
+ * A position manager contract that is used for managing positions (e.g. opening, closing, adding collateral,
+ * liquidations etc.). Although it is possible to use this class directly, it is recommended to use the
+ * {@link PositionWithAddress} (e.g. for liquidation) and {@link UserPosition} (for managing own position) classes
+ * instead, which provide a more user-friendly interface for managing positions.
+ */
+export class PositionManager extends Contract {
+  /**
+   * Creates a new position manager contract with a given signer.
+   * @param signer The signer that will be used for signing transactions.
+   */
+  constructor(signer: Signer) {
+    super(POSITION_MANAGER_ADDRESS, positionManagerAbi, signer);
+  }
+}
 
 /**
  * Represents a position without direct contact to any opened position. It is used for calculations (e.g. collateral
@@ -90,9 +110,10 @@ export class Position {
 
 class PositionWithRunner extends Position {
   protected userAddress: string;
+  protected collateralToken: Contract;
 
-  private collateralToken: RaftCollateralToken;
-  private debtToken: RaftDebtToken;
+  private indexCollateralToken: RaftCollateralToken;
+  private indexDebtToken: RaftDebtToken;
 
   /**
    * Creates a new representation of a position with attached address and given initial collateral and debt amounts.
@@ -111,8 +132,9 @@ class PositionWithRunner extends Position {
     super(collateralTokenType, collateral, debt);
 
     this.userAddress = userAddress;
-    this.collateralToken = new RaftCollateralToken(this.collateralTokenType, runner);
-    this.debtToken = new RaftDebtToken(runner);
+    this.collateralToken = new Contract(COLLATERAL_TOKEN_ADDRESSES[collateralTokenType], erc20PermitAbi, runner);
+    this.indexCollateralToken = new RaftCollateralToken(this.collateralTokenType, runner);
+    this.indexDebtToken = new RaftDebtToken(runner);
   }
 
   /**
@@ -134,13 +156,13 @@ class PositionWithRunner extends Position {
 
   private async fetchCollateral(): Promise<void> {
     const userAddress = await this.getUserAddress();
-    const collateral = await this.collateralToken.balanceOf(userAddress);
+    const collateral = await this.indexCollateralToken.balanceOf(userAddress);
     this.setCollateral(new Decimal(collateral));
   }
 
   private async fetchDebt(): Promise<void> {
     const userAddress = await this.getUserAddress();
-    const debt = await this.debtToken.balanceOf(userAddress);
+    const debt = await this.indexDebtToken.balanceOf(userAddress);
     this.setDebt(new Decimal(debt));
   }
 }
@@ -177,6 +199,7 @@ export class PositionWithAddress extends PositionWithRunner {
  */
 export class UserPosition extends PositionWithRunner {
   private user: Signer;
+  private positionManager: PositionManager;
 
   /**
    * Creates a new representation of a position or a given user with given initial collateral and debt amounts.
@@ -194,6 +217,153 @@ export class UserPosition extends PositionWithRunner {
     super('', user, collateralTokenType, collateral, debt);
 
     this.user = user;
+    this.positionManager = new PositionManager(user);
+  }
+
+  /**
+   * Manages the position's collateral and debt amounts by depositing or withdrawing from the position manager. Does not
+   * fetch the position's collateral and debt amounts after the operation. In case of adding collateral more collateral,
+   * it checks whether the collateral token allowance is sufficient and if not, it asks the user to approve the
+   * collateral change.
+   *
+   * This method is used as a generic method for managing the position's collateral and debt amounts. For more specific
+   * methods, use the {@link UserPosition.open}, {@link UserPosition.close}, {@link UserPosition.addCollateral},
+   * {@link UserPosition.withdrawCollateral}, {@link UserPosition.borrowDebt}, and {@link UserPosition.repayDebt}.
+   * @param collateralChange The amount to change the collateral by. Positive values deposit collateral, negative values
+   * withdraw collateral.
+   * @param debtChange The amount to change the debt by. Positive values borrow debt, negative values repay debt.
+   * @param maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
+   * @returns The dispatched transaction of the operation.
+   */
+  public async manage(
+    collateralChange: Decimal,
+    debtChange: Decimal,
+    maxFeePercentage: Decimal = Decimal.ONE,
+  ): Promise<ContractTransaction> {
+    if (collateralChange.gt(Decimal.ZERO)) {
+      const allowance = await this.collateralToken.allowance(await this.getUserAddress(), POSITION_MANAGER_ADDRESS);
+
+      if (new Decimal(allowance).lt(collateralChange)) {
+        const permitTx = await this.signCollateralTokenPermit(collateralChange);
+        await permitTx.wait();
+      }
+    }
+
+    return this.positionManager.managePosition(
+      COLLATERAL_TOKEN_ADDRESSES[this.collateralTokenType],
+      collateralChange.abs().value,
+      collateralChange.gt(Decimal.ZERO),
+      debtChange.abs().value,
+      debtChange.gt(Decimal.ZERO),
+      maxFeePercentage.value,
+    );
+  }
+
+  /**
+   * Opens the position by depositing collateral and borrowing debt from the position manager. Does not fetch the
+   * position's collateral and debt amounts after the operation. Checks whether the collateral token allowance is
+   * sufficient and if not, it asks the user to approve the collateral change.
+   * @param collateralAmount The amount of collateral to deposit. Must be greater than 0.
+   * @param debtAmount The amount of debt to borrow. Must be greater than 0.
+   * @param maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
+   * @returns The dispatched transaction of the operation.
+   * @throws An error if the collateral amount is less than or equal to 0.
+   * @throws An error if the debt amount is less than or equal to 0.
+   */
+  public async open(
+    collateralAmount: Decimal,
+    debtAmount: Decimal,
+    maxFeePercentage: Decimal = Decimal.ONE,
+  ): Promise<ContractTransaction> {
+    if (collateralAmount.lte(Decimal.ZERO)) {
+      throw new Error('Collateral amount must be greater than 0.');
+    }
+    if (debtAmount.lte(Decimal.ZERO)) {
+      throw new Error('Debt amount must be greater than 0.');
+    }
+
+    return this.manage(collateralAmount, debtAmount, maxFeePercentage);
+  }
+
+  /**
+   * Closes the position by withdrawing collateral and repaying debt to the position manager. Fetches the position's
+   * collateral and debt amounts before the operation, but does not fetch them after.
+   * @param maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
+   * @returns The dispatched transaction of the operation.
+   */
+  public async close(maxFeePercentage: Decimal = Decimal.ONE): Promise<ContractTransaction> {
+    await this.fetch();
+    const collateralChange = this.getCollateral().mul(-1);
+    const debtChange = this.getDebt().mul(-1);
+    return this.manage(collateralChange, debtChange, maxFeePercentage);
+  }
+
+  /**
+   * Adds more collateral to the position by depositing it to the position manager. Does not fetch the position's
+   * collateral and debt amounts after the operation. Checks whether the collateral token allowance is sufficient and if
+   * not, it asks the user to approve the collateral change.
+   * @param amount The amount of collateral to deposit. Must be greater than 0.
+   * @param maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
+   * @returns The dispatched transaction of the operation.
+   * @throws An error if the amount is less than or equal to 0.
+   */
+  public async addCollateral(amount: Decimal, maxFeePercentage: Decimal = Decimal.ONE): Promise<ContractTransaction> {
+    if (amount.lte(Decimal.ZERO)) {
+      throw new Error('Amount must be greater than 0.');
+    }
+
+    return this.manage(amount, Decimal.ZERO, maxFeePercentage);
+  }
+
+  /**
+   * Removes collateral from the position by withdrawing it from the position manager. Does not fetch the position's
+   * collateral and debt amounts after the operation.
+   * @param amount The amount of collateral to withdraw. Must be greater than 0.
+   * @param maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
+   * @returns The dispatched transaction of the operation.
+   * @throws An error if the amount is less than or equal to 0.
+   */
+  public async withdrawCollateral(
+    amount: Decimal,
+    maxFeePercentage: Decimal = Decimal.ONE,
+  ): Promise<ContractTransaction> {
+    if (amount.lte(Decimal.ZERO)) {
+      throw new Error('Amount must be greater than 0.');
+    }
+
+    return this.manage(amount.mul(-1), Decimal.ZERO, maxFeePercentage);
+  }
+
+  /**
+   * Borrows more debt from the position by borrowing it from the position manager. Does not fetch the position's
+   * collateral and debt amounts after the operation.
+   * @param amount The amount of debt to borrow. Must be greater than 0.
+   * @param maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
+   * @returns The dispatched transaction of the operation.
+   * @throws An error if the amount is less than or equal to 0.
+   */
+  public async borrowDebt(amount: Decimal, maxFeePercentage: Decimal = Decimal.ONE): Promise<ContractTransaction> {
+    if (amount.lte(Decimal.ZERO)) {
+      throw new Error('Amount must be greater than 0.');
+    }
+
+    return this.manage(Decimal.ZERO, amount, maxFeePercentage);
+  }
+
+  /**
+   * Repays debt to the position by repaying it to the position manager. Does not fetch the position's collateral and
+   * debt amounts after the operation.
+   * @param amount The amount of debt to repay. Must be greater than 0.
+   * @param maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
+   * @returns The dispatched transaction of the operation.
+   * @throws An error if the amount is less than or equal to 0.
+   */
+  public async repayDebt(amount: Decimal, maxFeePercentage: Decimal = Decimal.ONE): Promise<ContractTransaction> {
+    if (amount.lte(Decimal.ZERO)) {
+      throw new Error('Amount must be greater than 0.');
+    }
+
+    return this.manage(Decimal.ZERO, amount.mul(-1), maxFeePercentage);
   }
 
   /**
@@ -206,5 +376,61 @@ export class UserPosition extends PositionWithRunner {
     }
 
     return this.userAddress;
+  }
+
+  private async signCollateralTokenPermit(amount: Decimal) {
+    const deadline = Math.floor(Date.now() / 1000) + PERMIT_DEADLINE_SHIFT;
+    const userAddress = await this.getUserAddress();
+    const nonce = await this.collateralToken.nonces(userAddress);
+    const domain = {
+      name: await this.collateralToken.name(),
+      chainId: (await this.user.provider?.getNetwork())?.chainId ?? 1,
+      version: '1',
+      verifyingContract: COLLATERAL_TOKEN_ADDRESSES[this.collateralTokenType],
+    };
+    const values = {
+      owner: userAddress,
+      spender: POSITION_MANAGER_ADDRESS,
+      value: amount.value,
+      nonce,
+      deadline,
+    };
+    const types = {
+      Permit: [
+        {
+          name: 'owner',
+          type: 'address',
+        },
+        {
+          name: 'spender',
+          type: 'address',
+        },
+        {
+          name: 'value',
+          type: 'uint256',
+        },
+        {
+          name: 'nonce',
+          type: 'uint256',
+        },
+        {
+          name: 'deadline',
+          type: 'uint256',
+        },
+      ],
+    };
+
+    const signature = await this.user.signTypedData(domain, types, values);
+    const signatureComponents = ethers.Signature.from(signature);
+
+    return await this.collateralToken.permit(
+      userAddress,
+      POSITION_MANAGER_ADDRESS,
+      amount.value,
+      deadline,
+      signatureComponents.v,
+      signatureComponents.r,
+      signatureComponents.s,
+    );
   }
 }
