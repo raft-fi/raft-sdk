@@ -6,4 +6,5 @@ export {
 } from './constants';
 export { RaftCollateralToken, RaftDebtToken } from './tokens';
 export { Position, PositionWithAddress, UserPosition } from './position';
+export { PriceFeed } from './price';
 export { CollateralTokenType } from './types';
