@@ -17,10 +17,10 @@ const PERMIT_DEADLINE_SHIFT = 30 * 60; // 30 minutes
 export class PositionManager extends Contract {
   /**
    * Creates a new position manager contract with a given signer.
-   * @param signer The signer that will be used for signing transactions.
+   * @param runner The contract runner.
    */
-  constructor(signer: Signer) {
-    super(POSITION_MANAGER_ADDRESS, positionManagerAbi, signer);
+  constructor(runner: ContractRunner) {
+    super(POSITION_MANAGER_ADDRESS, positionManagerAbi, runner);
   }
 }
 
