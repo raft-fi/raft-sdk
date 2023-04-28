@@ -1,7 +1,7 @@
 import Decimal from '@tempusfinance/decimal';
 import { Contract, Provider } from 'ethers';
-import { COLLATERAL_TOKEN_ADDRESSES } from '../constants';
-import { PositionManager } from '../position';
+import { COLLATERAL_TOKEN_ADDRESSES, POSITION_MANAGER_ADDRESS } from '../constants';
+import { PositionManager, PositionManager__factory } from '../typechain';
 import { CollateralTokenType } from '../types';
 
 type PriceFeedsMap = Partial<Record<CollateralTokenType, Contract>>;
@@ -13,7 +13,7 @@ export class PriceFeed {
 
   public constructor(provider: Provider) {
     this.provider = provider;
-    this.positionManager = new PositionManager(provider);
+    this.positionManager = PositionManager__factory.connect(POSITION_MANAGER_ADDRESS, provider);
     this.priceFeeds = {};
   }
 
