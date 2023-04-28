@@ -1,28 +1,23 @@
 import Decimal from '@tempusfinance/decimal';
-import { Contract, ContractRunner, ContractTransaction, Provider, Signer, ethers } from 'ethers';
-import erc20PermitAbi from './abi/ERC20Permit.json';
-import positionManagerAbi from './abi/PositionManager.json';
-import { COLLATERAL_TOKEN_ADDRESSES, MIN_COLLATERAL_RATIO, POSITION_MANAGER_ADDRESS } from './constants';
-import { RaftCollateralToken, RaftDebtToken } from './tokens';
+import { ContractRunner, Provider, Signer, ethers, ContractTransactionResponse } from 'ethers';
+import {
+  COLLATERAL_TOKEN_ADDRESSES,
+  MIN_COLLATERAL_RATIO,
+  POSITION_MANAGER_ADDRESS,
+  RAFT_COLLATERAL_TOKEN_ADDRESSES,
+  RAFT_DEBT_TOKEN_ADDRESS,
+} from './constants';
 import { CollateralTokenType } from './types';
+import {
+  ERC20Indexable,
+  ERC20Indexable__factory,
+  ERC20Permit,
+  ERC20Permit__factory,
+  PositionManager,
+  PositionManager__factory,
+} from './typechain';
 
 const PERMIT_DEADLINE_SHIFT = 30 * 60; // 30 minutes
-
-/**
- * A position manager contract that is used for managing positions (e.g. opening, closing, adding collateral,
- * liquidations etc.). Although it is possible to use this class directly, it is recommended to use the
- * {@link PositionWithAddress} (e.g. for liquidation) and {@link UserPosition} (for managing own position) classes
- * instead, which provide a more user-friendly interface for managing positions.
- */
-export class PositionManager extends Contract {
-  /**
-   * Creates a new position manager contract with a given signer.
-   * @param runner The contract runner.
-   */
-  constructor(runner: ContractRunner) {
-    super(POSITION_MANAGER_ADDRESS, positionManagerAbi, runner);
-  }
-}
 
 /**
  * Represents a position without direct contact to any opened position. It is used for calculations (e.g. collateral
@@ -110,10 +105,10 @@ export class Position {
 
 class PositionWithRunner extends Position {
   protected userAddress: string;
-  protected collateralToken: Contract;
+  protected collateralToken: ERC20Permit;
 
-  private indexCollateralToken: RaftCollateralToken;
-  private indexDebtToken: RaftDebtToken;
+  private indexCollateralToken: ERC20Indexable;
+  private indexDebtToken: ERC20Indexable;
 
   /**
    * Creates a new representation of a position with attached address and given initial collateral and debt amounts.
@@ -132,9 +127,12 @@ class PositionWithRunner extends Position {
     super(collateralTokenType, collateral, debt);
 
     this.userAddress = userAddress;
-    this.collateralToken = new Contract(COLLATERAL_TOKEN_ADDRESSES[collateralTokenType], erc20PermitAbi, runner);
-    this.indexCollateralToken = new RaftCollateralToken(this.collateralTokenType, runner);
-    this.indexDebtToken = new RaftDebtToken(runner);
+    this.collateralToken = ERC20Permit__factory.connect(COLLATERAL_TOKEN_ADDRESSES[collateralTokenType], runner);
+    this.indexCollateralToken = ERC20Indexable__factory.connect(
+      RAFT_COLLATERAL_TOKEN_ADDRESSES[collateralTokenType],
+      runner,
+    );
+    this.indexDebtToken = ERC20Indexable__factory.connect(RAFT_DEBT_TOKEN_ADDRESS, runner);
   }
 
   /**
@@ -157,13 +155,13 @@ class PositionWithRunner extends Position {
   private async fetchCollateral(): Promise<void> {
     const userAddress = await this.getUserAddress();
     const collateral = await this.indexCollateralToken.balanceOf(userAddress);
-    this.setCollateral(new Decimal(collateral));
+    this.setCollateral(new Decimal(collateral, Decimal.PRECISION));
   }
 
   private async fetchDebt(): Promise<void> {
     const userAddress = await this.getUserAddress();
     const debt = await this.indexDebtToken.balanceOf(userAddress);
-    this.setDebt(new Decimal(debt));
+    this.setDebt(new Decimal(debt, Decimal.PRECISION));
   }
 }
 
@@ -217,7 +215,7 @@ export class UserPosition extends PositionWithRunner {
     super('', user, collateralTokenType, collateral, debt);
 
     this.user = user;
-    this.positionManager = new PositionManager(user);
+    this.positionManager = PositionManager__factory.connect(POSITION_MANAGER_ADDRESS, user);
   }
 
   /**
@@ -239,17 +237,20 @@ export class UserPosition extends PositionWithRunner {
     collateralChange: Decimal,
     debtChange: Decimal,
     maxFeePercentage: Decimal = Decimal.ONE,
-  ): Promise<ContractTransaction> {
+  ): Promise<ContractTransactionResponse> {
     if (collateralChange.gt(Decimal.ZERO)) {
-      const allowance = await this.collateralToken.allowance(await this.getUserAddress(), POSITION_MANAGER_ADDRESS);
+      const allowance = new Decimal(
+        await this.collateralToken.allowance(await this.getUserAddress(), POSITION_MANAGER_ADDRESS),
+        Decimal.PRECISION,
+      );
 
-      if (new Decimal(allowance).lt(collateralChange)) {
+      if (allowance.lt(collateralChange)) {
         const permitTx = await this.signCollateralTokenPermit(collateralChange);
         await permitTx.wait();
       }
     }
 
-    return this.positionManager.managePosition(
+    return this.positionManager['managePosition(address,uint256,bool,uint256,bool,uint256)'](
       COLLATERAL_TOKEN_ADDRESSES[this.collateralTokenType],
       collateralChange.abs().value,
       collateralChange.gt(Decimal.ZERO),
@@ -274,7 +275,7 @@ export class UserPosition extends PositionWithRunner {
     collateralAmount: Decimal,
     debtAmount: Decimal,
     maxFeePercentage: Decimal = Decimal.ONE,
-  ): Promise<ContractTransaction> {
+  ): Promise<ContractTransactionResponse> {
     if (collateralAmount.lte(Decimal.ZERO)) {
       throw new Error('Collateral amount must be greater than 0.');
     }
@@ -291,7 +292,7 @@ export class UserPosition extends PositionWithRunner {
    * @param maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @returns The dispatched transaction of the operation.
    */
-  public async close(maxFeePercentage: Decimal = Decimal.ONE): Promise<ContractTransaction> {
+  public async close(maxFeePercentage: Decimal = Decimal.ONE): Promise<ContractTransactionResponse> {
     await this.fetch();
     const collateralChange = this.getCollateral().mul(-1);
     const debtChange = this.getDebt().mul(-1);
@@ -307,7 +308,10 @@ export class UserPosition extends PositionWithRunner {
    * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async addCollateral(amount: Decimal, maxFeePercentage: Decimal = Decimal.ONE): Promise<ContractTransaction> {
+  public async addCollateral(
+    amount: Decimal,
+    maxFeePercentage: Decimal = Decimal.ONE,
+  ): Promise<ContractTransactionResponse> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
@@ -326,7 +330,7 @@ export class UserPosition extends PositionWithRunner {
   public async withdrawCollateral(
     amount: Decimal,
     maxFeePercentage: Decimal = Decimal.ONE,
-  ): Promise<ContractTransaction> {
+  ): Promise<ContractTransactionResponse> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
@@ -342,7 +346,10 @@ export class UserPosition extends PositionWithRunner {
    * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async borrowDebt(amount: Decimal, maxFeePercentage: Decimal = Decimal.ONE): Promise<ContractTransaction> {
+  public async borrowDebt(
+    amount: Decimal,
+    maxFeePercentage: Decimal = Decimal.ONE,
+  ): Promise<ContractTransactionResponse> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
@@ -358,7 +365,10 @@ export class UserPosition extends PositionWithRunner {
    * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async repayDebt(amount: Decimal, maxFeePercentage: Decimal = Decimal.ONE): Promise<ContractTransaction> {
+  public async repayDebt(
+    amount: Decimal,
+    maxFeePercentage: Decimal = Decimal.ONE,
+  ): Promise<ContractTransactionResponse> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
