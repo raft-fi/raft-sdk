@@ -4,7 +4,7 @@ import { COLLATERAL_TOKEN_ADDRESSES, POSITION_MANAGER_ADDRESS } from '../constan
 import { PositionManager, PositionManager__factory } from '../typechain';
 import { CollateralTokenType } from '../types';
 
-type PriceFeedsMap = Partial<Record<CollateralTokenType, Contract>>;
+type PriceFeedsMap = Partial<Record<string, Contract>>;
 
 export class PriceFeed {
   private provider: Provider;
@@ -17,23 +17,26 @@ export class PriceFeed {
     this.priceFeeds = {};
   }
 
-  public async getPrice(collateralTokenType: CollateralTokenType) {
-    const priceFeed = await this.getPriceFeed(collateralTokenType);
+  public async getPrice(token: string): Promise<Decimal> {
+    if (token === (await this.positionManager.rToken())) {
+      return new Decimal(1e18);
+    }
+    const priceFeed = await this.getPriceFeed(COLLATERAL_TOKEN_ADDRESSES[CollateralTokenType.WSTETH]);
     const price = await priceFeed.getPrice(); // TODO: replace with lastGoodPrice for mainnet
     return new Decimal(price);
   }
 
-  private async getPriceFeed(collateralTokenType: CollateralTokenType): Promise<Contract> {
-    if (this.priceFeeds[collateralTokenType] === undefined) {
-      const priceFeedAddress = await this.positionManager.priceFeeds(COLLATERAL_TOKEN_ADDRESSES[collateralTokenType]);
+  private async getPriceFeed(token: string): Promise<Contract> {
+    if (this.priceFeeds[token] === undefined) {
+      const priceFeedAddress = await this.positionManager.priceFeeds(token);
 
-      this.priceFeeds[collateralTokenType] = new Contract(
+      this.priceFeeds[token] = new Contract(
         priceFeedAddress,
         ['function getPrice() view returns (uint256)'],
         this.provider,
       );
     }
 
-    return this.priceFeeds[collateralTokenType] as Contract;
+    return this.priceFeeds[token] as Contract;
   }
 }
