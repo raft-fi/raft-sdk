@@ -245,8 +245,7 @@ export class UserPosition extends PositionWithRunner {
       );
 
       if (allowance.lt(collateralChange)) {
-        const permitTx = await this.signCollateralTokenPermit(collateralChange);
-        await permitTx.wait();
+        await this.collateralToken.getFunction('approve')(POSITION_MANAGER_ADDRESS, collateralChange.abs().value);
       }
     }
 
