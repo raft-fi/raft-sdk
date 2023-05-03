@@ -1,4 +1,4 @@
-import Decimal from '@tempusfinance/decimal';
+import { Decimal } from 'tempus-decimal';
 import { CollateralTokenType } from './types';
 
 export const WSTETH_ADDRESS = '0x6320cD32aA674d2898A68ec82e869385Fc5f7E2f';

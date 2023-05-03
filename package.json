@@ -1,45 +1,52 @@
 {
-  "name": "@raft-fi/sdk",
-  "version": "1.0.0",
-  "description": "",
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "rollup -c",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "lint": "yarn lint:prettier && yarn lint:eslint",
-    "lint:eslint": "eslint \"**/*.{js,ts}\"",
-    "lint:prettier": "yarn prettier \"**/*.{md,json,yml}\"",
-    "prepare": "husky install && typechain --target=ethers-v6 --out-dir ./src/typechain ./src/abi/*.json && chmod +x .husky/* && rollup -c"
+  "name": "raft-sdk",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/raft-sdk.umd.cjs",
+  "module": "./dist/raft-sdk.js",
+  "types": "./dist/index.d.ts",
+  "description": "Raft Protocol SDK",
+  "author": "Tempus",
+  "homepage": "https://github.com/tempusfinance/raft-sdk",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tempusfinance/raft-sdk"
   },
-  "dependencies": {
-    "@tempusfinance/decimal": "https://github.com/tempusfinance/decimal",
-    "ethers": "^6.3.0"
+  "bugs": {
+    "url": "https://github.com/tempusfinance/raft-sdk/issues"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/raft-sdk.js",
+      "require": "./dist/raft-sdk.umd.cjs"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "npm run lint:prettier && npm run lint:eslint",
+    "lint:eslint": "npx eslint \"**/*.{js,ts}\"",
+    "lint:prettier": "npx prettier \"**/*.{md,json,yml}\"",
+    "prepare": "husky install && typechain --target=ethers-v6 --out-dir ./src/typechain ./src/abi/*.json && chmod +x .husky/*"
   },
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^24.1.0",
-    "@rollup/plugin-json": "^6.0.0",
-    "@rollup/plugin-node-resolve": "^15.0.2",
-    "@rollup/plugin-typescript": "^11.1.0",
     "@typechain/ethers-v6": "^0.3.0",
-    "@types/jest": "^29.5.1",
-    "@typescript-eslint/eslint-plugin": "^5.59.0",
-    "@typescript-eslint/parser": "^5.59.0",
+    "@types/node": "^18.16.3",
+    "@typescript-eslint/eslint-plugin": "^5.59.2",
+    "@typescript-eslint/parser": "^5.59.2",
     "eslint": "^8.39.0",
     "husky": "^8.0.3",
-    "jest": "^29.5.0",
-    "lint-staged": "^13.2.1",
+    "lint-staged": "^13.2.2",
     "prettier": "^2.8.8",
-    "rollup": "^3.21.0",
-    "rollup-plugin-dts": "^5.3.0",
-    "rollup-plugin-replace": "^2.2.0",
-    "ts-jest": "^29.1.0",
-    "tslib": "^2.5.0",
     "typechain": "^8.1.1",
-    "typescript": "^5.0.4"
+    "typescript": "^5.0.2",
+    "vite": "^4.3.2",
+    "vite-plugin-dts": "^2.3.0"
+  },
+  "dependencies": {
+    "ethers": "^6.3.0",
+    "tempus-decimal": "^0.0.2"
   },
   "files": [
     "dist"
