@@ -44,7 +44,7 @@
     "vite": "^4.3.2",
     "vite-plugin-dts": "^2.3.0"
   },
-  "peerDependencies": {
+  "dependencies": {
     "ethers": "^6.3.0",
     "tempus-decimal": "^0.0.2"
   },
