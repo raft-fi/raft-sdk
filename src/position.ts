@@ -1,4 +1,4 @@
-import Decimal from '@tempusfinance/decimal';
+import { Decimal } from 'tempus-decimal';
 import { ContractRunner, Provider, Signer, ethers, ContractTransactionResponse } from 'ethers';
 import {
   COLLATERAL_TOKEN_ADDRESSES,

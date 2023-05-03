@@ -1,4 +1,4 @@
-import Decimal from '@tempusfinance/decimal';
+import { Decimal } from 'tempus-decimal';
 import { Contract, Provider } from 'ethers';
 import { COLLATERAL_TOKEN_ADDRESSES, POSITION_MANAGER_ADDRESS } from '../constants';
 import { PositionManager, PositionManager__factory } from '../typechain';
