@@ -17,12 +17,12 @@ export const POSITION_MANAGER_ADDRESS = '0x0feDed544f10661fA11A85F6bd5381153D04E
 
 export const MIN_COLLATERAL_RATIO = new Decimal(1.1); // 110%
 
-export const RAFT_TOKEN_ADDRESS = '0x79aE2e90A319CDa33c0fbA7Bf9b15658067C52A9';
+export const R_TOKEN_ADDRESS = '0x79aE2e90A319CDa33c0fbA7Bf9b15658067C52A9';
 
 // TODO - Use this one everywhere instead of COLLATERAL_TOKEN_ADDRESSES/CollateralTokenType
 export const COLLATERAL_TOKEN_ADDRESSES_TICKER_MAP: { [tokenName in Token]: string } = {
   ETH: '', // ETH does not have an address
-  R: RAFT_TOKEN_ADDRESS,
+  R: R_TOKEN_ADDRESS,
   stETH: STETH_ADDRESS,
   wstETH: WSTETH_ADDRESS,
 };
