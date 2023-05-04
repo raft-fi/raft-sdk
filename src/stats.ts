@@ -11,16 +11,9 @@ export class Stats {
   private raftCollateralToken: ERC20Indexable;
   private raftDebtToken: ERC20Indexable;
 
-  /**
-   * Raft protocol collateral supply denominated in wstETH token.
-   */
-  public collateralSupply: Decimal | null = null;
-
-  /**
-   * Raft protocol debt supply denominated in R token.
-   */
-  public debtSupply: Decimal | null = null;
-  public borrowingRate: Decimal | null = null;
+  private _collateralSupply: Decimal | null = null;
+  private _debtSupply: Decimal | null = null;
+  private _borrowingRate: Decimal | null = null;
 
   /**
    * Creates a new representation of a stats class. Stats is a singleton, so constructor is set to private.
@@ -49,6 +42,27 @@ export class Stats {
   }
 
   /**
+   * Raft protocol collateral supply denominated in wstETH token.
+   */
+  get collateralSupply(): Decimal | null {
+    return this._collateralSupply;
+  }
+
+  /**
+   * Raft protocol debt supply denominated in R token.
+   */
+  get debtSupply(): Decimal | null {
+    return this._debtSupply;
+  }
+
+  /**
+   * Raft protocol current borrowing rate.
+   */
+  get borrowingRate(): Decimal | null {
+    return this._borrowingRate;
+  }
+
+  /**
    * Fetches all stats.
    */
   public async fetch() {
@@ -59,20 +73,20 @@ export class Stats {
    * Fetches current collateral supply (Amount of wstETH locked in Raft protocol).
    */
   private async fetchCollateralSupply() {
-    this.collateralSupply = new Decimal(await this.raftCollateralToken.totalSupply(), Decimal.PRECISION);
+    this._collateralSupply = new Decimal(await this.raftCollateralToken.totalSupply(), Decimal.PRECISION);
   }
 
   /**
    * Fetches current debt supply (Amount of R users borrowed).
    */
   private async fetchDebtSupply() {
-    this.debtSupply = new Decimal(await this.raftDebtToken.totalSupply(), Decimal.PRECISION);
+    this._debtSupply = new Decimal(await this.raftDebtToken.totalSupply(), Decimal.PRECISION);
   }
 
   /**
    * Fetches current borrowing rate.
    */
   private async fetchBorrowingRate() {
-    this.borrowingRate = new Decimal(await this.positionManager.getBorrowingRate(), Decimal.PRECISION);
+    this._borrowingRate = new Decimal(await this.positionManager.getBorrowingRate(), Decimal.PRECISION);
   }
 }
