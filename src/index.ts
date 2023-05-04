@@ -7,3 +7,4 @@ export {
 export { Position, PositionWithAddress, UserPosition } from './position';
 export { PriceFeed } from './price';
 export { CollateralTokenType } from './types';
+export { Balance } from './balance';
