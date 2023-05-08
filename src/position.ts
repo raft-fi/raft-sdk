@@ -253,11 +253,11 @@ export class UserPosition extends PositionWithRunner {
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
 
     if (!isUnderlyingToken) {
-      this.checkDelegateWhitelisting(userAddress, positionManagerAddress, options);
+      await this.checkDelegateWhitelisting(userAddress, positionManagerAddress, options);
     }
 
     if (collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
-      this.checkTokenAllowance(
+      await this.checkTokenAllowance(
         collateralTokenContract,
         userAddress,
         positionManagerAddress,
@@ -292,13 +292,23 @@ export class UserPosition extends PositionWithRunner {
         );
 
       case 'wstETH':
-        return this.positionManager['managePosition(address,uint256,bool,uint256,bool,uint256)'](
+        return this.positionManager.managePosition(
           TOKEN_TICKER_ADDRESSES_MAP[collateralToken],
+          userAddress,
           absoluteCollateralChangeValue,
           isCollateralIncrease,
           absoluteDebtChangeValue,
           isDebtIncrease,
           maxFeePercentageValue,
+          {
+            // TODO - Implement permit for wstETH
+            token: '',
+            value: 0,
+            deadline: 0,
+            v: '',
+            r: '',
+            s: '',
+          },
         );
     }
   }
