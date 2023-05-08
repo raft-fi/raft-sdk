@@ -23,6 +23,10 @@ import {
 interface ManagePositionOptions {
   maxFeePercentage?: Decimal;
   collateralToken?: CollateralToken;
+  onDelegateWhitelistingStart?: () => void;
+  onDelegateWhitelistingEnd?: (error?: unknown) => void;
+  onApprovalStart?: () => void;
+  onApprovalEnd?: (error?: unknown) => void;
 }
 
 /**
@@ -241,7 +245,7 @@ export class UserPosition extends PositionWithRunner {
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
 
     if (!isUnderlyingToken) {
-      this.checkDelegateWhitelisting(userAddress, positionManagerAddress);
+      this.checkDelegateWhitelisting(userAddress, positionManagerAddress, options);
     }
 
     if (collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
@@ -251,6 +255,7 @@ export class UserPosition extends PositionWithRunner {
         positionManagerAddress,
         collateralChange,
         absoluteCollateralChangeValue,
+        options,
       );
     }
 
@@ -424,12 +429,26 @@ export class UserPosition extends PositionWithRunner {
     return this.userAddress;
   }
 
-  private async checkDelegateWhitelisting(userAddress: string, positionManagerAddress: string): Promise<void> {
+  private async checkDelegateWhitelisting(
+    userAddress: string,
+    positionManagerAddress: string,
+    options: ManagePositionOptions,
+  ): Promise<void> {
     const isDelegateWhitelisted = await this.positionManager.isDelegateWhitelisted(userAddress, positionManagerAddress);
 
     if (!isDelegateWhitelisted) {
-      const whitelistingTx = await this.positionManager.whitelistDelegate(positionManagerAddress, true);
-      await whitelistingTx.wait();
+      const { onDelegateWhitelistingStart, onDelegateWhitelistingEnd } = options;
+
+      onDelegateWhitelistingStart?.();
+
+      try {
+        const whitelistingTx = await this.positionManager.whitelistDelegate(positionManagerAddress, true);
+        await whitelistingTx.wait();
+        onDelegateWhitelistingEnd?.();
+      } catch (error) {
+        onDelegateWhitelistingEnd?.(error);
+        throw error;
+      }
     }
   }
 
@@ -439,6 +458,7 @@ export class UserPosition extends PositionWithRunner {
     positionManagerAddress: string,
     collateralChange: Decimal,
     absoluteCollateralChangeValue: bigint,
+    options: ManagePositionOptions,
   ): Promise<void> {
     const allowance = new Decimal(
       await collateralTokenContract.allowance(userAddress, positionManagerAddress),
@@ -446,8 +466,18 @@ export class UserPosition extends PositionWithRunner {
     );
 
     if (allowance.lt(collateralChange)) {
-      const approveTx = await collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue);
-      await approveTx.wait();
+      const { onApprovalStart, onApprovalEnd } = options;
+
+      onApprovalStart?.();
+
+      try {
+        const approveTx = await collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue);
+        await approveTx.wait();
+        onApprovalEnd?.();
+      } catch (error) {
+        onApprovalEnd?.(error);
+        throw error;
+      }
     }
   }
 
