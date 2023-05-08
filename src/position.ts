@@ -102,6 +102,14 @@ export class Position {
   public isCollateralRatioBelowMinimum(price: Decimal): boolean {
     return this.getCollateralRatio(price).lt(MIN_COLLATERAL_RATIO);
   }
+
+  /**
+   * Returns the position's liquidation price limit under which the position can be liquidated.
+   * @returns The liquidation price limit.
+   */
+  public getLiquidationPriceLimit(): Decimal {
+    return MIN_COLLATERAL_RATIO.mul(this.debt).div(this.collateral);
+  }
 }
 
 class PositionWithRunner extends Position {
