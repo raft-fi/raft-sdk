@@ -2,7 +2,7 @@ import { JsonRpcProvider } from 'ethers';
 import { Decimal } from 'tempus-decimal';
 import { Token } from './types';
 import { ERC20, ERC20Permit, ERC20Permit__factory, ERC20__factory } from './typechain';
-import { COLLATERAL_TOKEN_ADDRESSES_TICKER_MAP, R_TOKEN_ADDRESS, STETH_ADDRESS } from './constants';
+import { TOKEN_TICKER_ADDRESSES_MAP, R_TOKEN_ADDRESS, STETH_ADDRESS } from './constants';
 
 export class Balance {
   protected readonly token: Token;
@@ -35,10 +35,7 @@ export class Balance {
         this.tokenContract = null;
         break;
       default:
-        this.tokenContract = ERC20Permit__factory.connect(
-          COLLATERAL_TOKEN_ADDRESSES_TICKER_MAP[this.token],
-          this.provider,
-        );
+        this.tokenContract = ERC20Permit__factory.connect(TOKEN_TICKER_ADDRESSES_MAP[this.token], this.provider);
     }
   }
 
