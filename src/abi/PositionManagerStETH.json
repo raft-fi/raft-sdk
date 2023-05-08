@@ -1,0 +1,139 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "positionManager_",
+        "type": "address"
+      },
+      {
+        "internalType": "contract IWstETH",
+        "name": "wstETH_",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "caller",
+        "type": "address"
+      }
+    ],
+    "name": "CallerIsNotPositionManager",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "PositionManagerCannotBeZero",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "SendingEtherFailed",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "WstETHAddressCannotBeZero",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "debtChange",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "isDebtIncrease",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxFeePercentage",
+        "type": "uint256"
+      }
+    ],
+    "name": "managePositionETH",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "collateralChange",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "isCollateralIncrease",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "debtChange",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "isDebtIncrease",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxFeePercentage",
+        "type": "uint256"
+      }
+    ],
+    "name": "managePositionStETH",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "positionManager",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "stETH",
+    "outputs": [
+      {
+        "internalType": "contract IStETH",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "wstETH",
+    "outputs": [
+      {
+        "internalType": "contract IWstETH",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

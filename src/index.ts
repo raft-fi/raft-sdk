@@ -6,6 +6,5 @@ export {
 } from './constants';
 export { Position, PositionWithAddress, UserPosition } from './position';
 export { PriceFeed } from './price';
-export { CollateralTokenType } from './types';
 export { Balance } from './balance';
 export { Stats } from './stats';
