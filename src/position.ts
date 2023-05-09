@@ -9,7 +9,6 @@ import {
   RAFT_DEBT_TOKEN_ADDRESS,
   TOKENS_WITH_PERMIT,
   TOKEN_TICKER_ADDRESSES_MAP,
-  ZERO_ADDRESS,
 } from './constants';
 import { CollateralToken } from './types';
 import {
@@ -263,15 +262,14 @@ export class UserPosition extends PositionWithRunner {
 
     let permitSignature: ERC20PermitSignatureStruct;
     if (collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
-      permitSignature =
-        (await this.checkTokenAllowance(
-          collateralTokenContract,
-          userAddress,
-          positionManagerAddress,
-          collateralChange,
-          absoluteCollateralChangeValue,
-          options,
-        )) || this.createEmptyPermitSignature();
+      permitSignature = await this.checkTokenAllowance(
+        collateralTokenContract,
+        userAddress,
+        positionManagerAddress,
+        collateralChange,
+        absoluteCollateralChangeValue,
+        options,
+      );
     } else {
       permitSignature = this.createEmptyPermitSignature();
     }
@@ -478,7 +476,7 @@ export class UserPosition extends PositionWithRunner {
     collateralChange: Decimal,
     absoluteCollateralChangeValue: bigint,
     options: ManagePositionOptions,
-  ): Promise<void | ERC20PermitSignatureStruct> {
+  ): Promise<ERC20PermitSignatureStruct> {
     const allowance = new Decimal(
       await collateralTokenContract.allowance(userAddress, positionManagerAddress),
       Decimal.PRECISION,
@@ -508,11 +506,13 @@ export class UserPosition extends PositionWithRunner {
         throw error;
       }
     }
+
+    return this.createEmptyPermitSignature();
   }
 
   private createEmptyPermitSignature(): ERC20PermitSignatureStruct {
     return {
-      token: ZERO_ADDRESS,
+      token: ethers.ZeroAddress,
       value: 0,
       deadline: 0,
       v: 0,
@@ -579,7 +579,7 @@ export class UserPosition extends PositionWithRunner {
     return {
       token: tokenAddress,
       value: amount,
-      deadline: deadline,
+      deadline,
       v: signatureComponents.v,
       r: signatureComponents.r,
       s: signatureComponents.s,
