@@ -175,8 +175,9 @@ class PositionWithRunner extends Position {
 
 /**
  * A position with an attached address that is the position's owner address. This class is used for read-only
- * operations on the position (e.g. reading position details for liquidation). For operations that require a signer
- * (e.g. managing collateral and debt), use the {@link UserPosition} class.
+ * operations on the position (e.g. reading position details for liquidation). Also, it is possible to liquidate this
+ * position. For operations that require a signer (e.g. managing collateral and debt), use the {@link UserPosition}
+ * class.
  */
 export class PositionWithAddress extends PositionWithRunner {
   /**
@@ -193,6 +194,16 @@ export class PositionWithAddress extends PositionWithRunner {
     debt: Decimal = Decimal.ZERO,
   ) {
     super(userAddress, provider, collateral, debt);
+  }
+
+  /**
+   * Liquidates the position. The liquidator has to have enough R to repay the debt of the position.
+   * @param liquidator The signer of the liquidator.
+   * @returns The dispatched transaction of the liquidation.
+   */
+  public async liquidate(liquidator: Signer): Promise<ContractTransactionResponse> {
+    const positionManager = PositionManager__factory.connect(POSITION_MANAGER_ADDRESS, liquidator);
+    return positionManager.liquidate(await this.underlyingCollateralToken.getAddress(), this.userAddress);
   }
 }
 
