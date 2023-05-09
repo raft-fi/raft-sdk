@@ -18,7 +18,6 @@ export default defineConfig({
         },
       },
     },
-    sourcemap: 'inline',
   },
   plugins: [dts()],
 });

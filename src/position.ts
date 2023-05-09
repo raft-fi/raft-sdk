@@ -512,12 +512,12 @@ export class UserPosition extends PositionWithRunner {
 
   private createEmptyPermitSignature(): ERC20PermitSignatureStruct {
     return {
-      token: '0x0000000000000000000000000000000000000000000000000000000000000000',
+      token: ZERO_ADDRESS,
       value: 0,
       deadline: 0,
       v: 0,
-      r: ZERO_ADDRESS,
-      s: ZERO_ADDRESS,
+      r: '0x0000000000000000000000000000000000000000000000000000000000000000',
+      s: '0x0000000000000000000000000000000000000000000000000000000000000000',
     };
   }
 
