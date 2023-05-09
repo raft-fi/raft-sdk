@@ -1,5 +1,5 @@
 import { Decimal } from 'tempus-decimal';
-import { ContractRunner, Provider, Signer, ContractTransactionResponse, ethers, Signature } from 'ethers';
+import { ContractRunner, Provider, Signer, ContractTransactionResponse, ethers } from 'ethers';
 import {
   MIN_COLLATERAL_RATIO,
   PERMIT_DEADLINE_SHIFT,
@@ -301,7 +301,7 @@ export class UserPosition extends PositionWithRunner {
         );
 
       case 'wstETH':
-        return await this.positionManager.managePosition(
+        return this.positionManager.managePosition(
           TOKEN_TICKER_ADDRESSES_MAP[collateralToken],
           userAddress,
           absoluteCollateralChangeValue,
@@ -479,16 +479,6 @@ export class UserPosition extends PositionWithRunner {
     absoluteCollateralChangeValue: bigint,
     options: ManagePositionOptions,
   ): Promise<void | ERC20PermitSignatureStruct> {
-    // Use permit instead
-    if (options.collateralToken && TOKENS_WITH_PERMIT.has(options.collateralToken)) {
-      return this.createPermitSignature(
-        absoluteCollateralChangeValue,
-        userAddress,
-        positionManagerAddress,
-        collateralTokenContract,
-      );
-    }
-
     const allowance = new Decimal(
       await collateralTokenContract.allowance(userAddress, positionManagerAddress),
       Decimal.PRECISION,
@@ -500,6 +490,16 @@ export class UserPosition extends PositionWithRunner {
       onApprovalStart?.();
 
       try {
+        // Use permit instead
+        if (options.collateralToken && TOKENS_WITH_PERMIT.includes(options.collateralToken)) {
+          return this.createPermitSignature(
+            absoluteCollateralChangeValue,
+            userAddress,
+            positionManagerAddress,
+            collateralTokenContract,
+          );
+        }
+
         const approveTx = await collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue);
         await approveTx.wait();
         onApprovalEnd?.();
@@ -512,12 +512,12 @@ export class UserPosition extends PositionWithRunner {
 
   private createEmptyPermitSignature(): ERC20PermitSignatureStruct {
     return {
-      token: ZERO_ADDRESS,
+      token: '0x0000000000000000000000000000000000000000000000000000000000000000',
       value: 0,
       deadline: 0,
       v: 0,
-      r: '0',
-      s: '0',
+      r: ZERO_ADDRESS,
+      s: ZERO_ADDRESS,
     };
   }
 
@@ -526,7 +526,7 @@ export class UserPosition extends PositionWithRunner {
     userAddress: string,
     spenderAddress: string,
     tokenContract: ERC20Permit,
-  ) {
+  ): Promise<ERC20PermitSignatureStruct> {
     const [nonce, tokenAddress, tokenName] = await Promise.all([
       tokenContract.nonces(userAddress),
       tokenContract.getAddress(),
