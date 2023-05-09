@@ -27,3 +27,9 @@ export const TOKEN_TICKER_ADDRESSES_MAP: { [tokenTicker in Token]: string } = {
 // Protocol constants
 
 export const MIN_COLLATERAL_RATIO = new Decimal(1.1); // 110%
+
+export const PERMIT_DEADLINE_SHIFT = 30 * 60; // 30 minutes
+
+export const TOKENS_WITH_PERMIT = new Map([['wsetETH', true]]);
+
+export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
