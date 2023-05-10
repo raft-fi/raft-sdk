@@ -2,6 +2,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { ContractRunner, Provider, Signer, ContractTransactionResponse, ethers } from 'ethers';
 import {
   MIN_COLLATERAL_RATIO,
+  MIN_NET_DEBT,
   PERMIT_DEADLINE_SHIFT,
   POSITION_MANAGER_ADDRESS,
   POSITION_MANAGER_STETH_ADDRESS,
@@ -87,15 +88,15 @@ export class Position {
 
   /**
    * Returns the collateral ratio of the position for a given price.
-   * @param price The price of the collateral asset.
+   * @param collateralPrice The price of the collateral asset.
    * @returns The collateral ratio. If the debt is 0, returns the maximum decimal value (represents infinity).
    */
-  public getCollateralRatio(price: Decimal): Decimal {
+  public getCollateralRatio(collateralPrice: Decimal): Decimal {
     if (this.debt.equals(Decimal.ZERO)) {
       return Decimal.MAX_DECIMAL;
     }
 
-    return this.collateral.mul(price).div(this.debt);
+    return this.collateral.mul(collateralPrice).div(this.debt);
   }
 
   /**
@@ -113,6 +114,24 @@ export class Position {
    */
   public getLiquidationPriceLimit(): Decimal {
     return MIN_COLLATERAL_RATIO.mul(this.debt).div(this.collateral);
+  }
+
+  /**
+   * Returns whether the position is valid. A position is valid if it is empty or if it has a positive debt amount
+   * greater than or equal to the minimum net debt and has a healthy collateral ratio.
+   * @param collateralPrice The price of the collateral asset.
+   * @returns True if the position is valid, false otherwise.
+   */
+  public isValid(collateralPrice: Decimal): boolean {
+    if (this.collateral.lt(Decimal.ZERO) || this.debt.lt(Decimal.ZERO)) {
+      return false;
+    }
+
+    if (this.debt.equals(Decimal.ZERO)) {
+      return this.collateral.equals(Decimal.ZERO);
+    }
+
+    return this.debt.gte(MIN_NET_DEBT) && this.getCollateralRatio(collateralPrice).gte(MIN_COLLATERAL_RATIO);
   }
 }
 
