@@ -1,4 +1,4 @@
-import { Decimal } from 'tempus-decimal';
+import { Decimal } from '@tempusfinance/decimal';
 import { Contract, Provider } from 'ethers';
 import { POSITION_MANAGER_ADDRESS, TOKEN_TICKER_ADDRESSES_MAP, WSTETH_ADDRESS } from '../constants';
 import { PositionManager, PositionManager__factory, WstETH, WstETH__factory } from '../typechain';

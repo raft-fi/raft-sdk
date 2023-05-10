@@ -1,5 +1,5 @@
 import { JsonRpcProvider } from 'ethers';
-import { Decimal } from 'tempus-decimal';
+import { Decimal } from '@tempusfinance/decimal';
 import { RAFT_COLLATERAL_TOKEN_WSTETH_ADDRESS, RAFT_DEBT_TOKEN_ADDRESS, POSITION_MANAGER_ADDRESS } from './constants';
 import { ERC20Indexable, ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
 
