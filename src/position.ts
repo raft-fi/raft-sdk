@@ -432,10 +432,7 @@ export class UserPosition extends PositionWithRunner {
    * @returns The dispatched transaction of the operation.
    */
   public async close(options: ManagePositionOptions = {}): Promise<ContractTransactionResponse> {
-    await this.fetch();
-    const collateralChange = this.getCollateral().mul(-1);
-    const debtChange = this.getDebt().mul(-1);
-    return this.manage(collateralChange, debtChange, options);
+    return this.manage(Decimal.ZERO, Decimal.MAX_DECIMAL.mul(-1), options);
   }
 
   /**
