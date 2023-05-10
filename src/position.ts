@@ -1,4 +1,4 @@
-import { Decimal } from 'tempus-decimal';
+import { Decimal } from '@tempusfinance/decimal';
 import { ContractRunner, Provider, Signer, ContractTransactionResponse, ethers } from 'ethers';
 import {
   MIN_COLLATERAL_RATIO,

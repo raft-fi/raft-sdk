@@ -10,11 +10,11 @@ export default defineConfig({
       fileName: 'raft-sdk',
     },
     rollupOptions: {
-      external: ['ethers', 'tempus-decimal'],
+      external: ['ethers', '@tempusfinance/decimal'],
       output: {
         globals: {
           ethers: 'ethers',
-          'tempus-decimal': 'Decimal',
+          '@tempusfinance/decimal': 'Decimal',
         },
       },
     },

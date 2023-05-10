@@ -1,5 +1,5 @@
 import { JsonRpcProvider } from 'ethers';
-import { Decimal } from 'tempus-decimal';
+import { Decimal } from '@tempusfinance/decimal';
 import { Token } from './types';
 import { ERC20, ERC20Permit, ERC20Permit__factory, ERC20__factory } from './typechain';
 import { TOKEN_TICKER_ADDRESSES_MAP, R_TOKEN_ADDRESS, STETH_ADDRESS } from './constants';
