@@ -24,7 +24,10 @@ export class Stats {
     this.provider = provider;
 
     this.positionManager = PositionManager__factory.connect(RaftConfig.addresses.positionManager, this.provider);
-    this.raftCollateralToken = ERC20Indexable__factory.connect(RaftConfig.addresses.wstEth, this.provider);
+    this.raftCollateralToken = ERC20Indexable__factory.connect(
+      RaftConfig.addresses.raftCollateralTokens['wstETH'],
+      this.provider,
+    );
     this.raftDebtToken = ERC20Indexable__factory.connect(RaftConfig.addresses.raftDebtToken, this.provider);
   }
 
