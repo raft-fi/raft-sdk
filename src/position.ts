@@ -369,7 +369,7 @@ export class UserPosition extends PositionWithRunner {
 
       case 'wstETH':
         gasEstimate = await this.positionManager.managePosition.estimateGas(
-          TOKEN_TICKER_ADDRESSES_MAP[collateralToken],
+          RaftConfig.getTokenAddress(collateralToken),
           userAddress,
           absoluteCollateralChangeValue,
           isCollateralIncrease,
