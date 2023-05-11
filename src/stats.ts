@@ -1,6 +1,6 @@
 import { JsonRpcProvider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { RAFT_COLLATERAL_TOKEN_WSTETH_ADDRESS, RAFT_DEBT_TOKEN_ADDRESS, POSITION_MANAGER_ADDRESS } from './constants';
+import { RaftConfig } from './config';
 import { ERC20Indexable, ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
 
 export class Stats {
@@ -23,9 +23,9 @@ export class Stats {
   private constructor(provider: JsonRpcProvider) {
     this.provider = provider;
 
-    this.positionManager = PositionManager__factory.connect(POSITION_MANAGER_ADDRESS, this.provider);
-    this.raftCollateralToken = ERC20Indexable__factory.connect(RAFT_COLLATERAL_TOKEN_WSTETH_ADDRESS, this.provider);
-    this.raftDebtToken = ERC20Indexable__factory.connect(RAFT_DEBT_TOKEN_ADDRESS, this.provider);
+    this.positionManager = PositionManager__factory.connect(RaftConfig.addresses.positionManager, this.provider);
+    this.raftCollateralToken = ERC20Indexable__factory.connect(RaftConfig.addresses.wstEth, this.provider);
+    this.raftDebtToken = ERC20Indexable__factory.connect(RaftConfig.addresses.raftDebtToken, this.provider);
   }
 
   /**

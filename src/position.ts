@@ -1,17 +1,7 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { ContractRunner, Provider, Signer, ContractTransactionResponse, ethers } from 'ethers';
-import {
-  MIN_COLLATERAL_RATIO,
-  MIN_NET_DEBT,
-  PERMIT_DEADLINE_SHIFT,
-  POSITION_MANAGER_ADDRESS,
-  POSITION_MANAGER_STETH_ADDRESS,
-  RAFT_COLLATERAL_TOKEN_ADDRESSES,
-  RAFT_DEBT_TOKEN_ADDRESS,
-  R_TOKEN_ADDRESS,
-  TOKENS_WITH_PERMIT,
-  TOKEN_TICKER_ADDRESSES_MAP,
-} from './constants';
+import { RaftConfig } from './config';
+import { MIN_COLLATERAL_RATIO, MIN_NET_DEBT, PERMIT_DEADLINE_SHIFT, TOKENS_WITH_PERMIT } from './constants';
 import { CollateralToken } from './types';
 import {
   ERC20Indexable,
@@ -159,9 +149,12 @@ class PositionWithRunner extends Position {
     super(collateral, debt);
 
     this.userAddress = userAddress;
-    this.underlyingCollateralToken = ERC20__factory.connect(TOKEN_TICKER_ADDRESSES_MAP['wstETH'], runner);
-    this.indexCollateralToken = ERC20Indexable__factory.connect(RAFT_COLLATERAL_TOKEN_ADDRESSES['wstETH'], runner);
-    this.indexDebtToken = ERC20Indexable__factory.connect(RAFT_DEBT_TOKEN_ADDRESS, runner);
+    this.underlyingCollateralToken = ERC20__factory.connect(RaftConfig.addresses.wstEth, runner);
+    this.indexCollateralToken = ERC20Indexable__factory.connect(
+      RaftConfig.addresses.raftCollateralTokens['wstETH'],
+      runner,
+    );
+    this.indexDebtToken = ERC20Indexable__factory.connect(RaftConfig.addresses.raftDebtToken, runner);
   }
 
   /**
@@ -223,7 +216,7 @@ export class PositionWithAddress extends PositionWithRunner {
    * @returns The dispatched transaction of the liquidation.
    */
   public async liquidate(liquidator: Signer): Promise<ContractTransactionResponse> {
-    const positionManager = PositionManager__factory.connect(POSITION_MANAGER_ADDRESS, liquidator);
+    const positionManager = PositionManager__factory.connect(RaftConfig.addresses.positionManager, liquidator);
     return positionManager.liquidate(await this.underlyingCollateralToken.getAddress(), this.userAddress);
   }
 }
@@ -249,7 +242,7 @@ export class UserPosition extends PositionWithRunner {
     super('', user, collateral, debt);
 
     this.user = user;
-    this.positionManager = PositionManager__factory.connect(POSITION_MANAGER_ADDRESS, user);
+    this.positionManager = PositionManager__factory.connect(RaftConfig.addresses.positionManager, user);
   }
 
   /**
@@ -285,9 +278,11 @@ export class UserPosition extends PositionWithRunner {
 
     const userAddress = await this.getUserAddress();
     const isUnderlyingToken = collateralToken === 'wstETH';
-    const positionManagerAddress = isUnderlyingToken ? POSITION_MANAGER_ADDRESS : POSITION_MANAGER_STETH_ADDRESS;
+    const positionManagerAddress = isUnderlyingToken
+      ? RaftConfig.addresses.positionManager
+      : RaftConfig.addresses.positionManagerStEth;
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
-    const rTokenContract = ERC20Permit__factory.connect(R_TOKEN_ADDRESS, this.user);
+    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.addresses.r, this.user);
 
     if (!isUnderlyingToken) {
       await this.checkDelegateWhitelisting(userAddress, positionManagerAddress, options);
@@ -348,7 +343,7 @@ export class UserPosition extends PositionWithRunner {
 
       case 'wstETH':
         return this.positionManager.managePosition(
-          TOKEN_TICKER_ADDRESSES_MAP[collateralToken],
+          RaftConfig.getTokenAddress(collateralToken),
           userAddress,
           absoluteCollateralChangeValue,
           isCollateralIncrease,
@@ -630,7 +625,10 @@ export class UserPosition extends PositionWithRunner {
       return this.positionManagerStETH;
     }
 
-    const positionManagerStETH = PositionManagerStETH__factory.connect(POSITION_MANAGER_STETH_ADDRESS, this.user);
+    const positionManagerStETH = PositionManagerStETH__factory.connect(
+      RaftConfig.addresses.positionManagerStEth,
+      this.user,
+    );
     this.positionManagerStETH = positionManagerStETH;
     return positionManagerStETH;
   }
@@ -644,7 +642,7 @@ export class UserPosition extends PositionWithRunner {
       return this.collateralTokens.get(collateralToken) ?? null;
     }
 
-    const contract = ERC20__factory.connect(TOKEN_TICKER_ADDRESSES_MAP[collateralToken], this.user);
+    const contract = ERC20__factory.connect(RaftConfig.getTokenAddress(collateralToken), this.user);
     this.collateralTokens.set(collateralToken, contract);
     return contract;
   }
