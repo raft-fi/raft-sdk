@@ -294,7 +294,7 @@ export class UserPosition extends PositionWithRunner {
     }
 
     /**
-     * In case of R repayment we need to approve delegate to spend user R tokens.
+     * In case of R repayment we need to approve delegate to spend user's R tokens.
      * This is valid only if collateral used is not wstETH, because ETH and stETH go through a delegate contract.
      */
     if (!isDebtIncrease && !isUnderlyingToken) {
@@ -315,7 +315,7 @@ export class UserPosition extends PositionWithRunner {
         userAddress,
         positionManagerAddress,
         new Decimal(absoluteCollateralChangeValue, Decimal.PRECISION),
-        true,
+        Boolean(options.collateralToken && TOKENS_WITH_PERMIT.includes(options.collateralToken)),
         options,
       );
     } else {
@@ -530,14 +530,13 @@ export class UserPosition extends PositionWithRunner {
     if (allowance.lt(amountToCheck)) {
       const { onApprovalStart, onApprovalEnd } = options;
 
-      onApprovalStart?.();
-
       try {
-        // Use permit instead
-        if (allowPermit && options.collateralToken && TOKENS_WITH_PERMIT.includes(options.collateralToken)) {
+        // Use permit when possible
+        if (allowPermit) {
           return this.createPermitSignature(amountToCheck, userAddress, spenderAddress, tokenContract);
         }
 
+        onApprovalStart?.();
         const approveTx = await tokenContract.approve(spenderAddress, amountToCheck.toBigInt(Decimal.PRECISION));
         await approveTx.wait();
         onApprovalEnd?.();
