@@ -8,6 +8,7 @@ import {
   POSITION_MANAGER_STETH_ADDRESS,
   RAFT_COLLATERAL_TOKEN_ADDRESSES,
   RAFT_DEBT_TOKEN_ADDRESS,
+  R_TOKEN_ADDRESS,
   TOKENS_WITH_PERMIT,
   TOKEN_TICKER_ADDRESSES_MAP,
 } from './constants';
@@ -22,6 +23,7 @@ import {
   PositionManagerStETH,
   PositionManagerStETH__factory,
   ERC20Permit,
+  ERC20Permit__factory,
 } from './typechain';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
 
@@ -285,23 +287,39 @@ export class UserPosition extends PositionWithRunner {
     const isUnderlyingToken = collateralToken === 'wstETH';
     const positionManagerAddress = isUnderlyingToken ? POSITION_MANAGER_ADDRESS : POSITION_MANAGER_STETH_ADDRESS;
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
+    const rTokenContract = ERC20Permit__factory.connect(R_TOKEN_ADDRESS, this.user);
 
     if (!isUnderlyingToken) {
       await this.checkDelegateWhitelisting(userAddress, positionManagerAddress, options);
     }
 
-    let permitSignature: ERC20PermitSignatureStruct;
+    /**
+     * In case of R repayment we need to approve delegate to spend user R tokens.
+     * This is valid only if collateral used is not wstETH, because ETH and stETH go through a delegate contract.
+     */
+    if (!isDebtIncrease && !isUnderlyingToken) {
+      await this.checkTokenAllowance(
+        rTokenContract,
+        userAddress,
+        positionManagerAddress,
+        new Decimal(absoluteDebtChangeValue, Decimal.PRECISION),
+        false,
+        options,
+      );
+    }
+
+    let collateralPermitSignature: ERC20PermitSignatureStruct;
     if (collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
-      permitSignature = await this.checkTokenAllowance(
+      collateralPermitSignature = await this.checkTokenAllowance(
         collateralTokenContract,
         userAddress,
         positionManagerAddress,
-        collateralChange,
-        absoluteCollateralChangeValue,
+        new Decimal(absoluteCollateralChangeValue, Decimal.PRECISION),
+        true,
         options,
       );
     } else {
-      permitSignature = this.createEmptyPermitSignature();
+      collateralPermitSignature = this.createEmptyPermitSignature();
     }
 
     switch (collateralToken) {
@@ -337,7 +355,7 @@ export class UserPosition extends PositionWithRunner {
           absoluteDebtChangeValue,
           isDebtIncrease,
           maxFeePercentageValue,
-          permitSignature,
+          collateralPermitSignature,
         );
     }
   }
@@ -500,35 +518,27 @@ export class UserPosition extends PositionWithRunner {
   }
 
   private async checkTokenAllowance(
-    collateralTokenContract: ERC20,
+    tokenContract: ERC20 | ERC20Permit,
     userAddress: string,
-    positionManagerAddress: string,
-    collateralChange: Decimal,
-    absoluteCollateralChangeValue: bigint,
+    spenderAddress: string,
+    amountToCheck: Decimal,
+    allowPermit: boolean,
     options: ManagePositionOptions,
   ): Promise<ERC20PermitSignatureStruct> {
-    const allowance = new Decimal(
-      await collateralTokenContract.allowance(userAddress, positionManagerAddress),
-      Decimal.PRECISION,
-    );
+    const allowance = new Decimal(await tokenContract.allowance(userAddress, spenderAddress), Decimal.PRECISION);
 
-    if (allowance.lt(collateralChange)) {
+    if (allowance.lt(amountToCheck)) {
       const { onApprovalStart, onApprovalEnd } = options;
 
       onApprovalStart?.();
 
       try {
         // Use permit instead
-        if (options.collateralToken && TOKENS_WITH_PERMIT.includes(options.collateralToken)) {
-          return this.createPermitSignature(
-            absoluteCollateralChangeValue,
-            userAddress,
-            positionManagerAddress,
-            collateralTokenContract,
-          );
+        if (allowPermit && options.collateralToken && TOKENS_WITH_PERMIT.includes(options.collateralToken)) {
+          return this.createPermitSignature(amountToCheck, userAddress, spenderAddress, tokenContract);
         }
 
-        const approveTx = await collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue);
+        const approveTx = await tokenContract.approve(spenderAddress, amountToCheck.toBigInt(Decimal.PRECISION));
         await approveTx.wait();
         onApprovalEnd?.();
       } catch (error) {
@@ -552,7 +562,7 @@ export class UserPosition extends PositionWithRunner {
   }
 
   private async createPermitSignature(
-    amount: bigint,
+    amount: Decimal,
     userAddress: string,
     spenderAddress: string,
     tokenContract: ERC20Permit,
@@ -574,7 +584,7 @@ export class UserPosition extends PositionWithRunner {
     const values = {
       owner: userAddress,
       spender: spenderAddress,
-      value: amount,
+      value: amount.toBigInt(Decimal.PRECISION),
       nonce,
       deadline,
     };
@@ -608,7 +618,7 @@ export class UserPosition extends PositionWithRunner {
 
     return {
       token: tokenAddress,
-      value: amount,
+      value: amount.toBigInt(Decimal.PRECISION),
       deadline,
       v: signatureComponents.v,
       r: signatureComponents.r,
