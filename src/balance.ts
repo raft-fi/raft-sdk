@@ -1,8 +1,8 @@
 import { JsonRpcProvider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
+import { RaftConfig } from './config';
 import { Token } from './types';
 import { ERC20, ERC20Permit, ERC20Permit__factory, ERC20__factory } from './typechain';
-import { TOKEN_TICKER_ADDRESSES_MAP, R_TOKEN_ADDRESS, STETH_ADDRESS } from './constants';
 
 export class Balance {
   protected readonly token: Token;
@@ -23,19 +23,21 @@ export class Balance {
     this.walletAddress = walletAddress;
     this.provider = provider;
 
+    const tokenAddress = RaftConfig.getTokenAddress(token);
+
     switch (this.token) {
       case 'R':
-        this.tokenContract = ERC20Permit__factory.connect(R_TOKEN_ADDRESS, this.provider);
+      case 'wstETH':
+        this.tokenContract = ERC20Permit__factory.connect(tokenAddress, this.provider);
         break;
-      case 'stETH':
-        this.tokenContract = ERC20__factory.connect(STETH_ADDRESS, this.provider);
-        break;
+
       case 'ETH':
         // ETH is not a contract
         this.tokenContract = null;
         break;
+
       default:
-        this.tokenContract = ERC20Permit__factory.connect(TOKEN_TICKER_ADDRESSES_MAP[this.token], this.provider);
+        this.tokenContract = ERC20__factory.connect(tokenAddress, this.provider);
     }
   }
 
