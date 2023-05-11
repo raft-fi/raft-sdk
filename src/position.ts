@@ -1,6 +1,7 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { ContractRunner, Provider, Signer, ContractTransactionResponse, ethers } from 'ethers';
 import {
+  GAS_LIMIT_MULTIPLIER,
   MIN_COLLATERAL_RATIO,
   MIN_NET_DEBT,
   PERMIT_DEADLINE_SHIFT,
@@ -322,13 +323,16 @@ export class UserPosition extends PositionWithRunner {
       collateralPermitSignature = this.createEmptyPermitSignature();
     }
 
+    let positionManagerStEth: PositionManagerStETH;
+    let gasEstimate: bigint;
     switch (collateralToken) {
       case 'ETH':
         if (!isCollateralIncrease) {
           throw new Error('ETH withdrawal from the position is not supported');
         }
 
-        return this.loadPositionManagerStETH().managePositionETH(
+        positionManagerStEth = this.loadPositionManagerStETH();
+        gasEstimate = await positionManagerStEth.managePositionETH.estimateGas(
           absoluteDebtChangeValue,
           isDebtIncrease,
           maxFeePercentageValue,
@@ -337,8 +341,14 @@ export class UserPosition extends PositionWithRunner {
           },
         );
 
+        return positionManagerStEth.managePositionETH(absoluteDebtChangeValue, isDebtIncrease, maxFeePercentageValue, {
+          value: absoluteCollateralChangeValue,
+          gasLimit: new Decimal(gasEstimate, Decimal.PRECISION).mul(GAS_LIMIT_MULTIPLIER).toBigInt(),
+        });
+
       case 'stETH':
-        return this.loadPositionManagerStETH().managePositionStETH(
+        positionManagerStEth = this.loadPositionManagerStETH();
+        gasEstimate = await positionManagerStEth.managePositionStETH.estimateGas(
           absoluteCollateralChangeValue,
           isCollateralIncrease,
           absoluteDebtChangeValue,
@@ -346,7 +356,29 @@ export class UserPosition extends PositionWithRunner {
           maxFeePercentageValue,
         );
 
+        return positionManagerStEth.managePositionStETH(
+          absoluteCollateralChangeValue,
+          isCollateralIncrease,
+          absoluteDebtChangeValue,
+          isDebtIncrease,
+          maxFeePercentageValue,
+          {
+            gasLimit: new Decimal(gasEstimate, Decimal.PRECISION).mul(GAS_LIMIT_MULTIPLIER).toBigInt(),
+          },
+        );
+
       case 'wstETH':
+        gasEstimate = await this.positionManager.managePosition.estimateGas(
+          TOKEN_TICKER_ADDRESSES_MAP[collateralToken],
+          userAddress,
+          absoluteCollateralChangeValue,
+          isCollateralIncrease,
+          absoluteDebtChangeValue,
+          isDebtIncrease,
+          maxFeePercentageValue,
+          collateralPermitSignature,
+        );
+
         return this.positionManager.managePosition(
           TOKEN_TICKER_ADDRESSES_MAP[collateralToken],
           userAddress,
@@ -356,6 +388,9 @@ export class UserPosition extends PositionWithRunner {
           isDebtIncrease,
           maxFeePercentageValue,
           collateralPermitSignature,
+          {
+            gasLimit: new Decimal(gasEstimate, Decimal.PRECISION).mul(GAS_LIMIT_MULTIPLIER).toBigInt(),
+          },
         );
     }
   }
