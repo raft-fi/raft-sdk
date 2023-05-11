@@ -6,11 +6,19 @@ const addresses: { [network in SupportedNetwork]: NetworkAddresses } = {
   goerli: goerliNetworkAddresses,
 };
 
+const networkIds: { [network in SupportedNetwork]: number } = {
+  goerli: 5,
+};
+
 export class RaftConfig {
   private static network: SupportedNetwork = 'goerli'; // TODO: change to mainnet
 
   public static setNetwork(network: SupportedNetwork) {
     this.network = network;
+  }
+
+  static get networkId(): number {
+    return networkIds[this.network];
   }
 
   static get addresses(): NetworkAddresses {
