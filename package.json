@@ -7,13 +7,13 @@
   "types": "./dist/index.d.ts",
   "description": "Raft Protocol SDK",
   "author": "Tempus",
-  "homepage": "https://github.com/tempusfinance/raft-sdk",
+  "homepage": "https://github.com/raft-fi/raft-sdk",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tempusfinance/raft-sdk"
+    "url": "https://github.com/raft-fi/raft-sdk"
   },
   "bugs": {
-    "url": "https://github.com/tempusfinance/raft-sdk/issues"
+    "url": "https://github.com/raft-fi/raft-sdk/issues"
   },
   "exports": {
     ".": {
