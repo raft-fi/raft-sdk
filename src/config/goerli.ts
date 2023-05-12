@@ -9,5 +9,5 @@ export const goerliNetworkAddresses: NetworkAddresses = {
   },
   raftDebtToken: '0x8f616D781e799fE8e150AE98F3e233722007e536',
   positionManager: '0xfFaAB9cb73844DE549d28B4fFe348f48eff267C9',
-  positionManagerStEth: '0x82d1A80499BE14E73086f07659223aCD04697746',
+  positionManagerStEth: '0x7B2A37218fB5963C1Ed5041cdb76A588fdD266C0',
 };
