@@ -1,0 +1,8 @@
+sources:
+  - name: raft-test # TODO: update to production version
+    handler:
+      graphql:
+        endpoint: https://api.studio.thegraph.com/query/46633/raft-test/0.0.4
+
+documents:
+  - './src/**/*.graphql'

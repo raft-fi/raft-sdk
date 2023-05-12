@@ -1,0 +1,5 @@
+query fetchPrice($token: ID!) {
+  price(id: $token) {
+    value
+  }
+}

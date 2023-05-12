@@ -1,8 +1,11 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Contract, Provider } from 'ethers';
+import { getBuiltGraphSDK } from '../../.graphclient';
 import { RaftConfig } from '../config';
 import { PositionManager, PositionManager__factory, WstETH, WstETH__factory } from '../typechain';
-import { R_TOKEN, Token, UnderlyingCollateralToken } from '../types';
+import { CollateralToken, R_TOKEN, Token, UnderlyingCollateralToken } from '../types';
+
+const SUBGRAPH_PRICE_PRECISION = 8;
 
 export class PriceFeed {
   private provider: Provider;
@@ -21,20 +24,13 @@ export class PriceFeed {
         return Decimal.ONE;
 
       case 'ETH':
-      case 'stETH': {
-        const priceFeed = await this.loadPriceFeed('wstETH');
-        const wstEthPrice = new Decimal(await priceFeed.getPrice());
+        return this.fetchEthPrice();
 
-        const wstEthContract = await this.loadCollateralToken();
-        const wstEthPerStEth = new Decimal(await wstEthContract.getWstETHByStETH(Decimal.ONE.value), Decimal.PRECISION);
+      case 'stETH':
+        return this.fetchStEthPrice();
 
-        return wstEthPrice.mul(wstEthPerStEth).div(Decimal.ONE);
-      }
-
-      case 'wstETH': {
-        const priceFeed = await this.loadPriceFeed('wstETH');
-        return new Decimal(await priceFeed.getPrice());
-      }
+      case 'wstETH':
+        return this.fetchWstEthPrice();
     }
   }
 
@@ -59,5 +55,39 @@ export class PriceFeed {
     }
 
     return this.collateralTokens.get('wstETH') as WstETH;
+  }
+
+  private async fetchSubgraphPrice(token: CollateralToken): Promise<Decimal | null> {
+    const result = await getBuiltGraphSDK().fetchPrice({ token });
+    return result.price ? new Decimal(result.price?.value, SUBGRAPH_PRICE_PRECISION) : null;
+  }
+
+  private async fetchEthPrice(): Promise<Decimal> {
+    try {
+      return (await this.fetchSubgraphPrice('ETH')) ?? this.fetchStEthPriceFromBlockchain();
+    } catch {
+      return this.fetchStEthPriceFromBlockchain();
+    }
+  }
+
+  private async fetchStEthPrice(): Promise<Decimal> {
+    try {
+      return (await this.fetchSubgraphPrice('stETH')) ?? this.fetchStEthPriceFromBlockchain();
+    } catch {
+      return this.fetchStEthPriceFromBlockchain();
+    }
+  }
+
+  private async fetchStEthPriceFromBlockchain(): Promise<Decimal> {
+    const wstEthPrice = await this.fetchWstEthPrice();
+    const wstEthContract = await this.loadCollateralToken();
+    const wstEthPerStEth = await wstEthContract.getWstETHByStETH(Decimal.ONE.value);
+
+    return wstEthPrice.mul(new Decimal(wstEthPerStEth, Decimal.PRECISION)).div(Decimal.ONE);
+  }
+
+  private async fetchWstEthPrice(): Promise<Decimal> {
+    const priceFeed = await this.loadPriceFeed('wstETH');
+    return new Decimal(await priceFeed.getPrice());
   }
 }
