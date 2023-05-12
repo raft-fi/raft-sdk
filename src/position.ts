@@ -135,7 +135,6 @@ export class Position {
 
 class PositionWithRunner extends Position {
   protected userAddress: string;
-  protected underlyingCollateralToken: ERC20;
 
   private indexCollateralToken: ERC20Indexable;
   private indexDebtToken: ERC20Indexable;
@@ -155,7 +154,6 @@ class PositionWithRunner extends Position {
     super(collateral, debt);
 
     this.userAddress = userAddress;
-    this.underlyingCollateralToken = ERC20__factory.connect(RaftConfig.addresses.wstEth, runner);
     this.indexCollateralToken = ERC20Indexable__factory.connect(
       RaftConfig.addresses.raftCollateralTokens['wstETH'],
       runner,
@@ -223,7 +221,7 @@ export class PositionWithAddress extends PositionWithRunner {
    */
   public async liquidate(liquidator: Signer): Promise<ContractTransactionResponse> {
     const positionManager = PositionManager__factory.connect(RaftConfig.addresses.positionManager, liquidator);
-    return positionManager.liquidate(await this.underlyingCollateralToken.getAddress(), this.userAddress);
+    return positionManager.liquidate(this.userAddress);
   }
 }
 
@@ -298,18 +296,19 @@ export class UserPosition extends PositionWithRunner {
      * In case of R repayment we need to approve delegate to spend user's R tokens.
      * This is valid only if collateral used is not wstETH, because ETH and stETH go through a delegate contract.
      */
+    let rPermitSignature = this.createEmptyPermitSignature();
     if (!isDebtIncrease && !isUnderlyingToken) {
-      await this.checkTokenAllowance(
+      rPermitSignature = await this.checkTokenAllowance(
         rTokenContract,
         userAddress,
         positionManagerAddress,
         new Decimal(absoluteDebtChangeValue, Decimal.PRECISION),
-        false,
+        true,
         options,
       );
     }
 
-    let collateralPermitSignature: ERC20PermitSignatureStruct;
+    let collateralPermitSignature = this.createEmptyPermitSignature();
     if (collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
       collateralPermitSignature = await this.checkTokenAllowance(
         collateralTokenContract,
@@ -319,8 +318,6 @@ export class UserPosition extends PositionWithRunner {
         Boolean(options.collateralToken && TOKENS_WITH_PERMIT.includes(options.collateralToken)),
         options,
       );
-    } else {
-      collateralPermitSignature = this.createEmptyPermitSignature();
     }
 
     let positionManagerStEth: PositionManagerStETH;
@@ -336,15 +333,22 @@ export class UserPosition extends PositionWithRunner {
           absoluteDebtChangeValue,
           isDebtIncrease,
           maxFeePercentageValue,
+          rPermitSignature,
           {
             value: absoluteCollateralChangeValue,
           },
         );
 
-        return positionManagerStEth.managePositionETH(absoluteDebtChangeValue, isDebtIncrease, maxFeePercentageValue, {
-          value: absoluteCollateralChangeValue,
-          gasLimit: new Decimal(gasEstimate, Decimal.PRECISION).mul(GAS_LIMIT_MULTIPLIER).toBigInt(),
-        });
+        return positionManagerStEth.managePositionETH(
+          absoluteDebtChangeValue,
+          isDebtIncrease,
+          maxFeePercentageValue,
+          rPermitSignature,
+          {
+            value: absoluteCollateralChangeValue,
+            gasLimit: new Decimal(gasEstimate, Decimal.PRECISION).mul(GAS_LIMIT_MULTIPLIER).toBigInt(),
+          },
+        );
 
       case 'stETH':
         positionManagerStEth = this.loadPositionManagerStETH();
@@ -354,6 +358,7 @@ export class UserPosition extends PositionWithRunner {
           absoluteDebtChangeValue,
           isDebtIncrease,
           maxFeePercentageValue,
+          rPermitSignature,
         );
 
         return positionManagerStEth.managePositionStETH(
@@ -362,6 +367,7 @@ export class UserPosition extends PositionWithRunner {
           absoluteDebtChangeValue,
           isDebtIncrease,
           maxFeePercentageValue,
+          rPermitSignature,
           {
             gasLimit: new Decimal(gasEstimate, Decimal.PRECISION).mul(GAS_LIMIT_MULTIPLIER).toBigInt(),
           },
