@@ -7,9 +7,7 @@ import { CollateralToken, R_TOKEN, Token, UnderlyingCollateralToken } from '../t
 import { SUBGRAPH_ENDPOINT_URL, SUBGRAPH_PRICE_PRECISION } from '../constants';
 
 export type PriceQueryResponse = {
-  id: CollateralToken;
   value: string;
-  updatedAt: string;
 };
 
 export class PriceFeed {
