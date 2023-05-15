@@ -3,8 +3,14 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Contract, Provider } from 'ethers';
 import { RaftConfig } from '../config';
 import { PositionManager, PositionManager__factory, WstETH, WstETH__factory } from '../typechain';
-import { CollateralToken, PriceQueryResponse, R_TOKEN, Token, UnderlyingCollateralToken } from '../types';
+import { CollateralToken, R_TOKEN, Token, UnderlyingCollateralToken } from '../types';
 import { SUBGRAPH_ENDPOINT_URL, SUBGRAPH_PRICE_PRECISION } from '../constants';
+
+export type PriceQueryResponse = {
+  id: CollateralToken;
+  value: string;
+  updatedAt: string;
+};
 
 export class PriceFeed {
   private provider: Provider;
@@ -57,9 +63,7 @@ export class PriceFeed {
     const query = gql`
       query getTokenPrice($token: String!) {
         price(id: $token) {
-          id
           value
-          updatedAt
         }
       }
     `;
