@@ -1,8 +1,10 @@
+import { request, gql } from 'graphql-request';
 import { Decimal } from '@tempusfinance/decimal';
 import { Contract, Provider } from 'ethers';
 import { RaftConfig } from '../config';
 import { PositionManager, PositionManager__factory, WstETH, WstETH__factory } from '../typechain';
-import { R_TOKEN, Token, UnderlyingCollateralToken } from '../types';
+import { CollateralToken, PriceQueryResponse, R_TOKEN, Token, UnderlyingCollateralToken } from '../types';
+import { SUBGRAPH_ENDPOINT_URL, SUBGRAPH_PRICE_PRECISION } from '../constants';
 
 export class PriceFeed {
   private provider: Provider;
@@ -19,22 +21,12 @@ export class PriceFeed {
     switch (token) {
       case R_TOKEN:
         return Decimal.ONE;
-
       case 'ETH':
-      case 'stETH': {
-        const priceFeed = await this.loadPriceFeed('wstETH');
-        const wstEthPrice = new Decimal(await priceFeed.getPrice());
-
-        const wstEthContract = await this.loadCollateralToken();
-        const wstEthPerStEth = new Decimal(await wstEthContract.getWstETHByStETH(Decimal.ONE.value), Decimal.PRECISION);
-
-        return wstEthPrice.mul(wstEthPerStEth).div(Decimal.ONE);
-      }
-
-      case 'wstETH': {
-        const priceFeed = await this.loadPriceFeed('wstETH');
-        return new Decimal(await priceFeed.getPrice());
-      }
+        return this.fetchEthPrice();
+      case 'stETH':
+        return this.fetchStEthPrice();
+      case 'wstETH':
+        return this.fetchWstEthPrice();
     }
   }
 
@@ -59,5 +51,53 @@ export class PriceFeed {
     }
 
     return this.collateralTokens.get('wstETH') as WstETH;
+  }
+
+  private async fetchSubgraphPrice(token: CollateralToken) {
+    const query = gql`
+      query getTokenPrice($token: String!) {
+        price(id: $token) {
+          id
+          value
+          updatedAt
+        }
+      }
+    `;
+    const variables = {
+      token,
+    };
+
+    const response = await request<{ price: PriceQueryResponse }>(SUBGRAPH_ENDPOINT_URL, query, variables);
+
+    return new Decimal(BigInt(response.price.value), SUBGRAPH_PRICE_PRECISION);
+  }
+
+  private async fetchEthPrice(): Promise<Decimal> {
+    try {
+      return (await this.fetchSubgraphPrice('ETH')) ?? this.fetchStEthPriceFromBlockchain();
+    } catch {
+      return this.fetchStEthPriceFromBlockchain();
+    }
+  }
+
+  private async fetchStEthPrice(): Promise<Decimal> {
+    try {
+      return (await this.fetchSubgraphPrice('stETH')) ?? this.fetchStEthPriceFromBlockchain();
+    } catch {
+      return this.fetchStEthPriceFromBlockchain();
+    }
+  }
+
+  private async fetchStEthPriceFromBlockchain(): Promise<Decimal> {
+    const wstEthPrice = await this.fetchWstEthPrice();
+    const wstEthContract = await this.loadCollateralToken();
+    const wstEthPerStEth = await wstEthContract.getWstETHByStETH(Decimal.ONE.value);
+
+    return wstEthPrice.mul(new Decimal(wstEthPerStEth, Decimal.PRECISION)).div(Decimal.ONE);
+  }
+
+  private async fetchWstEthPrice(): Promise<Decimal> {
+    const priceFeed = await this.loadPriceFeed('wstETH');
+    return new Decimal(await priceFeed.getPrice());
   }
 }

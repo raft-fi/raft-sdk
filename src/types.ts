@@ -7,3 +7,8 @@ export type UnderlyingCollateralToken = (typeof UNDERLYING_COLLATERAL_TOKENS)[nu
 export type CollateralToken = (typeof COLLATERAL_TOKENS)[number];
 export type RToken = typeof R_TOKEN;
 export type Token = CollateralToken | RToken;
+export type PriceQueryResponse = {
+  id: CollateralToken;
+  value: string;
+  updatedAt: string;
+};

@@ -45,8 +45,10 @@
     "vite-plugin-dts": "^2.3.0"
   },
   "dependencies": {
+    "@tempusfinance/decimal": "^0.0.8",
     "ethers": "^6.3.0",
-    "@tempusfinance/decimal": "^0.0.8"
+    "graphql": "^16.6.0",
+    "graphql-request": "^6.0.0"
   },
   "files": [
     "dist"
