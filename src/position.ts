@@ -257,13 +257,19 @@ export class UserPosition extends PositionWithRunner {
    *
    * This method is used as a generic method for managing the position's collateral and debt amounts. For more specific
    * methods, use the {@link UserPosition.open}, {@link UserPosition.close}, {@link UserPosition.addCollateral},
-   * {@link UserPosition.withdrawCollateral}, {@link UserPosition.borrowDebt}, and {@link UserPosition.repayDebt}.
+   * {@link UserPosition.withdrawCollateral}, {@link UserPosition.borrow}, and {@link UserPosition.repayDebt}.
    * @param collateralChange The amount to change the collateral by. Positive values deposit collateral, negative values
    * withdraw collateral.
    * @param debtChange The amount to change the debt by. Positive values borrow debt, negative values repay debt.
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
+   * Optional.
+   * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
+   * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
+   * approval is not needed, the callback will never be called. Optional.
+   * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
    * @returns The dispatched transaction of the operation.
    * @throws If the collateral change is negative and the collateral token is ETH.
    */
@@ -410,6 +416,12 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
+   * Optional.
+   * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
+   * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
+   * approval is not needed, the callback will never be called. Optional.
+   * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
    * @returns The dispatched transaction of the operation.
    * @throws An error if the collateral amount is less than or equal to 0.
    * @throws An error if the debt amount is less than or equal to 0.
@@ -435,6 +447,12 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
+   * Optional.
+   * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
+   * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
+   * approval is not needed, the callback will never be called. Optional.
+   * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
    * @returns The dispatched transaction of the operation.
    */
   public async close(options: ManagePositionOptions = {}): Promise<ContractTransactionResponse> {
@@ -449,6 +467,12 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
+   * Optional.
+   * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
+   * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
+   * approval is not needed, the callback will never be called. Optional.
+   * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
    * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
@@ -470,6 +494,12 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the withdrawal. Defaults to the position's underlying
    * collateral token.
+   * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
+   * Optional.
+   * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
+   * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
+   * approval is not needed, the callback will never be called. Optional.
+   * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
    * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
@@ -491,10 +521,16 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
+   * Optional.
+   * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
+   * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
+   * approval is not needed, the callback will never be called. Optional.
+   * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
    * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async borrowDebt(amount: Decimal, options: ManagePositionOptions = {}): Promise<ContractTransactionResponse> {
+  public async borrow(amount: Decimal, options: ManagePositionOptions = {}): Promise<ContractTransactionResponse> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
@@ -509,6 +545,12 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
+   * Optional.
+   * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
+   * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
+   * approval is not needed, the callback will never be called. Optional.
+   * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
    * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
