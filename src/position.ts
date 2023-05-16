@@ -1,16 +1,8 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { ContractRunner, Provider, Signer, ContractTransactionResponse, ethers } from 'ethers';
+import { ContractRunner, Provider, Signer, ContractTransactionResponse } from 'ethers';
 import { request, gql } from 'graphql-request';
 import { RaftConfig } from './config';
-import {
-  GAS_LIMIT_MULTIPLIER,
-  MIN_COLLATERAL_RATIO,
-  MIN_NET_DEBT,
-  PERMIT_DEADLINE_SHIFT,
-  SUBGRAPH_ENDPOINT_URL,
-  TOKENS_WITH_PERMIT,
-} from './constants';
-import { CollateralToken } from './types';
+import { GAS_LIMIT_MULTIPLIER, MIN_COLLATERAL_RATIO, MIN_NET_DEBT, SUBGRAPH_ENDPOINT_URL } from './constants';
 import {
   ERC20Indexable,
   ERC20Indexable__factory,
@@ -24,6 +16,8 @@ import {
   ERC20Permit__factory,
 } from './typechain';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
+import { CollateralToken, Token } from './types';
+import { createEmptyPermitSignature, createPermitSignature } from './utils';
 
 export type PositionTransactionType = 'OPEN' | 'ADJUST' | 'CLOSE' | 'LIQUIDATION';
 
@@ -41,6 +35,8 @@ interface PositionTransactionsQuery {
     transactions: PositionTransactionQuery[];
   } | null;
 }
+
+const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
 
 /**
  * Represents a position transaction.
@@ -377,7 +373,7 @@ export class UserPosition extends PositionWithRunner {
      * In case of R repayment we need to approve delegate to spend user's R tokens.
      * This is valid only if collateral used is not wstETH, because ETH and stETH go through a delegate contract.
      */
-    let rPermitSignature = this.createEmptyPermitSignature();
+    let rPermitSignature = createEmptyPermitSignature();
     if (!isDebtIncrease && !isUnderlyingToken) {
       rPermitSignature = await this.checkTokenAllowance(
         rTokenContract,
@@ -389,14 +385,14 @@ export class UserPosition extends PositionWithRunner {
       );
     }
 
-    let collateralPermitSignature = this.createEmptyPermitSignature();
+    let collateralPermitSignature = createEmptyPermitSignature();
     if (collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
       collateralPermitSignature = await this.checkTokenAllowance(
         collateralTokenContract,
         userAddress,
         positionManagerAddress,
         new Decimal(absoluteCollateralChangeValue, Decimal.PRECISION),
-        TOKENS_WITH_PERMIT.includes(collateralToken),
+        TOKENS_WITH_PERMIT.has(collateralToken),
         options,
       );
     }
@@ -688,7 +684,7 @@ export class UserPosition extends PositionWithRunner {
       try {
         // Use permit when possible
         if (allowPermit) {
-          return this.createPermitSignature(amountToCheck, userAddress, spenderAddress, tokenContract);
+          return createPermitSignature(this.user, amountToCheck, userAddress, spenderAddress, tokenContract);
         }
 
         onApprovalStart?.();
@@ -701,83 +697,7 @@ export class UserPosition extends PositionWithRunner {
       }
     }
 
-    return this.createEmptyPermitSignature();
-  }
-
-  private createEmptyPermitSignature(): ERC20PermitSignatureStruct {
-    return {
-      token: ethers.ZeroAddress,
-      value: 0,
-      deadline: 0,
-      v: 0,
-      r: '0x0000000000000000000000000000000000000000000000000000000000000000',
-      s: '0x0000000000000000000000000000000000000000000000000000000000000000',
-    };
-  }
-
-  private async createPermitSignature(
-    amount: Decimal,
-    userAddress: string,
-    spenderAddress: string,
-    tokenContract: ERC20Permit,
-  ): Promise<ERC20PermitSignatureStruct> {
-    const [nonce, tokenAddress, tokenName] = await Promise.all([
-      tokenContract.nonces(userAddress),
-      tokenContract.getAddress(),
-      tokenContract.name(),
-    ]);
-
-    const deadline = Math.floor(Date.now() / 1000) + PERMIT_DEADLINE_SHIFT;
-
-    const domain = {
-      name: tokenName,
-      chainId: (await this.user.provider?.getNetwork())?.chainId || 1,
-      version: '1',
-      verifyingContract: tokenAddress,
-    };
-    const values = {
-      owner: userAddress,
-      spender: spenderAddress,
-      value: amount.toBigInt(Decimal.PRECISION),
-      nonce,
-      deadline,
-    };
-    const types = {
-      Permit: [
-        {
-          name: 'owner',
-          type: 'address',
-        },
-        {
-          name: 'spender',
-          type: 'address',
-        },
-        {
-          name: 'value',
-          type: 'uint256',
-        },
-        {
-          name: 'nonce',
-          type: 'uint256',
-        },
-        {
-          name: 'deadline',
-          type: 'uint256',
-        },
-      ],
-    };
-
-    const signature = await this.user.signTypedData(domain, types, values);
-    const signatureComponents = ethers.Signature.from(signature);
-
-    return {
-      token: tokenAddress,
-      value: amount.toBigInt(Decimal.PRECISION),
-      deadline,
-      v: signatureComponents.v,
-      r: signatureComponents.r,
-      s: signatureComponents.s,
-    };
+    return createEmptyPermitSignature();
   }
 
   private loadPositionManagerStETH(): PositionManagerStETH {
