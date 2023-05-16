@@ -1,7 +1,13 @@
+import { request, gql } from 'graphql-request';
 import { JsonRpcProvider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import { ERC20Indexable, ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
+import { SUBGRAPH_ENDPOINT_URL } from './constants';
+
+interface OpenPositionsResponse {
+  count: string;
+}
 
 export class Stats {
   private static instance: Stats;
@@ -14,6 +20,7 @@ export class Stats {
   private _collateralSupply: Decimal | null = null;
   private _debtSupply: Decimal | null = null;
   private _borrowingRate: Decimal | null = null;
+  private _openPositionCount: number | null = null;
 
   /**
    * Creates a new representation of a stats class. Stats is a singleton, so constructor is set to private.
@@ -66,10 +73,22 @@ export class Stats {
   }
 
   /**
+   * Raft protocol current number of open positions.
+   */
+  get openPositionCount(): number | null {
+    return this._openPositionCount;
+  }
+
+  /**
    * Fetches all stats.
    */
   public async fetch() {
-    await Promise.all([this.fetchCollateralSupply(), this.fetchDebtSupply(), this.fetchBorrowingRate()]);
+    await Promise.all([
+      this.fetchCollateralSupply(),
+      this.fetchDebtSupply(),
+      this.fetchBorrowingRate(),
+      this.fetchOpenPositionCount(),
+    ]);
   }
 
   /**
@@ -91,5 +110,22 @@ export class Stats {
    */
   private async fetchBorrowingRate() {
     this._borrowingRate = new Decimal(await this.positionManager.getBorrowingRate(), Decimal.PRECISION);
+  }
+
+  /**
+   * Fetches current open position count from TheGraph.
+   */
+  private async fetchOpenPositionCount() {
+    const query = gql`
+      {
+        openPositionCounter(id: "raft-open-positions-counter") {
+          count
+        }
+      }
+    `;
+
+    const response = await request<{ openPositionCounter: OpenPositionsResponse }>(SUBGRAPH_ENDPOINT_URL, query);
+
+    this._openPositionCount = Number(response.openPositionCounter.count);
   }
 }
