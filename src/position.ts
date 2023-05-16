@@ -396,7 +396,7 @@ export class UserPosition extends PositionWithRunner {
         userAddress,
         positionManagerAddress,
         new Decimal(absoluteCollateralChangeValue, Decimal.PRECISION),
-        Boolean(options.collateralToken && TOKENS_WITH_PERMIT.includes(options.collateralToken)),
+        TOKENS_WITH_PERMIT.includes(collateralToken),
         options,
       );
     }
