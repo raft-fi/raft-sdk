@@ -1,3 +1,4 @@
+import { ZeroAddress } from 'ethers';
 import { Token } from '../types';
 import { goerliNetworkAddresses } from './goerli';
 import { NetworkAddresses, SupportedNetwork } from './types';
@@ -25,7 +26,7 @@ export class RaftConfig {
     return addresses[this.network];
   }
 
-  static getTokenAddress(token: Token): string {
+  static getTokenAddress(token: Token): string | null {
     switch (token) {
       case 'stETH':
         return this.addresses.stEth;
@@ -37,7 +38,25 @@ export class RaftConfig {
         return this.addresses.r;
 
       default:
-        return '';
+        return null;
     }
+  }
+
+  static getTokenTicker(address: string): Token | null {
+    switch (address.toLowerCase()) {
+      case ZeroAddress:
+        return 'ETH';
+
+      case this.addresses.stEth.toLowerCase():
+        return 'stETH';
+
+      case this.addresses.wstEth.toLowerCase():
+        return 'wstETH';
+
+      case this.addresses.r.toLowerCase():
+        return 'R';
+    }
+
+    return null;
   }
 }

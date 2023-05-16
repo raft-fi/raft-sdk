@@ -11,4 +11,4 @@ export const TOKENS_WITH_PERMIT = ['wstETH'];
 
 export const GAS_LIMIT_MULTIPLIER = new Decimal(1.2); // 20%
 
-export const SUBGRAPH_ENDPOINT_URL = 'https://api.studio.thegraph.com/proxy/46633/raft-test/0.0.7';
+export const SUBGRAPH_ENDPOINT_URL = 'https://api.studio.thegraph.com/proxy/46633/raft-test/0.1.0';

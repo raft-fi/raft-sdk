@@ -28,7 +28,7 @@ export class Balance {
     switch (this.token) {
       case 'R':
       case 'wstETH':
-        this.tokenContract = ERC20Permit__factory.connect(tokenAddress, this.provider);
+        this.tokenContract = ERC20Permit__factory.connect(tokenAddress as string, this.provider);
         break;
 
       case 'ETH':
@@ -37,7 +37,7 @@ export class Balance {
         break;
 
       default:
-        this.tokenContract = ERC20__factory.connect(tokenAddress, this.provider);
+        this.tokenContract = ERC20__factory.connect(tokenAddress as string, this.provider);
     }
   }
 
