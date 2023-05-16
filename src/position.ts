@@ -684,7 +684,7 @@ export class UserPosition extends PositionWithRunner {
       try {
         // Use permit when possible
         if (allowPermit) {
-          return createPermitSignature(this.user, amountToCheck, userAddress, spenderAddress, tokenContract);
+          return createPermitSignature(this.user, amountToCheck, spenderAddress, tokenContract);
         }
 
         onApprovalStart?.();

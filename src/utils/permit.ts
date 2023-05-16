@@ -45,12 +45,12 @@ export function createEmptyPermitSignature(): ERC20PermitSignatureStruct {
 export async function createPermitSignature(
   signer: Signer,
   amount: Decimal,
-  userAddress: string,
   spenderAddress: string,
   tokenContract: ERC20Permit,
 ): Promise<ERC20PermitSignatureStruct> {
+  const signerAddress = await signer.getAddress();
   const [nonce, tokenAddress, tokenName] = await Promise.all([
-    tokenContract.nonces(userAddress),
+    tokenContract.nonces(signerAddress),
     tokenContract.getAddress(),
     tokenContract.name(),
   ]);
@@ -64,7 +64,7 @@ export async function createPermitSignature(
     verifyingContract: tokenAddress,
   };
   const values = {
-    owner: userAddress,
+    owner: signerAddress,
     spender: spenderAddress,
     value: amount.toBigInt(Decimal.PRECISION),
     nonce,
