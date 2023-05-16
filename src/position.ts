@@ -235,8 +235,8 @@ class PositionWithRunner extends Position {
     return response.position.transactions.map(transaction => ({
       ...transaction,
       collateralToken: RaftConfig.getTokenTicker(transaction.collateralToken) as CollateralToken,
-      collateralChange: Decimal.parse(transaction.collateralChange, 0),
-      debtChange: Decimal.parse(transaction.debtChange, 0),
+      collateralChange: Decimal.parse(BigInt(transaction.collateralChange), 0n, Decimal.PRECISION),
+      debtChange: Decimal.parse(BigInt(transaction.debtChange), 0n, Decimal.PRECISION),
       timestamp: new Date(Number(transaction.timestamp) * 1000),
     }));
   }
