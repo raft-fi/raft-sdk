@@ -1,11 +1,13 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { ContractRunner, Provider, Signer, ContractTransactionResponse, ethers } from 'ethers';
+import { request, gql } from 'graphql-request';
 import { RaftConfig } from './config';
 import {
   GAS_LIMIT_MULTIPLIER,
   MIN_COLLATERAL_RATIO,
   MIN_NET_DEBT,
   PERMIT_DEADLINE_SHIFT,
+  SUBGRAPH_ENDPOINT_URL,
   TOKENS_WITH_PERMIT,
 } from './constants';
 import { CollateralToken } from './types';
@@ -23,7 +25,42 @@ import {
 } from './typechain';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
 
-interface ManagePositionOptions {
+export type PositionTransactionType = 'OPEN' | 'ADJUST' | 'CLOSE' | 'LIQUIDATION';
+
+interface PositionTransactionQuery {
+  id: string;
+  type: PositionTransactionType;
+  collateralToken: string;
+  collateralChange: string;
+  debtChange: string;
+  timestamp: string;
+}
+
+interface PositionTransactionsQuery {
+  position: {
+    transactions: PositionTransactionQuery[];
+  } | null;
+}
+
+/**
+ * Represents a position transaction.
+ * @property id The transaction hash.
+ * @property type The type of the transaction.
+ * @property collateralToken The collateral token ticker.
+ * @property collateralChange The collateral change amount.
+ * @property debtChange The debt change amount.
+ * @property timestamp The timestamp of the transaction.
+ */
+export interface PositionTransaction {
+  id: string;
+  type: PositionTransactionType;
+  collateralToken: CollateralToken;
+  collateralChange: Decimal;
+  debtChange: Decimal;
+  timestamp: Date;
+}
+
+export interface ManagePositionOptions {
   maxFeePercentage?: Decimal;
   collateralToken?: CollateralToken;
   onDelegateWhitelistingStart?: () => void;
@@ -168,6 +205,47 @@ class PositionWithRunner extends Position {
     const collateral = this.fetchCollateral();
     const debt = this.fetchDebt();
     await Promise.all([collateral, debt]);
+  }
+
+  /**
+   * Fetches the list of transactions of the position.
+   * @returns The list of transactions.
+   */
+  public async getTransactions(): Promise<PositionTransaction[]> {
+    const query = gql`
+      query GetTransactions($ownerAddress: String!) {
+        position(id: $ownerAddress) {
+          transactions(orderBy: timestamp, orderDirection: desc) {
+            id
+            type
+            collateralToken
+            collateralChange
+            debtChange
+            timestamp
+          }
+        }
+      }
+    `;
+
+    const userAddress = await this.getUserAddress();
+    const response = await request<PositionTransactionsQuery>(SUBGRAPH_ENDPOINT_URL, query, {
+      ownerAddress: userAddress.toLowerCase(),
+    });
+
+    if (!response.position?.transactions) {
+      return [];
+    }
+
+    return response.position.transactions.map(
+      transaction =>
+        ({
+          ...transaction,
+          collateralToken: RaftConfig.getTokenTicker(transaction.collateralToken) ?? '',
+          collateralChange: Decimal.parse(transaction.collateralChange, Decimal.PRECISION),
+          debtChange: Decimal.parse(transaction.debtChange, Decimal.PRECISION),
+          timestamp: new Date(Number(transaction.timestamp) * 1000),
+        } as PositionTransaction),
+    );
   }
 
   /**
