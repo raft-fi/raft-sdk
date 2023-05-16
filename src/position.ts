@@ -236,16 +236,13 @@ class PositionWithRunner extends Position {
       return [];
     }
 
-    return response.position.transactions.map(
-      transaction =>
-        ({
-          ...transaction,
-          collateralToken: RaftConfig.getTokenTicker(transaction.collateralToken) ?? '',
-          collateralChange: Decimal.parse(transaction.collateralChange, Decimal.PRECISION),
-          debtChange: Decimal.parse(transaction.debtChange, Decimal.PRECISION),
-          timestamp: new Date(Number(transaction.timestamp) * 1000),
-        } as PositionTransaction),
-    );
+    return response.position.transactions.map(transaction => ({
+      ...transaction,
+      collateralToken: RaftConfig.getTokenTicker(transaction.collateralToken) as CollateralToken,
+      collateralChange: Decimal.parse(transaction.collateralChange, 0),
+      debtChange: Decimal.parse(transaction.debtChange, 0),
+      timestamp: new Date(Number(transaction.timestamp) * 1000),
+    }));
   }
 
   /**
@@ -459,7 +456,7 @@ export class UserPosition extends PositionWithRunner {
 
       case 'wstETH':
         gasEstimate = await this.positionManager.managePosition.estimateGas(
-          RaftConfig.getTokenAddress(collateralToken),
+          RaftConfig.getTokenAddress(collateralToken) as string,
           userAddress,
           absoluteCollateralChangeValue,
           isCollateralIncrease,
@@ -470,7 +467,7 @@ export class UserPosition extends PositionWithRunner {
         );
 
         return this.positionManager.managePosition(
-          RaftConfig.getTokenAddress(collateralToken),
+          RaftConfig.getTokenAddress(collateralToken) as string,
           userAddress,
           absoluteCollateralChangeValue,
           isCollateralIncrease,
@@ -797,15 +794,17 @@ export class UserPosition extends PositionWithRunner {
   }
 
   private loadCollateralToken(collateralToken: CollateralToken): ERC20 | null {
-    if (collateralToken === 'ETH') {
-      return null;
-    }
-
     if (this.collateralTokens.has(collateralToken)) {
       return this.collateralTokens.get(collateralToken) ?? null;
     }
 
-    const contract = ERC20__factory.connect(RaftConfig.getTokenAddress(collateralToken), this.user);
+    const tokenAddress = RaftConfig.getTokenAddress(collateralToken);
+
+    if (!tokenAddress) {
+      return null;
+    }
+
+    const contract = ERC20__factory.connect(tokenAddress, this.user);
     this.collateralTokens.set(collateralToken, contract);
     return contract;
   }
