@@ -16,7 +16,7 @@ import {
   ERC20Permit__factory,
 } from './typechain';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
-import { CollateralToken, Token } from './types';
+import { CollateralToken, Token, UnderlyingCollateralToken } from './types';
 import { createEmptyPermitSignature, createPermitSignature } from './utils';
 
 export type PositionTransactionType = 'OPEN' | 'ADJUST' | 'CLOSE' | 'LIQUIDATION';
@@ -37,6 +37,10 @@ interface PositionTransactionsQuery {
 }
 
 const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
+
+const SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING: Record<UnderlyingCollateralToken, Set<CollateralToken>> = {
+  wstETH: new Set(['ETH', 'stETH', 'wstETH']),
+};
 
 /**
  * Represents a position transaction.
@@ -168,27 +172,31 @@ export class Position {
 
 class PositionWithRunner extends Position {
   protected userAddress: string;
+  protected readonly underlyingCollateralToken: UnderlyingCollateralToken;
 
-  private indexCollateralToken: ERC20Indexable;
-  private indexDebtToken: ERC20Indexable;
+  private readonly indexCollateralToken: ERC20Indexable;
+  private readonly indexDebtToken: ERC20Indexable;
 
   /**
    * Creates a new representation of a position with attached address and given initial collateral and debt amounts.
    * @param userAddress The address of the owner of the position.
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
+   * @param underlyingCollateralToken The underlying collateral token. Defaults to wstETH.
    */
   public constructor(
     userAddress: string,
     runner: ContractRunner,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
+    underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH',
   ) {
     super(collateral, debt);
 
     this.userAddress = userAddress;
+    this.underlyingCollateralToken = underlyingCollateralToken;
     this.indexCollateralToken = ERC20Indexable__factory.connect(
-      RaftConfig.addresses.raftCollateralTokens['wstETH'],
+      RaftConfig.addresses.raftCollateralTokens[underlyingCollateralToken],
       runner,
     );
     this.indexDebtToken = ERC20Indexable__factory.connect(RaftConfig.addresses.raftDebtToken, runner);
@@ -275,14 +283,16 @@ export class PositionWithAddress extends PositionWithRunner {
    * @param provider The blockchain provider.
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
+   * @param underlyingCollateralToken The underlying collateral token. Defaults to wstETH.
    */
   public constructor(
     userAddress: string,
     provider: Provider,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
+    underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH',
   ) {
-    super(userAddress, provider, collateral, debt);
+    super(userAddress, provider, collateral, debt, underlyingCollateralToken);
   }
 
   /**
@@ -312,9 +322,15 @@ export class UserPosition extends PositionWithRunner {
    * @param user The signer of the position's owner.
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
+   * @param underlyingCollateralToken The underlying collateral token. Defaults to wstETH.
    */
-  public constructor(user: Signer, collateral: Decimal = Decimal.ZERO, debt: Decimal = Decimal.ZERO) {
-    super('', user, collateral, debt);
+  public constructor(
+    user: Signer,
+    collateral: Decimal = Decimal.ZERO,
+    debt: Decimal = Decimal.ZERO,
+    underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH',
+  ) {
+    super('', user, collateral, debt, underlyingCollateralToken);
 
     this.user = user;
     this.positionManager = PositionManager__factory.connect(RaftConfig.addresses.positionManager, user);
@@ -349,7 +365,11 @@ export class UserPosition extends PositionWithRunner {
     debtChange: Decimal,
     options: ManagePositionOptions = {},
   ): Promise<ContractTransactionResponse> {
-    const { maxFeePercentage = Decimal.ONE, collateralToken = 'wstETH' } = options;
+    const { maxFeePercentage = Decimal.ONE, collateralToken = this.underlyingCollateralToken } = options;
+
+    if (!SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING[this.underlyingCollateralToken].has(collateralToken)) {
+      throw Error('Unsupported collateral token');
+    }
 
     const absoluteCollateralChangeValue = collateralChange.abs().value;
     const isCollateralIncrease = collateralChange.gt(Decimal.ZERO);
@@ -358,7 +378,7 @@ export class UserPosition extends PositionWithRunner {
     const maxFeePercentageValue = maxFeePercentage.value;
 
     const userAddress = await this.getUserAddress();
-    const isUnderlyingToken = collateralToken === 'wstETH';
+    const isUnderlyingToken = this.underlyingCollateralToken === collateralToken;
     const positionManagerAddress = isUnderlyingToken
       ? RaftConfig.addresses.positionManager
       : RaftConfig.addresses.positionManagerStEth;
