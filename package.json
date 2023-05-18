@@ -1,6 +1,6 @@
 {
   "name": "@raft-fi/sdk",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "type": "module",
   "main": "./dist/raft-sdk.umd.cjs",
   "module": "./dist/raft-sdk.js",
@@ -45,7 +45,7 @@
     "vite-plugin-dts": "^2.3.0"
   },
   "dependencies": {
-    "@tempusfinance/decimal": "^0.0.8",
+    "@tempusfinance/decimal": "^0.0.9",
     "ethers": "^6.3.0",
     "graphql": "^16.6.0",
     "graphql-request": "^6.0.0"
