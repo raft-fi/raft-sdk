@@ -36,7 +36,7 @@ interface PositionTransactionsQuery {
   } | null;
 }
 
-const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
+export const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
 
 const SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING: Record<UnderlyingCollateralToken, Set<CollateralToken>> = {
   wstETH: new Set(['ETH', 'stETH', 'wstETH']),
@@ -510,7 +510,7 @@ export class UserPosition extends PositionWithRunner {
 
     // Whitelist is not needed if collateral token is the underlying token
     if (!isUnderlyingToken) {
-      await this.positionManager.isDelegateWhitelisted(userAddress, RaftConfig.addresses.positionManagerStEth);
+      return await this.positionManager.isDelegateWhitelisted(userAddress, RaftConfig.addresses.positionManagerStEth);
     }
     return true;
   }
