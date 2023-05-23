@@ -63,6 +63,7 @@ export interface PositionTransaction {
 export interface ManagePositionOptions {
   maxFeePercentage?: Decimal;
   collateralToken?: CollateralToken;
+  rPermitSignature?: ERC20PermitSignatureStruct;
   onDelegateWhitelistingStart?: () => void;
   onDelegateWhitelistingEnd?: (error?: unknown) => void;
   onApprovalStart?: () => void;
@@ -351,6 +352,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -393,8 +395,8 @@ export class UserPosition extends PositionWithRunner {
      * In case of R repayment we need to approve delegate to spend user's R tokens.
      * This is valid only if collateral used is not wstETH, because ETH and stETH go through a delegate contract.
      */
-    let rPermitSignature = createEmptyPermitSignature();
-    if (!isDebtIncrease && !isUnderlyingToken) {
+    let rPermitSignature = options.rPermitSignature ?? createEmptyPermitSignature();
+    if (!options.rPermitSignature && !isDebtIncrease && !isUnderlyingToken) {
       rPermitSignature = await this.checkTokenAllowance(
         rTokenContract,
         userAddress,
@@ -598,6 +600,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -629,6 +632,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -649,6 +653,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -676,6 +681,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the withdrawal. Defaults to the position's underlying
    * collateral token.
+   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -703,6 +709,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -727,6 +734,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
