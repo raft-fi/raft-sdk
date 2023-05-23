@@ -9,7 +9,7 @@ Raft is an immutable, decentralized lending protocol that allows people to take 
 
 R is the first Ethereum USD stablecoin solely backed by stETH (Lido Staked Ether). R provides the most capital-efficient way to borrow using your stETH. R aims to be the stablecoin of choice within the decentralized ecosystem, with deep liquidity across many trading pairs and a stable peg.
 
-This repository contains the Raft SDK: a TypeScript-based library that provides a set of utilities for building applications using the [Raft protocol](https://raft.fi). It abstracts away the complexity of interacting with the [Raft smart contracts](https://github.com/raft-fi/raft-contracts), and provides a simple interface for interacting with the protocol.
+This repository contains the Raft SDK: a TypeScript-based library that provides a set of utilities for building applications using the [Raft protocol](https://raft.fi). It abstracts away the complexity of interacting with the [Raft smart contracts](https://github.com/raft-fi/contracts), and provides a simple interface for interacting with the protocol.
 
 ## Quick Start
 
