@@ -14,7 +14,7 @@ export class Allowance {
   private tokenContract: ERC20Permit | ERC20 | null;
 
   /**
-   * Creates a new representation of a allowance.
+   * Creates a new representation of an allowance.
    * @param token The token for the allowance.
    * @param walletAddress Wallet to check allowance for.
    * @param spender Address to which allowance belongs.

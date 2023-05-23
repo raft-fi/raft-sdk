@@ -529,9 +529,9 @@ export class UserPosition extends PositionWithRunner {
 
     if (!isUnderlyingToken) {
       return await this.positionManager.whitelistDelegate(RaftConfig.addresses.positionManagerStEth, true);
-    } else {
-      return true;
     }
+
+    return true;
   }
 
   /**
