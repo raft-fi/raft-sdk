@@ -367,10 +367,21 @@ export class UserPosition extends PositionWithRunner {
     debtChange: Decimal,
     options: ManagePositionOptions = {},
   ): Promise<ContractTransactionResponse> {
-    const { maxFeePercentage = Decimal.ONE, collateralToken = this.underlyingCollateralToken } = options;
+    const { maxFeePercentage = Decimal.ONE } = options;
+    let { collateralToken = this.underlyingCollateralToken } = options;
 
     if (!SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING[this.underlyingCollateralToken].has(collateralToken)) {
       throw Error('Unsupported collateral token');
+    }
+
+    if (collateralChange.isZero()) {
+      if (debtChange.isZero()) {
+        throw Error('Collateral and debt change cannot be both zero');
+      }
+
+      // It saves gas by not using the delegate contract if the collateral token is not the underlying collateral token.
+      // It does it by skipping the delegate whitelisting (if it is not whitelisted) and approving the R token.
+      collateralToken = this.underlyingCollateralToken;
     }
 
     const absoluteCollateralChangeValue = collateralChange.abs().value;
