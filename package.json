@@ -6,7 +6,8 @@
   "module": "./dist/raft-sdk.js",
   "types": "./dist/index.d.ts",
   "description": "Raft Protocol SDK",
-  "author": "Tempus",
+  "author": "Raft <contact@raft.fi>",
+  "license": "MIT",
   "homepage": "https://github.com/raft-fi/sdk",
   "repository": {
     "type": "git",
