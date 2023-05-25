@@ -76,3 +76,7 @@ Check out the following places for more Raft-related information and support:
 - [Twitter](https://twitter.com/raft_fi)
 - [Discord](https://discord.com/invite/raft-fi)
 - [Telegram](https://t.me/raft_fi)
+
+## License
+
+The Raft SDK is licensed under the [MIT License](LICENSE).
