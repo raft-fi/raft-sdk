@@ -2,7 +2,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { ContractRunner, Provider, Signer, ContractTransactionResponse } from 'ethers';
 import { request, gql } from 'graphql-request';
 import { RaftConfig } from './config';
-import { GAS_LIMIT_MULTIPLIER, MIN_COLLATERAL_RATIO, MIN_NET_DEBT, SUBGRAPH_ENDPOINT_URL } from './constants';
+import { MIN_COLLATERAL_RATIO, MIN_NET_DEBT, SUBGRAPH_ENDPOINT_URL } from './constants';
 import {
   ERC20Indexable,
   ERC20Indexable__factory,
@@ -15,6 +15,7 @@ import {
   ERC20Permit,
   ERC20Permit__factory,
 } from './typechain';
+import { Overrides, StateMutability, TypedContractMethod } from './typechain/common';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
 import { CollateralToken, Token, UnderlyingCollateralToken } from './types';
 import { createEmptyPermitSignature, createPermitSignature } from './utils';
@@ -64,6 +65,7 @@ export interface ManagePositionOptions {
   maxFeePercentage?: Decimal;
   collateralToken?: CollateralToken;
   rPermitSignature?: ERC20PermitSignatureStruct;
+  gasLimitMultiplier?: Decimal;
   onDelegateWhitelistingStart?: () => void;
   onDelegateWhitelistingEnd?: (error?: unknown) => void;
   onApprovalStart?: () => void;
@@ -373,6 +375,7 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
+   * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -387,7 +390,7 @@ export class UserPosition extends PositionWithRunner {
     debtChange: Decimal,
     options: ManagePositionOptions = {},
   ): Promise<ContractTransactionResponse> {
-    const { maxFeePercentage = Decimal.ONE } = options;
+    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE } = options;
     let { collateralToken = this.underlyingCollateralToken } = options;
 
     if (!SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING[this.underlyingCollateralToken].has(collateralToken)) {
@@ -448,61 +451,36 @@ export class UserPosition extends PositionWithRunner {
       );
     }
 
-    let positionManagerStEth: PositionManagerStETH;
-    let gasEstimate: bigint;
     switch (collateralToken) {
       case 'ETH':
         if (!isCollateralIncrease) {
           throw new Error('ETH withdrawal from the position is not supported');
         }
 
-        positionManagerStEth = this.loadPositionManagerStETH();
-        gasEstimate = await positionManagerStEth.managePositionETH.estimateGas(
-          absoluteDebtChangeValue,
-          isDebtIncrease,
-          maxFeePercentageValue,
-          rPermitSignature,
-          {
-            value: absoluteCollateralChangeValue,
-          },
-        );
-
-        return positionManagerStEth.managePositionETH(
-          absoluteDebtChangeValue,
-          isDebtIncrease,
-          maxFeePercentageValue,
-          rPermitSignature,
-          {
-            value: absoluteCollateralChangeValue,
-            gasLimit: new Decimal(gasEstimate, Decimal.PRECISION).mul(GAS_LIMIT_MULTIPLIER).toBigInt(),
-          },
+        return this.sendManagePositionTransaction(
+          this.loadPositionManagerStETH().managePositionETH,
+          gasLimitMultiplier,
+          absoluteCollateralChangeValue,
+          [absoluteDebtChangeValue, isDebtIncrease, maxFeePercentageValue, rPermitSignature],
         );
 
       case 'stETH':
-        positionManagerStEth = this.loadPositionManagerStETH();
-        gasEstimate = await positionManagerStEth.managePositionStETH.estimateGas(
-          absoluteCollateralChangeValue,
-          isCollateralIncrease,
-          absoluteDebtChangeValue,
-          isDebtIncrease,
-          maxFeePercentageValue,
-          rPermitSignature,
-        );
-
-        return positionManagerStEth.managePositionStETH(
-          absoluteCollateralChangeValue,
-          isCollateralIncrease,
-          absoluteDebtChangeValue,
-          isDebtIncrease,
-          maxFeePercentageValue,
-          rPermitSignature,
-          {
-            gasLimit: new Decimal(gasEstimate, Decimal.PRECISION).mul(GAS_LIMIT_MULTIPLIER).toBigInt(),
-          },
+        return this.sendManagePositionTransaction(
+          this.loadPositionManagerStETH().managePositionStETH,
+          gasLimitMultiplier,
+          undefined,
+          [
+            absoluteCollateralChangeValue,
+            isCollateralIncrease,
+            absoluteDebtChangeValue,
+            isDebtIncrease,
+            maxFeePercentageValue,
+            rPermitSignature,
+          ],
         );
 
       case 'wstETH':
-        gasEstimate = await this.positionManager.managePosition.estimateGas(
+        return this.sendManagePositionTransaction(this.positionManager.managePosition, gasLimitMultiplier, undefined, [
           RaftConfig.getTokenAddress(collateralToken) as string,
           userAddress,
           absoluteCollateralChangeValue,
@@ -511,21 +489,7 @@ export class UserPosition extends PositionWithRunner {
           isDebtIncrease,
           maxFeePercentageValue,
           collateralPermitSignature,
-        );
-
-        return this.positionManager.managePosition(
-          RaftConfig.getTokenAddress(collateralToken) as string,
-          userAddress,
-          absoluteCollateralChangeValue,
-          isCollateralIncrease,
-          absoluteDebtChangeValue,
-          isDebtIncrease,
-          maxFeePercentageValue,
-          collateralPermitSignature,
-          {
-            gasLimit: new Decimal(gasEstimate, Decimal.PRECISION).mul(GAS_LIMIT_MULTIPLIER).toBigInt(),
-          },
-        );
+        ]);
     }
   }
 
@@ -624,6 +588,7 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
+   * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -657,6 +622,7 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
+   * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -679,6 +645,7 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
+   * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -708,6 +675,7 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
+   * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -737,6 +705,7 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
+   * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -763,6 +732,7 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
+   * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -845,6 +815,17 @@ export class UserPosition extends PositionWithRunner {
     }
 
     return createEmptyPermitSignature();
+  }
+
+  private async sendManagePositionTransaction<A extends Array<unknown>, R, S extends Exclude<StateMutability, 'view'>>(
+    method: TypedContractMethod<A, R, S>,
+    gasLimitMultiplier: Decimal,
+    value: bigint | undefined,
+    args: { [I in keyof A]-?: A[I] },
+  ): Promise<ContractTransactionResponse> {
+    const gasEstimate = await method.estimateGas(...args, { value } as Overrides<S>);
+    const gasLimit = new Decimal(gasEstimate, Decimal.PRECISION).mul(gasLimitMultiplier).toBigInt();
+    return await method(...args, { value, gasLimit } as Overrides<S>);
   }
 
   private loadPositionManagerStETH(): PositionManagerStETH {
