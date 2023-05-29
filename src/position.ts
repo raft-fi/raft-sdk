@@ -86,6 +86,9 @@ export class Position {
    * @param debt The debt amount. Defaults to 0.
    */
   public constructor(collateral: Decimal = Decimal.ZERO, debt: Decimal = Decimal.ZERO) {
+    this.checkNonNegativeAmount(collateral);
+    this.checkNonNegativeAmount(debt);
+
     this.collateral = collateral;
     this.debt = debt;
   }
@@ -95,6 +98,7 @@ export class Position {
    * @param collateral The collateral amount.
    */
   public setCollateral(collateral: Decimal): void {
+    this.checkNonNegativeAmount(collateral);
     this.collateral = collateral;
   }
 
@@ -111,6 +115,7 @@ export class Position {
    * @param debt The debt amount.
    */
   public setDebt(debt: Decimal): void {
+    this.checkNonNegativeAmount(debt);
     this.debt = debt;
   }
 
@@ -153,21 +158,31 @@ export class Position {
   }
 
   /**
-   * Returns whether the position is valid. A position is valid if it is empty or if it has a positive debt amount
-   * greater than or equal to the minimum net debt and has a healthy collateral ratio.
+   * Returns whether the position is valid. A position is valid if it is either closed or if it has a positive debt
+   * amount greater than or equal to the minimum net debt and has a healthy collateral ratio.
    * @param collateralPrice The price of the collateral asset.
    * @returns True if the position is valid, false otherwise.
    */
   public isValid(collateralPrice: Decimal): boolean {
-    if (this.collateral.lt(Decimal.ZERO) || this.debt.lt(Decimal.ZERO)) {
-      return false;
-    }
-
-    if (this.debt.equals(Decimal.ZERO)) {
-      return this.collateral.equals(Decimal.ZERO);
+    if (!this.isOpened) {
+      return true;
     }
 
     return this.debt.gte(MIN_NET_DEBT) && this.getCollateralRatio(collateralPrice).gte(MIN_COLLATERAL_RATIO);
+  }
+
+  /**
+   * Returns whether the position is opened. A position is opened if it has a positive collateral and debt amount.
+   * @returns True if the position is opened, false otherwise.
+   */
+  public get isOpened(): boolean {
+    return this.collateral.gt(Decimal.ZERO) && this.debt.gt(Decimal.ZERO);
+  }
+
+  private checkNonNegativeAmount(amount: Decimal): void {
+    if (amount.lt(Decimal.ZERO)) {
+      throw new Error('Amount cannot be negative');
+    }
   }
 }
 
@@ -256,6 +271,10 @@ class PositionWithRunner extends Position {
    */
   public async getUserAddress(): Promise<string> {
     return this.userAddress;
+  }
+
+  protected isUnderlyingCollateralToken(collateralToken: CollateralToken): boolean {
+    return this.underlyingCollateralToken === collateralToken;
   }
 
   private async fetchCollateral(): Promise<void> {
@@ -352,7 +371,8 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
+   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
+   * if this parameter is set.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -391,10 +411,8 @@ export class UserPosition extends PositionWithRunner {
     const maxFeePercentageValue = maxFeePercentage.value;
 
     const userAddress = await this.getUserAddress();
-    const isUnderlyingToken = this.underlyingCollateralToken === collateralToken;
-    const positionManagerAddress = isUnderlyingToken
-      ? RaftConfig.addresses.positionManager
-      : RaftConfig.addresses.positionManagerStEth;
+    const isUnderlyingToken = this.isUnderlyingCollateralToken(collateralToken);
+    const positionManagerAddress = RaftConfig.getPositionManagerAddress(collateralToken);
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
     const rTokenContract = ERC20Permit__factory.connect(RaftConfig.addresses.r, this.user);
 
@@ -512,37 +530,33 @@ export class UserPosition extends PositionWithRunner {
   }
 
   /**
-   * Checks if user wallet is whitelisted for provided collateral token
-   * @param collateralToken Collateral token to check whitelist for
-   * @returns True if wallet is whitelisted, otherwise false
+   * Checks if delegate for a given collateral token is whitelisted for the position owner.
+   * @param collateralToken Collateral token to check the whitelist for.
+   * @returns True if the delegate is whitelisted or the collateral token is the position's underlying collateral token,
+   * otherwise false.
    */
-  public async isWalletWhitelistedForCollateral(collateralToken: CollateralToken): Promise<boolean> {
-    const isUnderlyingToken = this.underlyingCollateralToken === collateralToken;
-
-    const userAddress = await this.getUserAddress();
-
-    // Whitelist is not needed if collateral token is the underlying token
-    if (!isUnderlyingToken) {
+  public async isDelegateWhitelisted(collateralToken: CollateralToken): Promise<boolean> {
+    if (!this.isUnderlyingCollateralToken(collateralToken)) {
+      const userAddress = await this.getUserAddress();
       return await this.positionManager.isDelegateWhitelisted(userAddress, RaftConfig.addresses.positionManagerStEth);
     }
+
     return true;
   }
 
   /**
-   * Whitelists wallet for collateral token
-   * @param collateralToken Collateral token for which to whitelist wallet
-   * @returns ContractTransactionResponse if whitelist is needed, otherwise returns true (if whitelist is not needed for provided collateral token)
+   * Whitelists the delegate for a given collateral token. This is needed for the position owner to be able to open the
+   * position for the first time or after the delegate has been removed from the whitelist. {@link managePosition}
+   * handles the whitelisting automatically.
+   * @param collateralToken The collateral token for which the delegate should be whitelisted.
+   * @returns Transaction response if the whitelisting is needed, otherwise null.
    */
-  public async whitelistWalletForCollateral(
-    collateralToken: CollateralToken,
-  ): Promise<ContractTransactionResponse | boolean> {
-    const isUnderlyingToken = this.underlyingCollateralToken === collateralToken;
-
-    if (!isUnderlyingToken) {
-      return await this.positionManager.whitelistDelegate(RaftConfig.addresses.positionManagerStEth, true);
+  public async whitelistDelegate(collateralToken: CollateralToken): Promise<ContractTransactionResponse | null> {
+    if (!this.isUnderlyingCollateralToken(collateralToken)) {
+      return await this.positionManager.whitelistDelegate(RaftConfig.getPositionManagerAddress(collateralToken), true);
     }
 
-    return true;
+    return null;
   }
 
   /**
@@ -557,13 +571,10 @@ export class UserPosition extends PositionWithRunner {
     debtChange: Decimal,
     collateralToken: CollateralToken,
   ) {
-    const isUnderlyingToken = this.underlyingCollateralToken === collateralToken;
     const absoluteCollateralChangeValue = collateralChange.abs().value;
     const absoluteDebtChangeValue = debtChange.abs().value;
     const isDebtDecrease = debtChange.lt(Decimal.ZERO);
-    const positionManagerAddress = isUnderlyingToken
-      ? RaftConfig.addresses.positionManager
-      : RaftConfig.addresses.positionManagerStEth;
+    const positionManagerAddress = RaftConfig.getPositionManagerAddress(collateralToken);
     const rTokenContract = ERC20Permit__factory.connect(RaftConfig.addresses.r, this.user);
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
 
@@ -572,7 +583,7 @@ export class UserPosition extends PositionWithRunner {
      * This is valid only if collateral used is not wstETH, because ETH and stETH go through a delegate contract.
      */
     let rPermitSignature = createEmptyPermitSignature();
-    if (isDebtDecrease && !isUnderlyingToken) {
+    if (isDebtDecrease && !this.isUnderlyingCollateralToken(collateralToken)) {
       rPermitSignature = await createPermitSignature(
         this.user,
         new Decimal(absoluteDebtChangeValue, Decimal.PRECISION),
@@ -611,7 +622,8 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
+   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
+   * if this parameter is set.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -643,7 +655,8 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
+   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
+   * if this parameter is set.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -664,7 +677,8 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
+   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
+   * if this parameter is set.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -692,7 +706,8 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the withdrawal. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
+   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
+   * if this parameter is set.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -720,7 +735,8 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
+   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
+   * if this parameter is set.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -745,7 +761,8 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The Permit signature for token R. Skip Permit for R if provided
+   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
+   * if this parameter is set.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.

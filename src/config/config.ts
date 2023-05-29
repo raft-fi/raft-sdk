@@ -1,5 +1,5 @@
 import { ZeroAddress } from 'ethers';
-import { Token } from '../types';
+import { CollateralToken, Token } from '../types';
 import { goerliNetworkAddresses } from './goerli';
 import { NetworkAddresses, SupportedNetwork } from './types';
 
@@ -58,5 +58,16 @@ export class RaftConfig {
     }
 
     return null;
+  }
+
+  static getPositionManagerAddress(collateralToken: CollateralToken): string {
+    switch (collateralToken) {
+      case 'ETH':
+      case 'stETH':
+        return this.addresses.positionManagerStEth;
+
+      default:
+        return this.addresses.positionManager;
+    }
   }
 }
