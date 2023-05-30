@@ -4,7 +4,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import { ERC20Indexable, ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
 import { SUBGRAPH_ENDPOINT_URL } from './constants';
-import { CollateralToken } from './types';
+import { UnderlyingCollateralToken } from './types';
 
 interface OpenPositionsResponse {
   count: string;
@@ -105,7 +105,7 @@ export class Stats {
    * @param collateralToken Collateral token to fetch borrowing rate for.
    * @returns Fetched borrowing rate.
    */
-  async fetchBorrowingRate(collateralToken: CollateralToken): Promise<Decimal> {
+  async fetchBorrowingRate(collateralToken: UnderlyingCollateralToken): Promise<Decimal> {
     const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
     if (collateralTokenAddress) {
       this._borrowingRate = new Decimal(
