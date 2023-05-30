@@ -1,12 +1,12 @@
 import { ZeroAddress } from 'ethers';
 import { CollateralToken, Token } from '../types';
-import { goerliNetworkAddresses } from './goerli';
-import { mainnetNetworkAddresses } from './mainnet';
-import { NetworkAddresses, SupportedNetwork } from './types';
+import { goerliConfig } from './goerli';
+import { mainnetConfig } from './mainnet';
+import { NetworkConfig, SupportedNetwork } from './types';
 
-const addresses: { [network in SupportedNetwork]: NetworkAddresses } = {
-  mainnet: mainnetNetworkAddresses,
-  goerli: goerliNetworkAddresses,
+const networkConfig: { [network in SupportedNetwork]: NetworkConfig } = {
+  mainnet: mainnetConfig,
+  goerli: goerliConfig,
 };
 
 const networkIds: { [network in SupportedNetwork]: number } = {
@@ -25,20 +25,24 @@ export class RaftConfig {
     return networkIds[this.network];
   }
 
-  static get addresses(): NetworkAddresses {
-    return addresses[this.network];
+  static get networkConfig(): NetworkConfig {
+    return networkConfig[this.network];
+  }
+
+  static get isTestNetwork(): boolean {
+    return this.networkConfig.testNetwork;
   }
 
   static getTokenAddress(token: Token): string | null {
     switch (token) {
       case 'stETH':
-        return this.addresses.stEth;
+        return this.networkConfig.stEth;
 
       case 'wstETH':
-        return this.addresses.wstEth;
+        return this.networkConfig.wstEth;
 
       case 'R':
-        return this.addresses.r;
+        return this.networkConfig.r;
 
       default:
         return null;
@@ -50,13 +54,13 @@ export class RaftConfig {
       case ZeroAddress:
         return 'ETH';
 
-      case this.addresses.stEth.toLowerCase():
+      case this.networkConfig.stEth.toLowerCase():
         return 'stETH';
 
-      case this.addresses.wstEth.toLowerCase():
+      case this.networkConfig.wstEth.toLowerCase():
         return 'wstETH';
 
-      case this.addresses.r.toLowerCase():
+      case this.networkConfig.r.toLowerCase():
         return 'R';
     }
 
@@ -67,10 +71,10 @@ export class RaftConfig {
     switch (collateralToken) {
       case 'ETH':
       case 'stETH':
-        return this.addresses.positionManagerStEth;
+        return this.networkConfig.positionManagerStEth;
 
       default:
-        return this.addresses.positionManager;
+        return this.networkConfig.positionManager;
     }
   }
 }

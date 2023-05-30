@@ -31,12 +31,12 @@ export class Stats {
   private constructor(provider: JsonRpcProvider) {
     this.provider = provider;
 
-    this.positionManager = PositionManager__factory.connect(RaftConfig.addresses.positionManager, this.provider);
+    this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, this.provider);
     this.raftCollateralToken = ERC20Indexable__factory.connect(
-      RaftConfig.addresses.raftCollateralTokens['wstETH'],
+      RaftConfig.networkConfig.raftCollateralTokens['wstETH'],
       this.provider,
     );
-    this.raftDebtToken = ERC20Indexable__factory.connect(RaftConfig.addresses.raftDebtToken, this.provider);
+    this.raftDebtToken = ERC20Indexable__factory.connect(RaftConfig.networkConfig.raftDebtToken, this.provider);
   }
 
   /**

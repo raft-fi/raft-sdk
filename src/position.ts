@@ -216,10 +216,10 @@ class PositionWithRunner extends Position {
     this.userAddress = userAddress;
     this.underlyingCollateralToken = underlyingCollateralToken;
     this.indexCollateralToken = ERC20Indexable__factory.connect(
-      RaftConfig.addresses.raftCollateralTokens[underlyingCollateralToken],
+      RaftConfig.networkConfig.raftCollateralTokens[underlyingCollateralToken],
       runner,
     );
-    this.indexDebtToken = ERC20Indexable__factory.connect(RaftConfig.addresses.raftDebtToken, runner);
+    this.indexDebtToken = ERC20Indexable__factory.connect(RaftConfig.networkConfig.raftDebtToken, runner);
   }
 
   /**
@@ -325,7 +325,7 @@ export class PositionWithAddress extends PositionWithRunner {
    * @returns The dispatched transaction of the liquidation.
    */
   public async liquidate(liquidator: Signer): Promise<ContractTransactionResponse> {
-    const positionManager = PositionManager__factory.connect(RaftConfig.addresses.positionManager, liquidator);
+    const positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, liquidator);
     return positionManager.liquidate(this.userAddress);
   }
 }
@@ -357,7 +357,7 @@ export class UserPosition extends PositionWithRunner {
     super('', user, collateral, debt, underlyingCollateralToken);
 
     this.user = user;
-    this.positionManager = PositionManager__factory.connect(RaftConfig.addresses.positionManager, user);
+    this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, user);
   }
 
   /**
@@ -420,7 +420,7 @@ export class UserPosition extends PositionWithRunner {
     const isUnderlyingToken = this.isUnderlyingCollateralToken(collateralToken);
     const positionManagerAddress = RaftConfig.getPositionManagerAddress(collateralToken);
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
-    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.addresses.r, this.user);
+    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.r, this.user);
 
     if (!isUnderlyingToken) {
       await this.checkDelegateWhitelisting(userAddress, positionManagerAddress, options);
@@ -505,7 +505,10 @@ export class UserPosition extends PositionWithRunner {
   public async isDelegateWhitelisted(collateralToken: CollateralToken): Promise<boolean> {
     if (!this.isUnderlyingCollateralToken(collateralToken)) {
       const userAddress = await this.getUserAddress();
-      return await this.positionManager.isDelegateWhitelisted(userAddress, RaftConfig.addresses.positionManagerStEth);
+      return await this.positionManager.isDelegateWhitelisted(
+        userAddress,
+        RaftConfig.networkConfig.positionManagerStEth,
+      );
     }
 
     return true;
@@ -542,7 +545,7 @@ export class UserPosition extends PositionWithRunner {
     const absoluteDebtChangeValue = debtChange.abs().value;
     const isDebtDecrease = debtChange.lt(Decimal.ZERO);
     const positionManagerAddress = RaftConfig.getPositionManagerAddress(collateralToken);
-    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.addresses.r, this.user);
+    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.r, this.user);
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
 
     /**
@@ -837,7 +840,7 @@ export class UserPosition extends PositionWithRunner {
     }
 
     const positionManagerStETH = PositionManagerStETH__factory.connect(
-      RaftConfig.addresses.positionManagerStEth,
+      RaftConfig.networkConfig.positionManagerStEth,
       this.user,
     );
     this.positionManagerStETH = positionManagerStETH;

@@ -6,7 +6,7 @@ type RaftCollateralTokenAddresses = {
   [tokenTicker in UnderlyingCollateralToken]: string;
 };
 
-export interface NetworkAddresses {
+export interface NetworkConfig {
   wstEth: string;
   stEth: string;
   r: string;
@@ -14,4 +14,5 @@ export interface NetworkAddresses {
   raftDebtToken: string;
   positionManager: string;
   positionManagerStEth: string;
+  testNetwork: boolean;
 }
