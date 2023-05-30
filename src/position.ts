@@ -43,6 +43,8 @@ const SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING: Record<UnderlyingCollateralTok
   wstETH: new Set(['ETH', 'stETH', 'wstETH']),
 };
 
+const DEBT_CHANGE_TO_CLOSE = Decimal.MAX_DECIMAL.mul(-1);
+
 /**
  * Represents a position transaction.
  * @property id The transaction hash.
@@ -397,7 +399,8 @@ export class UserPosition extends PositionWithRunner {
       throw Error('Unsupported collateral token');
     }
 
-    if (collateralChange.isZero()) {
+    // check whether it's closing position (i.e. collateralChange is ZERO while debtChange is -ve MAX)
+    if (collateralChange.isZero() && !debtChange.equals(DEBT_CHANGE_TO_CLOSE)) {
       if (debtChange.isZero()) {
         throw Error('Collateral and debt change cannot be both zero');
       }
@@ -632,7 +635,7 @@ export class UserPosition extends PositionWithRunner {
    * @returns The dispatched transaction of the operation.
    */
   public async close(options: ManagePositionOptions = {}): Promise<ContractTransactionResponse> {
-    return this.manage(Decimal.ZERO, Decimal.MAX_DECIMAL.mul(-1), options);
+    return this.manage(Decimal.ZERO, DEBT_CHANGE_TO_CLOSE, options);
   }
 
   /**
