@@ -1,6 +1,6 @@
 import { UnderlyingCollateralToken } from '../types';
 
-export type SupportedNetwork = 'goerli';
+export type SupportedNetwork = 'goerli' | 'mainnet';
 
 type RaftCollateralTokenAddresses = {
   [tokenTicker in UnderlyingCollateralToken]: string;

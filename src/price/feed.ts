@@ -40,7 +40,7 @@ export class PriceFeed {
 
   private async loadPriceFeed(token: UnderlyingCollateralToken): Promise<Contract> {
     if (!this.priceFeeds.has(token)) {
-      const priceFeedAddress = await this.positionManager.priceFeeds(RaftConfig.getTokenAddress(token) as string);
+      const priceFeedAddress = await this.positionManager.priceFeed(RaftConfig.getTokenAddress(token) as string);
       const contract = new Contract(priceFeedAddress, ['function getPrice() view returns (uint256)'], this.provider);
 
       this.priceFeeds.set(token, contract);

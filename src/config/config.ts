@@ -1,13 +1,16 @@
 import { ZeroAddress } from 'ethers';
 import { CollateralToken, Token } from '../types';
 import { goerliNetworkAddresses } from './goerli';
+import { mainnetNetworkAddresses } from './mainnet';
 import { NetworkAddresses, SupportedNetwork } from './types';
 
 const addresses: { [network in SupportedNetwork]: NetworkAddresses } = {
+  mainnet: mainnetNetworkAddresses,
   goerli: goerliNetworkAddresses,
 };
 
 const networkIds: { [network in SupportedNetwork]: number } = {
+  mainnet: 1,
   goerli: 5,
 };
 
