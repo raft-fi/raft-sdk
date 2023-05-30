@@ -9,5 +9,5 @@ export const mainnetNetworkAddresses: NetworkAddresses = {
   },
   raftDebtToken: '0x1C1D49D8F601f19D2Fa88b14BEf491759aaaF5d8',
   positionManager: '0x5f59b322eb3e16a0c78846195af1f588b77403fc',
-  positionManagerStEth: '0x72af30d6648bde46219a1eb0c45a1d876c374716',
+  positionManagerStEth: '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6',
 };
