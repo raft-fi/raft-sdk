@@ -12,7 +12,7 @@ export class PriceFeed {
 
   public constructor(provider: Provider) {
     this.provider = provider;
-    this.positionManager = PositionManager__factory.connect(RaftConfig.addresses.positionManager, provider);
+    this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, provider);
   }
 
   public async getPrice(token: Token): Promise<Decimal> {
@@ -23,7 +23,12 @@ export class PriceFeed {
       case 'ETH':
       case 'stETH': {
         const priceFeed = await this.loadPriceFeed('wstETH');
-        const wstEthPrice = new Decimal(await priceFeed.getPrice());
+        let wstEthPrice: Decimal;
+        if (RaftConfig.isTestNetwork) {
+          wstEthPrice = new Decimal(await priceFeed.getPrice());
+        } else {
+          wstEthPrice = new Decimal(await priceFeed.lastGoodPrice());
+        }
 
         const wstEthContract = await this.loadCollateralToken();
         const wstEthPerStEth = new Decimal(await wstEthContract.getWstETHByStETH(Decimal.ONE.value), Decimal.PRECISION);
@@ -33,7 +38,11 @@ export class PriceFeed {
 
       case 'wstETH': {
         const priceFeed = await this.loadPriceFeed('wstETH');
-        return new Decimal(await priceFeed.getPrice());
+        if (RaftConfig.isTestNetwork) {
+          return new Decimal(await priceFeed.getPrice());
+        } else {
+          return new Decimal(await priceFeed.lastGoodPrice());
+        }
       }
     }
   }
@@ -41,7 +50,11 @@ export class PriceFeed {
   private async loadPriceFeed(token: UnderlyingCollateralToken): Promise<Contract> {
     if (!this.priceFeeds.has(token)) {
       const priceFeedAddress = await this.positionManager.priceFeed(RaftConfig.getTokenAddress(token) as string);
-      const contract = new Contract(priceFeedAddress, ['function getPrice() view returns (uint256)'], this.provider);
+      const contract = new Contract(
+        priceFeedAddress,
+        ['function getPrice() view returns (uint256)', 'function lastGoodPrice() view returns (uint256)'],
+        this.provider,
+      );
 
       this.priceFeeds.set(token, contract);
       return contract;
@@ -52,7 +65,7 @@ export class PriceFeed {
 
   private async loadCollateralToken(): Promise<WstETH> {
     if (!this.collateralTokens.has('wstETH')) {
-      const contract = WstETH__factory.connect(RaftConfig.addresses.wstEth, this.provider);
+      const contract = WstETH__factory.connect(RaftConfig.networkConfig.wstEth, this.provider);
 
       this.collateralTokens.set('wstETH', contract);
       return contract;
