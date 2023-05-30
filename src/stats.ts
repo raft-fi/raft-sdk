@@ -4,6 +4,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import { ERC20Indexable, ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
 import { SUBGRAPH_ENDPOINT_URL } from './constants';
+import { UnderlyingCollateralToken } from './types';
 
 interface OpenPositionsResponse {
   count: string;
@@ -80,42 +81,49 @@ export class Stats {
   }
 
   /**
-   * Fetches all stats.
-   */
-  public async fetch() {
-    await Promise.all([
-      this.fetchCollateralSupply(),
-      this.fetchDebtSupply(),
-      this.fetchBorrowingRate(),
-      this.fetchOpenPositionCount(),
-    ]);
-  }
-
-  /**
    * Fetches current collateral supply (Amount of wstETH locked in Raft protocol).
+   * @returns Fetched collateral supply
    */
-  private async fetchCollateralSupply() {
+  async fetchCollateralSupply(): Promise<Decimal> {
     this._collateralSupply = new Decimal(await this.raftCollateralToken.totalSupply(), Decimal.PRECISION);
+
+    return this._collateralSupply;
   }
 
   /**
    * Fetches current debt supply (Amount of R users borrowed).
+   * @returns Fetched debt supply
    */
-  private async fetchDebtSupply() {
+  async fetchDebtSupply(): Promise<Decimal> {
     this._debtSupply = new Decimal(await this.raftDebtToken.totalSupply(), Decimal.PRECISION);
+
+    return this._debtSupply;
   }
 
   /**
-   * Fetches current borrowing rate.
+   * Fetches current borrowing rate for specified collateral token.
+   * @param collateralToken Collateral token to fetch borrowing rate for.
+   * @returns Fetched borrowing rate.
    */
-  private async fetchBorrowingRate() {
-    this._borrowingRate = new Decimal(await this.positionManager.getBorrowingRate(), Decimal.PRECISION);
+  async fetchBorrowingRate(collateralToken: UnderlyingCollateralToken): Promise<Decimal> {
+    const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
+    if (collateralTokenAddress) {
+      this._borrowingRate = new Decimal(
+        await this.positionManager.getBorrowingRate(collateralTokenAddress),
+        Decimal.PRECISION,
+      );
+
+      return this._borrowingRate;
+    } else {
+      throw new Error(`Collateral token ${collateralToken} is not supported`);
+    }
   }
 
   /**
    * Fetches current open position count from TheGraph.
+   * @returns Fetched open position count.
    */
-  private async fetchOpenPositionCount() {
+  async fetchOpenPositionCount(): Promise<number> {
     const query = gql`
       {
         openPositionCounter(id: "raft-open-positions-counter") {
@@ -127,5 +135,7 @@ export class Stats {
     const response = await request<{ openPositionCounter: OpenPositionsResponse }>(SUBGRAPH_ENDPOINT_URL, query);
 
     this._openPositionCount = Number(response.openPositionCounter.count);
+
+    return this._openPositionCount;
   }
 }
