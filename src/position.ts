@@ -572,9 +572,9 @@ export class UserPosition extends PositionWithRunner {
           positionManagerAddress,
           collateralTokenContract,
         );
+      } else {
+        return collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue);
       }
-
-      return collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue);
     }
 
     return {
