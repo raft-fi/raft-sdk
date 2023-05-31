@@ -3,7 +3,6 @@ import { JsonRpcProvider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import { ERC20Indexable, ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
-import { SUBGRAPH_ENDPOINT_URL } from './constants';
 import { UnderlyingCollateralToken } from './types';
 
 interface OpenPositionsResponse {
@@ -132,7 +131,10 @@ export class Stats {
       }
     `;
 
-    const response = await request<{ openPositionCounter: OpenPositionsResponse }>(SUBGRAPH_ENDPOINT_URL, query);
+    const response = await request<{ openPositionCounter: OpenPositionsResponse }>(
+      RaftConfig.networkConfig.subgraphEndpointUrl,
+      query,
+    );
 
     this._openPositionCount = Number(response.openPositionCounter.count);
 
