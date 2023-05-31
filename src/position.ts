@@ -2,7 +2,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { ContractRunner, Provider, Signer, ContractTransactionResponse } from 'ethers';
 import { request, gql } from 'graphql-request';
 import { RaftConfig } from './config';
-import { MIN_COLLATERAL_RATIO, MIN_NET_DEBT, SUBGRAPH_ENDPOINT_URL } from './constants';
+import { MIN_COLLATERAL_RATIO, MIN_NET_DEBT } from './constants';
 import {
   ERC20Indexable,
   ERC20Indexable__factory,
@@ -252,7 +252,7 @@ class PositionWithRunner extends Position {
     `;
 
     const userAddress = await this.getUserAddress();
-    const response = await request<PositionTransactionsQuery>(SUBGRAPH_ENDPOINT_URL, query, {
+    const response = await request<PositionTransactionsQuery>(RaftConfig.networkConfig.subgraphEndpointUrl, query, {
       ownerAddress: userAddress.toLowerCase(),
     });
 

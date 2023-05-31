@@ -15,4 +15,5 @@ export interface NetworkConfig {
   positionManager: string;
   positionManagerStEth: string;
   testNetwork: boolean;
+  subgraphEndpointUrl: string;
 }

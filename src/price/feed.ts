@@ -52,7 +52,9 @@ export class PriceFeed {
       const priceFeedAddress = await this.positionManager.priceFeed(RaftConfig.getTokenAddress(token) as string);
       const contract = new Contract(
         priceFeedAddress,
-        ['function getPrice() view returns (uint256)', 'function lastGoodPrice() view returns (uint256)'],
+        RaftConfig.isTestNetwork
+          ? ['function getPrice() view returns (uint256)']
+          : ['function lastGoodPrice() view returns (uint256)'],
         this.provider,
       );
 

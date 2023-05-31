@@ -11,4 +11,5 @@ export const mainnetConfig: NetworkConfig = {
   positionManager: '0x5f59b322eb3e16a0c78846195af1f588b77403fc',
   positionManagerStEth: '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6',
   testNetwork: false,
+  subgraphEndpointUrl: 'https://api.studio.thegraph.com/proxy/46633/raft-test/0.1.3',
 };
