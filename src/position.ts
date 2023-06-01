@@ -66,6 +66,7 @@ export interface PositionTransaction {
 export interface ManagePositionOptions {
   maxFeePercentage?: Decimal;
   collateralToken?: CollateralToken;
+  collateralPermitSignature?: ERC20PermitSignatureStruct;
   rPermitSignature?: ERC20PermitSignatureStruct;
   gasLimitMultiplier?: Decimal;
   onDelegateWhitelistingStart?: () => void;
@@ -375,6 +376,8 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
+   * @param options.collateralPermitSignature The permit signature for the collateral token. Skips the manual permit
+   * signature generation if this parameter is set.
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
@@ -442,8 +445,8 @@ export class UserPosition extends PositionWithRunner {
       );
     }
 
-    let collateralPermitSignature = createEmptyPermitSignature();
-    if (collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
+    let collateralPermitSignature = options.collateralPermitSignature ?? createEmptyPermitSignature();
+    if (!options.collateralPermitSignature && collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
       collateralPermitSignature = await this.checkTokenAllowance(
         collateralTokenContract,
         userAddress,
