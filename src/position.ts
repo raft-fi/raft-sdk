@@ -25,8 +25,10 @@ export type PositionTransactionType = 'OPEN' | 'ADJUST' | 'CLOSE' | 'LIQUIDATION
 interface PositionTransactionQuery {
   id: string;
   type: PositionTransactionType;
-  collateralToken: string;
-  collateralChange: string;
+  collateralToken: string | null;
+  collateralChange: string | null;
+  underlyingCollateralToken: string;
+  underlyingCollateralChange: string;
   debtChange: string;
   timestamp: string;
 }
@@ -57,8 +59,10 @@ const DEBT_CHANGE_TO_CLOSE = Decimal.MAX_DECIMAL.mul(-1);
 export interface PositionTransaction {
   id: string;
   type: PositionTransactionType;
-  collateralToken: CollateralToken;
-  collateralChange: Decimal;
+  collateralToken: CollateralToken | null;
+  collateralChange: Decimal | null;
+  underlyingCollateralToken: CollateralToken;
+  underlyingCollateralChange: Decimal;
   debtChange: Decimal;
   timestamp: Date;
 }
@@ -245,6 +249,8 @@ class PositionWithRunner extends Position {
             type
             collateralToken
             collateralChange
+            underlyingCollateralToken
+            underlyingCollateralChange
             debtChange
             timestamp
           }
@@ -263,8 +269,14 @@ class PositionWithRunner extends Position {
 
     return response.position.transactions.map(transaction => ({
       ...transaction,
-      collateralToken: RaftConfig.getTokenTicker(transaction.collateralToken) as CollateralToken,
-      collateralChange: Decimal.parse(BigInt(transaction.collateralChange), 0n, Decimal.PRECISION),
+      collateralToken: transaction.collateralToken
+        ? (RaftConfig.getTokenTicker(transaction.collateralToken) as CollateralToken)
+        : null,
+      collateralChange: transaction.collateralChange
+        ? Decimal.parse(BigInt(transaction.collateralChange), 0n, Decimal.PRECISION)
+        : null,
+      underlyingCollateralToken: RaftConfig.getTokenTicker(transaction.underlyingCollateralToken) as CollateralToken,
+      underlyingCollateralChange: Decimal.parse(BigInt(transaction.underlyingCollateralChange), 0n, Decimal.PRECISION),
       debtChange: Decimal.parse(BigInt(transaction.debtChange), 0n, Decimal.PRECISION),
       timestamp: new Date(Number(transaction.timestamp) * 1000),
     }));
