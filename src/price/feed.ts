@@ -112,9 +112,9 @@ export class PriceFeed {
   private async fetchWstEthPrice(): Promise<Decimal> {
     const priceFeed = await this.loadPriceFeed('wstETH');
     if (RaftConfig.isTestNetwork) {
-      return new Decimal(await priceFeed.getPrice());
+      return new Decimal(await priceFeed.getPrice.staticCall());
     } else {
-      return new Decimal(await priceFeed.lastGoodPrice());
+      return new Decimal(await priceFeed.lastGoodPrice.staticCall());
     }
   }
 
@@ -128,7 +128,7 @@ export class PriceFeed {
 
   private async fetchStEthTestnetPrice(): Promise<Decimal> {
     const priceFeed = await this.loadPriceFeed('wstETH');
-    const wstEthPrice = new Decimal(await priceFeed.getPrice());
+    const wstEthPrice = new Decimal(await priceFeed.getPrice.staticCall());
 
     const wstEthContract = await this.loadCollateralToken();
     const wstEthPerStEth = new Decimal(await wstEthContract.getWstETHByStETH(Decimal.ONE.value), Decimal.PRECISION);
