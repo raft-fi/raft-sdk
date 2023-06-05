@@ -259,7 +259,7 @@ class PositionWithRunner extends Position {
     `;
 
     const userAddress = await this.getUserAddress();
-    const response = await request<PositionTransactionsQuery>(RaftConfig.networkConfig.subgraphEndpointUrl, query, {
+    const response = await request<PositionTransactionsQuery>(RaftConfig.subgraphEndpoint, query, {
       ownerAddress: userAddress.toLowerCase(),
     });
 

@@ -15,22 +15,31 @@ const networkIds: { [network in SupportedNetwork]: number } = {
 };
 
 export class RaftConfig {
-  private static network: SupportedNetwork = 'goerli'; // TODO: change to mainnet
+  private static _network: SupportedNetwork = 'goerli'; // TODO: change to mainnet
+  private static _subgraphEndpoint = '';
 
   public static setNetwork(network: SupportedNetwork) {
-    this.network = network;
+    this._network = network;
+  }
+
+  public static setSubgraphEndpoint(subgraphEndpoint: string) {
+    this._subgraphEndpoint = subgraphEndpoint;
   }
 
   static get networkId(): number {
-    return networkIds[this.network];
+    return networkIds[this._network];
   }
 
   static get networkConfig(): NetworkConfig {
-    return networkConfig[this.network];
+    return networkConfig[this._network];
   }
 
   static get isTestNetwork(): boolean {
     return this.networkConfig.testNetwork;
+  }
+
+  static get subgraphEndpoint(): string {
+    return this._subgraphEndpoint;
   }
 
   static getTokenAddress(token: Token): string | null {
