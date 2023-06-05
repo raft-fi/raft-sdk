@@ -131,10 +131,7 @@ export class Stats {
       }
     `;
 
-    const response = await request<{ openPositionCounter: OpenPositionsResponse }>(
-      RaftConfig.networkConfig.subgraphEndpointUrl,
-      query,
-    );
+    const response = await request<{ openPositionCounter: OpenPositionsResponse }>(RaftConfig.subgraphEndpoint, query);
 
     this._openPositionCount = Number(response.openPositionCounter.count);
 

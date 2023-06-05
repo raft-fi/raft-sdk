@@ -76,11 +76,7 @@ export class PriceFeed {
       token,
     };
 
-    const response = await request<{ price: PriceQueryResponse }>(
-      RaftConfig.networkConfig.subgraphEndpointUrl,
-      query,
-      variables,
-    );
+    const response = await request<{ price: PriceQueryResponse }>(RaftConfig.subgraphEndpoint, query, variables);
 
     return new Decimal(BigInt(response.price.value), SUBGRAPH_PRICE_PRECISION);
   }

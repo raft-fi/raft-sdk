@@ -11,5 +11,4 @@ export const goerliConfig: NetworkConfig = {
   positionManager: '0xeaf8aad45d563f14d8b443277dd51c426ad8607f',
   positionManagerStEth: '0x4e01f8c03893be67b60af6a1b49d6e51a8781e3c',
   testNetwork: true,
-  subgraphEndpointUrl: 'https://api.studio.thegraph.com/query/47687/raft-testnet/1.0.0',
 };
