@@ -15,10 +15,9 @@ import {
   ERC20Permit,
   ERC20Permit__factory,
 } from './typechain';
-import { Overrides, StateMutability, TypedContractMethod } from './typechain/common';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
-import { CollateralToken, Token, UnderlyingCollateralToken } from './types';
-import { createEmptyPermitSignature, createPermitSignature } from './utils';
+import { CollateralToken, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
+import { createEmptyPermitSignature, createPermitSignature, sendTransactionWithGasLimit } from './utils';
 
 export type PositionTransactionType = 'OPEN' | 'ADJUST' | 'CLOSE' | 'LIQUIDATION';
 
@@ -67,12 +66,10 @@ export interface PositionTransaction {
   timestamp: Date;
 }
 
-export interface ManagePositionOptions {
-  maxFeePercentage?: Decimal;
+export interface ManagePositionOptions extends TransactionWithFeesOptions {
   collateralToken?: CollateralToken;
   collateralPermitSignature?: ERC20PermitSignatureStruct;
   rPermitSignature?: ERC20PermitSignatureStruct;
-  gasLimitMultiplier?: Decimal;
   onDelegateWhitelistingStart?: () => void;
   onDelegateWhitelistingEnd?: (error?: unknown) => void;
   onApprovalStart?: () => void;
@@ -475,18 +472,16 @@ export class UserPosition extends PositionWithRunner {
           throw new Error('ETH withdrawal from the position is not supported');
         }
 
-        return this.sendManagePositionTransaction(
+        return sendTransactionWithGasLimit(
           this.loadPositionManagerStETH().managePositionETH,
+          [absoluteDebtChangeValue, isDebtIncrease, maxFeePercentageValue, rPermitSignature],
           gasLimitMultiplier,
           absoluteCollateralChangeValue,
-          [absoluteDebtChangeValue, isDebtIncrease, maxFeePercentageValue, rPermitSignature],
         );
 
       case 'stETH':
-        return this.sendManagePositionTransaction(
+        return sendTransactionWithGasLimit(
           this.loadPositionManagerStETH().managePositionStETH,
-          gasLimitMultiplier,
-          undefined,
           [
             absoluteCollateralChangeValue,
             isCollateralIncrease,
@@ -495,19 +490,24 @@ export class UserPosition extends PositionWithRunner {
             maxFeePercentageValue,
             rPermitSignature,
           ],
+          gasLimitMultiplier,
         );
 
       case 'wstETH':
-        return this.sendManagePositionTransaction(this.positionManager.managePosition, gasLimitMultiplier, undefined, [
-          RaftConfig.getTokenAddress(collateralToken) as string,
-          userAddress,
-          absoluteCollateralChangeValue,
-          isCollateralIncrease,
-          absoluteDebtChangeValue,
-          isDebtIncrease,
-          maxFeePercentageValue,
-          collateralPermitSignature,
-        ]);
+        return sendTransactionWithGasLimit(
+          this.positionManager.managePosition,
+          [
+            RaftConfig.getTokenAddress(collateralToken) as string,
+            userAddress,
+            absoluteCollateralChangeValue,
+            isCollateralIncrease,
+            absoluteDebtChangeValue,
+            isDebtIncrease,
+            maxFeePercentageValue,
+            collateralPermitSignature,
+          ],
+          gasLimitMultiplier,
+        );
     }
   }
 
@@ -836,17 +836,6 @@ export class UserPosition extends PositionWithRunner {
     }
 
     return createEmptyPermitSignature();
-  }
-
-  private async sendManagePositionTransaction<A extends Array<unknown>, R, S extends Exclude<StateMutability, 'view'>>(
-    method: TypedContractMethod<A, R, S>,
-    gasLimitMultiplier: Decimal,
-    value: bigint | undefined,
-    args: { [I in keyof A]-?: A[I] },
-  ): Promise<ContractTransactionResponse> {
-    const gasEstimate = await method.estimateGas(...args, { value } as Overrides<S>);
-    const gasLimit = new Decimal(gasEstimate, Decimal.PRECISION).mul(gasLimitMultiplier).toBigInt();
-    return await method(...args, { value, gasLimit } as Overrides<S>);
   }
 
   private loadPositionManagerStETH(): PositionManagerStETH {
