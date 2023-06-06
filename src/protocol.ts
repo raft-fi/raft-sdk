@@ -1,16 +1,17 @@
 import { request, gql } from 'graphql-request';
-import { JsonRpcProvider } from 'ethers';
+import { ContractTransactionResponse, JsonRpcProvider, Signer } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import { ERC20Indexable, ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
-import { UnderlyingCollateralToken } from './types';
+import { TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
+import { sendTransactionWithGasLimit } from './utils';
 
 interface OpenPositionsResponse {
   count: string;
 }
 
-export class Stats {
-  private static instance: Stats;
+export class Protocol {
+  private static instance: Protocol;
 
   private provider: JsonRpcProvider;
   private positionManager: PositionManager;
@@ -39,16 +40,45 @@ export class Stats {
   }
 
   /**
-   * Returns singleton instance of Stats class.
+   * Returns singleton instance of the class.
    * @param provider Provider to use for reading data from blockchain.
-   * @returns Stats singleton instance.
+   * @returns The singleton instance.
    */
-  public static getInstance(provider: JsonRpcProvider): Stats {
-    if (!Stats.instance) {
-      Stats.instance = new Stats(provider);
+  public static getInstance(provider: JsonRpcProvider): Protocol {
+    if (!Protocol.instance) {
+      Protocol.instance = new Protocol(provider);
     }
 
-    return Stats.instance;
+    return Protocol.instance;
+  }
+
+  /**
+   * Redeems collateral from all positions in exchange for amount in R.
+   * @notice Redemption of R at peg will result in significant financial loss.
+   * @param collateralToken The collateral token to redeem.
+   * @param debtAmount The amount of debt in R to burn.
+   * @param redeemer The account to redeem collateral for.
+   * @param options.maxFeePercentage The maximum fee percentage to pay for redemption.
+   * @returns The dispatched redemption transaction.
+   */
+  public async redeemCollateral(
+    collateralToken: UnderlyingCollateralToken,
+    debtAmount: Decimal,
+    redeemer: Signer,
+    options: TransactionWithFeesOptions = {},
+  ): Promise<ContractTransactionResponse> {
+    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE } = options;
+    const positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, redeemer);
+
+    return sendTransactionWithGasLimit(
+      positionManager.redeemCollateral,
+      [
+        RaftConfig.getTokenAddress(collateralToken) as string,
+        debtAmount.toBigInt(Decimal.PRECISION),
+        maxFeePercentage.toBigInt(Decimal.PRECISION),
+      ],
+      gasLimitMultiplier,
+    );
   }
 
   /**
