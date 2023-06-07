@@ -22,5 +22,6 @@ export {
   type RToken,
   type Token,
   type UnderlyingCollateralToken,
+  type TransactionWithFeesOptions,
 } from './types';
 export type { ERC20PermitSignatureStruct } from './typechain/PositionManager';
