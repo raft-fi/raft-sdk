@@ -21,6 +21,7 @@ export class Protocol {
   private _collateralSupply: Decimal | null = null;
   private _debtSupply: Decimal | null = null;
   private _borrowingRate: Decimal | null = null;
+  private _redemptionRate: Decimal | null = null;
   private _openPositionCount: number | null = null;
 
   /**
@@ -103,6 +104,13 @@ export class Protocol {
   }
 
   /**
+   * Raft protocol current redemption rate.
+   */
+  get redemptionRate(): Decimal | null {
+    return this._redemptionRate;
+  }
+
+  /**
    * Raft protocol current number of open positions.
    */
   get openPositionCount(): number | null {
@@ -143,6 +151,25 @@ export class Protocol {
       );
 
       return this._borrowingRate;
+    } else {
+      throw new Error(`Collateral token ${collateralToken} is not supported`);
+    }
+  }
+
+  /**
+   * Fetches current redemption rate for specified collateral token.
+   * @param collateralToken Collateral token to fetch redemption rate for.
+   * @returns Fetched borrowing rate.
+   */
+  async fetchRedemptionRate(collateralToken: UnderlyingCollateralToken): Promise<Decimal> {
+    const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
+    if (collateralTokenAddress) {
+      this._redemptionRate = new Decimal(
+        await this.positionManager.getRedemptionRate(collateralTokenAddress),
+        Decimal.PRECISION,
+      );
+
+      return this._redemptionRate;
     } else {
       throw new Error(`Collateral token ${collateralToken} is not supported`);
     }
