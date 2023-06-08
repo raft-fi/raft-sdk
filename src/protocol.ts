@@ -3,7 +3,7 @@ import { JsonRpcProvider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import { ERC20Indexable, ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
-import { TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
+import { CollateralToken, TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
 import { sendTransactionWithGasLimit } from './utils';
 
 interface OpenPositionsResponse {
@@ -193,5 +193,76 @@ export class Protocol {
     this._openPositionCount = Number(response.openPositionCounter.count);
 
     return this._openPositionCount;
+  }
+
+  public async fetchBaseRateForRedemption(
+    collateralToken: UnderlyingCollateralToken,
+    rToRedeem: Decimal,
+    collateralPrice: Decimal,
+    totalDebtSupply: Decimal,
+  ): Promise<Decimal> {
+    // TODO - Check if we need this
+    // uint256 decayedBaseRate = _calcDecayedBaseRate(collateralToken);
+
+    const collateralAmount = rToRedeem.div(collateralPrice);
+
+    const redeemedFraction = collateralAmount.mul(collateralPrice).div(totalDebtSupply);
+
+    const BETA = new Decimal(2);
+
+    /**
+function _calcDecayedBaseRate(IERC20 collateralToken) internal view returns (uint256) {
+        uint256 minutesPassed = (block.timestamp - collateralInfo[collateralToken].lastFeeOperationTime) / 1 minutes;
+        uint256 decayFactor = MathUtils._decPow(MINUTE_DECAY_FACTOR, minutesPassed);
+
+        return collateralInfo[collateralToken].baseRate.mulDown(decayFactor);
+    }
+     */
+
+    const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
+    if (!collateralTokenAddress) {
+      throw new Error(`Unsupported underlying collateral token ${collateralToken}`);
+    }
+
+    const lastFeeOperationTime = new Decimal(
+      (await this.positionManager.collateralInfo(collateralTokenAddress)).lastFeeOperationTime,
+      0,
+    );
+    const baseRate = new Decimal(
+      (await this.positionManager.collateralInfo(collateralTokenAddress)).baseRate,
+      Decimal.PRECISION,
+    );
+
+    const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+    console.log('currentTimeInSeconds', currentTimeInSeconds.toString());
+
+    const timestampDecimal = new Decimal(currentTimeInSeconds);
+
+    console.log('lastFeeOperationTime', lastFeeOperationTime.toString());
+    console.log('baseRate', baseRate.toString());
+    console.log('timestampDecimal', timestampDecimal.toString());
+
+    const minutesPassed = timestampDecimal.sub(lastFeeOperationTime).div(60);
+    console.log('minutesPassed', minutesPassed.toString());
+
+    const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION);
+
+    const decayFactor = MINUTE_DECAY_FACTOR.pow(Math.floor(Number(minutesPassed.toString())));
+    console.log('decayFactor', decayFactor.toString());
+
+    const decayedBaseRate = baseRate.mul(decayFactor);
+    console.log('decayedBaseRate', decayedBaseRate.toString());
+
+    let newBaseRate = decayedBaseRate.add(redeemedFraction.div(BETA));
+
+    if (newBaseRate.gt(Decimal.ONE)) {
+      newBaseRate = Decimal.ONE;
+    }
+
+    if (newBaseRate.lte(Decimal.ZERO)) {
+      throw new Error('Calculated base rate cannot be zero or less!');
+    }
+
+    return newBaseRate;
   }
 }
