@@ -156,23 +156,55 @@ export class Protocol {
     }
   }
 
-  /**
-   * Fetches current redemption rate for specified collateral token.
-   * @param collateralToken Collateral token to fetch redemption rate for.
-   * @returns Fetched borrowing rate.
-   */
-  async fetchRedemptionRate(collateralToken: UnderlyingCollateralToken): Promise<Decimal> {
-    const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
-    if (collateralTokenAddress) {
-      this._redemptionRate = new Decimal(
-        await this.positionManager.getRedemptionRate(collateralTokenAddress),
-        Decimal.PRECISION,
-      );
+  public async fetchRedemptionRate(
+    collateralToken: UnderlyingCollateralToken,
+    rToRedeem: Decimal,
+    collateralPrice: Decimal,
+    totalDebtSupply: Decimal,
+  ): Promise<Decimal> {
+    const BETA = new Decimal(2);
+    const DEVIATION = new Decimal(0.01);
+    const SECONDS_IN_MINUTE = 60;
+    const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)
 
-      return this._redemptionRate;
-    } else {
-      throw new Error(`Collateral token ${collateralToken} is not supported`);
+    const collateralAmount = rToRedeem.div(collateralPrice);
+    const redeemedFraction = collateralAmount.mul(collateralPrice).div(totalDebtSupply);
+
+    const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
+    if (!collateralTokenAddress) {
+      throw new Error(`Unsupported underlying collateral token ${collateralToken}`);
     }
+
+    const [collateralInfo, redemptionRate, lastBlock] = await Promise.all([
+      this.positionManager.collateralInfo(collateralTokenAddress),
+      this.positionManager.getRedemptionRate(collateralTokenAddress),
+      this.provider.getBlock('latest'),
+    ]);
+    if (!lastBlock) {
+      throw new Error('Failed to fetch latest block');
+    }
+
+    const lastFeeOperationTime = new Decimal(collateralInfo.lastFeeOperationTime, 0);
+    const baseRate = new Decimal(collateralInfo.baseRate, Decimal.PRECISION);
+    const latestBlockTimestampDecimal = new Decimal(lastBlock.timestamp);
+    const minutesPassed = latestBlockTimestampDecimal.sub(lastFeeOperationTime).div(SECONDS_IN_MINUTE);
+    const redemptionRateDecimal = new Decimal(redemptionRate, Decimal.PRECISION);
+
+    // Using floor here because fractional number cannot be converted to BigInt
+    const decayFactor = MINUTE_DECAY_FACTOR.pow(Math.floor(Number(minutesPassed.toString())));
+    const decayedBaseRate = baseRate.mul(decayFactor);
+
+    let newBaseRate = decayedBaseRate.add(redeemedFraction.div(BETA));
+
+    if (newBaseRate.gt(Decimal.ONE)) {
+      newBaseRate = Decimal.ONE;
+    }
+
+    if (newBaseRate.lte(Decimal.ZERO)) {
+      throw new Error('Calculated base rate cannot be zero or less!');
+    }
+
+    return newBaseRate.add(redemptionRateDecimal).add(DEVIATION);
   }
 
   /**
@@ -193,76 +225,5 @@ export class Protocol {
     this._openPositionCount = Number(response.openPositionCounter.count);
 
     return this._openPositionCount;
-  }
-
-  public async fetchBaseRateForRedemption(
-    collateralToken: UnderlyingCollateralToken,
-    rToRedeem: Decimal,
-    collateralPrice: Decimal,
-    totalDebtSupply: Decimal,
-  ): Promise<Decimal> {
-    // TODO - Check if we need this
-    // uint256 decayedBaseRate = _calcDecayedBaseRate(collateralToken);
-
-    const collateralAmount = rToRedeem.div(collateralPrice);
-
-    const redeemedFraction = collateralAmount.mul(collateralPrice).div(totalDebtSupply);
-
-    const BETA = new Decimal(2);
-
-    /**
-function _calcDecayedBaseRate(IERC20 collateralToken) internal view returns (uint256) {
-        uint256 minutesPassed = (block.timestamp - collateralInfo[collateralToken].lastFeeOperationTime) / 1 minutes;
-        uint256 decayFactor = MathUtils._decPow(MINUTE_DECAY_FACTOR, minutesPassed);
-
-        return collateralInfo[collateralToken].baseRate.mulDown(decayFactor);
-    }
-     */
-
-    const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
-    if (!collateralTokenAddress) {
-      throw new Error(`Unsupported underlying collateral token ${collateralToken}`);
-    }
-
-    const lastFeeOperationTime = new Decimal(
-      (await this.positionManager.collateralInfo(collateralTokenAddress)).lastFeeOperationTime,
-      0,
-    );
-    const baseRate = new Decimal(
-      (await this.positionManager.collateralInfo(collateralTokenAddress)).baseRate,
-      Decimal.PRECISION,
-    );
-
-    const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-    console.log('currentTimeInSeconds', currentTimeInSeconds.toString());
-
-    const timestampDecimal = new Decimal(currentTimeInSeconds);
-
-    console.log('lastFeeOperationTime', lastFeeOperationTime.toString());
-    console.log('baseRate', baseRate.toString());
-    console.log('timestampDecimal', timestampDecimal.toString());
-
-    const minutesPassed = timestampDecimal.sub(lastFeeOperationTime).div(60);
-    console.log('minutesPassed', minutesPassed.toString());
-
-    const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION);
-
-    const decayFactor = MINUTE_DECAY_FACTOR.pow(Math.floor(Number(minutesPassed.toString())));
-    console.log('decayFactor', decayFactor.toString());
-
-    const decayedBaseRate = baseRate.mul(decayFactor);
-    console.log('decayedBaseRate', decayedBaseRate.toString());
-
-    let newBaseRate = decayedBaseRate.add(redeemedFraction.div(BETA));
-
-    if (newBaseRate.gt(Decimal.ONE)) {
-      newBaseRate = Decimal.ONE;
-    }
-
-    if (newBaseRate.lte(Decimal.ZERO)) {
-      throw new Error('Calculated base rate cannot be zero or less!');
-    }
-
-    return newBaseRate;
   }
 }
