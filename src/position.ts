@@ -1,5 +1,5 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { ContractRunner, Provider, Signer, ContractTransactionResponse } from 'ethers';
+import { ContractRunner, Provider, Signer, ContractTransactionResponse, TransactionResponse } from 'ethers';
 import { request, gql } from 'graphql-request';
 import { RaftConfig } from './config';
 import { MIN_COLLATERAL_RATIO, MIN_NET_DEBT } from './constants';
@@ -66,10 +66,22 @@ export interface PositionTransaction {
   timestamp: Date;
 }
 
+/**
+ * Options for managing a position.
+ * @property collateralToken The collateral token to use for the operation.
+ * @property collateralPermitSignature The permit signature for the collateral token.
+ * @property rPermitSignature The permit signature for the R token.
+ * @property frontendTag The frontend operator tag for the transaction.
+ * @property onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
+ * @property onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends.
+ * @property onApprovalStart A callback that is called when the collateral token or R approval starts.
+ * @property onApprovalEnd A callback that is called when the approval ends.
+ */
 export interface ManagePositionOptions extends TransactionWithFeesOptions {
   collateralToken?: CollateralToken;
   collateralPermitSignature?: ERC20PermitSignatureStruct;
   rPermitSignature?: ERC20PermitSignatureStruct;
+  frontendTag?: string;
   onDelegateWhitelistingStart?: () => void;
   onDelegateWhitelistingEnd?: (error?: unknown) => void;
   onApprovalStart?: () => void;
@@ -390,6 +402,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
+   * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -403,8 +416,8 @@ export class UserPosition extends PositionWithRunner {
     collateralChange: Decimal,
     debtChange: Decimal,
     options: ManagePositionOptions = {},
-  ): Promise<ContractTransactionResponse> {
-    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE } = options;
+  ): Promise<TransactionResponse> {
+    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE, frontendTag } = options;
     let { collateralToken = this.underlyingCollateralToken } = options;
 
     if (!SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING[this.underlyingCollateralToken].has(collateralToken)) {
@@ -476,6 +489,8 @@ export class UserPosition extends PositionWithRunner {
           this.loadPositionManagerStETH().managePositionETH,
           [absoluteDebtChangeValue, isDebtIncrease, maxFeePercentageValue, rPermitSignature],
           gasLimitMultiplier,
+          frontendTag,
+          this.user,
           absoluteCollateralChangeValue,
         );
 
@@ -491,6 +506,8 @@ export class UserPosition extends PositionWithRunner {
             rPermitSignature,
           ],
           gasLimitMultiplier,
+          frontendTag,
+          this.user,
         );
 
       case 'wstETH':
@@ -507,6 +524,8 @@ export class UserPosition extends PositionWithRunner {
             collateralPermitSignature,
           ],
           gasLimitMultiplier,
+          frontendTag,
+          this.user,
         );
     }
   }
@@ -610,6 +629,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
+   * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -624,12 +644,12 @@ export class UserPosition extends PositionWithRunner {
     collateralAmount: Decimal,
     debtAmount: Decimal,
     options: ManagePositionOptions = {},
-  ): Promise<ContractTransactionResponse> {
+  ): Promise<TransactionResponse> {
     if (collateralAmount.lte(Decimal.ZERO)) {
-      throw new Error('Collateral amount must be greater than 0.');
+      throw new Error('Collateral amount must be greater than 0');
     }
     if (debtAmount.lte(Decimal.ZERO)) {
-      throw new Error('Debt amount must be greater than 0.');
+      throw new Error('Debt amount must be greater than 0');
     }
 
     return this.manage(collateralAmount, debtAmount, options);
@@ -644,6 +664,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
+   * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -652,7 +673,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
    * @returns The dispatched transaction of the operation.
    */
-  public async close(options: ManagePositionOptions = {}): Promise<ContractTransactionResponse> {
+  public async close(options: ManagePositionOptions = {}): Promise<TransactionResponse> {
     return this.manage(Decimal.ZERO, DEBT_CHANGE_TO_CLOSE, options);
   }
 
@@ -667,6 +688,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
+   * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -676,10 +698,7 @@ export class UserPosition extends PositionWithRunner {
    * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async addCollateral(
-    amount: Decimal,
-    options: ManagePositionOptions = {},
-  ): Promise<ContractTransactionResponse> {
+  public async addCollateral(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
@@ -697,6 +716,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
+   * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -706,10 +726,7 @@ export class UserPosition extends PositionWithRunner {
    * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async withdrawCollateral(
-    amount: Decimal,
-    options: ManagePositionOptions = {},
-  ): Promise<ContractTransactionResponse> {
+  public async withdrawCollateral(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
@@ -727,6 +744,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
+   * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -736,7 +754,7 @@ export class UserPosition extends PositionWithRunner {
    * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async borrow(amount: Decimal, options: ManagePositionOptions = {}): Promise<ContractTransactionResponse> {
+  public async borrow(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
@@ -754,6 +772,7 @@ export class UserPosition extends PositionWithRunner {
    * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
    * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
+   * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -763,7 +782,7 @@ export class UserPosition extends PositionWithRunner {
    * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async repayDebt(amount: Decimal, options: ManagePositionOptions = {}): Promise<ContractTransactionResponse> {
+  public async repayDebt(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
