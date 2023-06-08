@@ -1,5 +1,5 @@
 import { request, gql } from 'graphql-request';
-import { ContractTransactionResponse, JsonRpcProvider, Signer } from 'ethers';
+import { JsonRpcProvider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import { ERC20Indexable, ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
@@ -67,7 +67,7 @@ export class Protocol {
     debtAmount: Decimal,
     redeemer: Signer,
     options: TransactionWithFeesOptions = {},
-  ): Promise<ContractTransactionResponse> {
+  ): Promise<TransactionResponse> {
     const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE } = options;
     const positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, redeemer);
 
