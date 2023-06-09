@@ -45,7 +45,7 @@ export class PriceFeed {
   public getUnderlyingToCollateralRate(
     underlyingCollateral: UnderlyingCollateralToken,
     collateralToken: CollateralToken,
-  ) {
+  ): Promise<Decimal> {
     switch (underlyingCollateral) {
       case 'wstETH':
         switch (collateralToken) {
