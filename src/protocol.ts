@@ -175,9 +175,8 @@ export class Protocol {
       throw new Error(`Unsupported underlying collateral token ${collateralToken}`);
     }
 
-    const [collateralInfo, redemptionRate, lastBlock] = await Promise.all([
+    const [collateralInfo, lastBlock] = await Promise.all([
       this.positionManager.collateralInfo(collateralTokenAddress),
-      this.positionManager.getRedemptionRate(collateralTokenAddress),
       this.provider.getBlock('latest'),
     ]);
     if (!lastBlock) {
@@ -186,9 +185,9 @@ export class Protocol {
 
     const lastFeeOperationTime = new Decimal(collateralInfo.lastFeeOperationTime, 0);
     const baseRate = new Decimal(collateralInfo.baseRate, Decimal.PRECISION);
+    const redemptionSpreadDecimal = new Decimal(collateralInfo.redemptionSpread, Decimal.PRECISION);
     const latestBlockTimestampDecimal = new Decimal(lastBlock.timestamp);
     const minutesPassed = latestBlockTimestampDecimal.sub(lastFeeOperationTime).div(SECONDS_IN_MINUTE);
-    const redemptionRateDecimal = new Decimal(redemptionRate, Decimal.PRECISION);
 
     // Using floor here because fractional number cannot be converted to BigInt
     const decayFactor = MINUTE_DECAY_FACTOR.pow(Math.floor(Number(minutesPassed.toString())));
@@ -204,7 +203,7 @@ export class Protocol {
       throw new Error('Calculated base rate cannot be zero or less!');
     }
 
-    return newBaseRate.add(redemptionRateDecimal).add(DEVIATION);
+    return newBaseRate.add(redemptionSpreadDecimal).add(DEVIATION);
   }
 
   /**
