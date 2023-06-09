@@ -38,8 +38,8 @@ export class PriceFeed {
   /**
    * This function provides conversion rate from any supported underlying token to any supported
    * collateral token.
-   * @param underlyingCollateral Underlying collateral token which rate converts to.
-   * @param collateralToken Collateral token which rate converts from.
+   * @param underlyingCollateral Underlying collateral token which rate converts from.
+   * @param collateralToken Collateral token which rate converts to.
    * @returns Conversion rate from underlying collateral token to collateral token.
    */
   public getUnderlyingToCollateralRate(
