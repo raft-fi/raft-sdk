@@ -4,6 +4,13 @@ import { goerliConfig } from './goerli';
 import { mainnetConfig } from './mainnet';
 import { NetworkConfig, SupportedNetwork } from './types';
 
+type TokenAddressType = {
+  ETH: null;
+  stETH: string;
+  wstETH: string;
+  R: string;
+};
+
 const networkConfig: { [network in SupportedNetwork]: NetworkConfig } = {
   mainnet: mainnetConfig,
   goerli: goerliConfig,
@@ -42,19 +49,19 @@ export class RaftConfig {
     return this._subgraphEndpoint;
   }
 
-  static getTokenAddress(token: Token): string | null {
+  static getTokenAddress<T extends Token>(token: T): TokenAddressType[T] {
     switch (token) {
       case 'stETH':
-        return this.networkConfig.stEth;
+        return this.networkConfig.stEth as TokenAddressType[T];
 
       case 'wstETH':
-        return this.networkConfig.wstEth;
+        return this.networkConfig.wstEth as TokenAddressType[T];
 
       case 'R':
-        return this.networkConfig.r;
+        return this.networkConfig.r as TokenAddressType[T];
 
       default:
-        return null;
+        return null as TokenAddressType[T];
     }
   }
 

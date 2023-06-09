@@ -10,6 +10,11 @@ interface OpenPositionsResponse {
   count: string;
 }
 
+const BETA = new Decimal(2);
+const DEVIATION = new Decimal(0.01);
+const SECONDS_IN_MINUTE = 60;
+const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)
+
 export class Protocol {
   private static instance: Protocol;
 
@@ -74,7 +79,7 @@ export class Protocol {
     return sendTransactionWithGasLimit(
       positionManager.redeemCollateral,
       [
-        RaftConfig.getTokenAddress(collateralToken) as string,
+        RaftConfig.getTokenAddress(collateralToken),
         debtAmount.toBigInt(Decimal.PRECISION),
         maxFeePercentage.toBigInt(Decimal.PRECISION),
       ],
@@ -144,37 +149,36 @@ export class Protocol {
    */
   async fetchBorrowingRate(collateralToken: UnderlyingCollateralToken): Promise<Decimal> {
     const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
-    if (collateralTokenAddress) {
-      this._borrowingRate = new Decimal(
-        await this.positionManager.getBorrowingRate(collateralTokenAddress),
-        Decimal.PRECISION,
-      );
+    this._borrowingRate = new Decimal(
+      await this.positionManager.getBorrowingRate(collateralTokenAddress),
+      Decimal.PRECISION,
+    );
 
-      return this._borrowingRate;
-    } else {
-      throw new Error(`Collateral token ${collateralToken} is not supported`);
-    }
+    return this._borrowingRate;
   }
 
+  /**
+   * Calculates fee for redeem tx based on user input.
+   * @param collateralToken Collateral token user wants to receive from redeem
+   * @param rToRedeem Amount of R tokens user wants to redeem
+   * @param collateralPrice Current price of collateral user wants to receive from redeem
+   * @param totalDebtSupply Total debt supply of R token
+   * @returns Fee percentage for redeem transaction.
+   */
   public async fetchRedemptionRate(
     collateralToken: UnderlyingCollateralToken,
     rToRedeem: Decimal,
     collateralPrice: Decimal,
     totalDebtSupply: Decimal,
   ): Promise<Decimal> {
-    const BETA = new Decimal(2);
-    const DEVIATION = new Decimal(0.01);
-    const SECONDS_IN_MINUTE = 60;
-    const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)
+    if (collateralPrice.isZero()) {
+      throw new Error('Collateral price is zero!');
+    }
 
     const collateralAmount = rToRedeem.div(collateralPrice);
     const redeemedFraction = collateralAmount.mul(collateralPrice).div(totalDebtSupply);
 
     const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
-    if (!collateralTokenAddress) {
-      throw new Error(`Unsupported underlying collateral token ${collateralToken}`);
-    }
-
     const [collateralInfo, lastBlock] = await Promise.all([
       this.positionManager.collateralInfo(collateralTokenAddress),
       this.provider.getBlock('latest'),
@@ -193,12 +197,7 @@ export class Protocol {
     const decayFactor = MINUTE_DECAY_FACTOR.pow(Math.floor(Number(minutesPassed.toString())));
     const decayedBaseRate = baseRate.mul(decayFactor);
 
-    let newBaseRate = decayedBaseRate.add(redeemedFraction.div(BETA));
-
-    if (newBaseRate.gt(Decimal.ONE)) {
-      newBaseRate = Decimal.ONE;
-    }
-
+    const newBaseRate = Decimal.min(decayedBaseRate.add(redeemedFraction.div(BETA)), Decimal.ONE);
     if (newBaseRate.lte(Decimal.ZERO)) {
       throw new Error('Calculated base rate cannot be zero or less!');
     }

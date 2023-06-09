@@ -65,7 +65,7 @@ export class PriceFeed {
 
   private async loadPriceFeed(token: UnderlyingCollateralToken): Promise<Contract> {
     if (!this.priceFeeds.has(token)) {
-      const priceFeedAddress = await this.positionManager.priceFeed(RaftConfig.getTokenAddress(token) as string);
+      const priceFeedAddress = await this.positionManager.priceFeed(RaftConfig.getTokenAddress(token));
       const contract = new Contract(
         priceFeedAddress,
         RaftConfig.isTestNetwork
