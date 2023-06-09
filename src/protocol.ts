@@ -205,12 +205,7 @@ export class Protocol {
     const decayFactor = MINUTE_DECAY_FACTOR.pow(Math.floor(Number(minutesPassed.toString())));
     const decayedBaseRate = baseRate.mul(decayFactor);
 
-    let newBaseRate = decayedBaseRate.add(redeemedFraction.div(BETA));
-
-    if (newBaseRate.gt(Decimal.ONE)) {
-      newBaseRate = Decimal.ONE;
-    }
-
+    const newBaseRate = Decimal.min(decayedBaseRate.add(redeemedFraction.div(BETA)), Decimal.ONE);
     if (newBaseRate.lte(Decimal.ZERO)) {
       throw new Error('Calculated base rate cannot be zero or less!');
     }
