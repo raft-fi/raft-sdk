@@ -54,7 +54,7 @@ export class PriceFeed {
           case 'stETH':
             return this.getWstEthToStEthRate();
           case 'wstETH':
-            return Decimal.ONE;
+            return Promise.resolve(Decimal.ONE);
         }
     }
   }
@@ -167,7 +167,7 @@ export class PriceFeed {
 
   private async getWstEthToStEthRate() {
     const wstEthContract = await this.loadCollateralToken();
-    const wstEthPerStEth = await wstEthContract.getWstETHByStETH(Decimal.ONE.toBigInt(Decimal.PRECISION));
+    const wstEthPerStEth = await wstEthContract.stEthPerToken();
 
     return new Decimal(wstEthPerStEth, Decimal.PRECISION);
   }
