@@ -10,6 +10,11 @@ interface OpenPositionsResponse {
   count: string;
 }
 
+const BETA = new Decimal(2);
+const DEVIATION = new Decimal(0.01);
+const SECONDS_IN_MINUTE = 60;
+const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)
+
 export class Protocol {
   private static instance: Protocol;
 
@@ -170,10 +175,9 @@ export class Protocol {
     collateralPrice: Decimal,
     totalDebtSupply: Decimal,
   ): Promise<Decimal> {
-    const BETA = new Decimal(2);
-    const DEVIATION = new Decimal(0.01);
-    const SECONDS_IN_MINUTE = 60;
-    const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)
+    if (collateralPrice.isZero()) {
+      throw new Error('Collateral price is zero!');
+    }
 
     const collateralAmount = rToRedeem.div(collateralPrice);
     const redeemedFraction = collateralAmount.mul(collateralPrice).div(totalDebtSupply);
