@@ -35,6 +35,30 @@ export class PriceFeed {
     }
   }
 
+  /**
+   * This function provides conversion rate from any supported underlying token to any supported
+   * collateral token.
+   * @param underlyingCollateral Underlying collateral token which rate converts from.
+   * @param collateralToken Collateral token which rate converts to.
+   * @returns Conversion rate from underlying collateral token to collateral token.
+   */
+  public getUnderlyingToCollateralRate(
+    underlyingCollateral: UnderlyingCollateralToken,
+    collateralToken: CollateralToken,
+  ): Promise<Decimal> {
+    switch (underlyingCollateral) {
+      case 'wstETH':
+        switch (collateralToken) {
+          case 'ETH':
+            return this.getTokenRateFromPrice(underlyingCollateral, collateralToken);
+          case 'stETH':
+            return this.getWstEthToStEthRate();
+          case 'wstETH':
+            return Promise.resolve(Decimal.ONE);
+        }
+    }
+  }
+
   private async loadPriceFeed(token: UnderlyingCollateralToken): Promise<Contract> {
     if (!this.priceFeeds.has(token)) {
       const priceFeedAddress = await this.positionManager.priceFeed(RaftConfig.getTokenAddress(token));
@@ -130,5 +154,21 @@ export class PriceFeed {
     const wstEthPerStEth = new Decimal(await wstEthContract.getWstETHByStETH(Decimal.ONE.value), Decimal.PRECISION);
 
     return wstEthPrice.mul(wstEthPerStEth).div(Decimal.ONE);
+  }
+
+  private async getTokenRateFromPrice(
+    fromToken: UnderlyingCollateralToken,
+    toToken: CollateralToken,
+  ): Promise<Decimal> {
+    const [toTokenPrice, fromTokenPrice] = await Promise.all([this.getPrice(toToken), this.getPrice(fromToken)]);
+
+    return toTokenPrice.div(fromTokenPrice);
+  }
+
+  private async getWstEthToStEthRate() {
+    const wstEthContract = await this.loadCollateralToken();
+    const wstEthPerStEth = await wstEthContract.stEthPerToken();
+
+    return new Decimal(wstEthPerStEth, Decimal.PRECISION);
   }
 }
