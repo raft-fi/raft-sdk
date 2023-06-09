@@ -26,12 +26,10 @@ export class Allowance {
     this.spender = spender;
     this.provider = provider;
 
-    const tokenAddress = RaftConfig.getTokenAddress(token);
-
     switch (this.token) {
       case 'R':
       case 'wstETH':
-        this.tokenContract = ERC20Permit__factory.connect(tokenAddress as string, this.provider);
+        this.tokenContract = ERC20Permit__factory.connect(RaftConfig.getTokenAddress(this.token), this.provider);
         break;
 
       case 'ETH':
@@ -40,7 +38,7 @@ export class Allowance {
         break;
 
       default:
-        this.tokenContract = ERC20__factory.connect(tokenAddress as string, this.provider);
+        this.tokenContract = ERC20__factory.connect(RaftConfig.getTokenAddress(this.token), this.provider);
     }
   }
 

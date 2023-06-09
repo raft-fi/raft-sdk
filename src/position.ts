@@ -514,7 +514,7 @@ export class UserPosition extends PositionWithRunner {
         return sendTransactionWithGasLimit(
           this.positionManager.managePosition,
           [
-            RaftConfig.getTokenAddress(collateralToken) as string,
+            RaftConfig.getTokenAddress(collateralToken),
             userAddress,
             absoluteCollateralChangeValue,
             isCollateralIncrease,

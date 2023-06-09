@@ -79,7 +79,7 @@ export class Protocol {
     return sendTransactionWithGasLimit(
       positionManager.redeemCollateral,
       [
-        RaftConfig.getTokenAddress(collateralToken) as string,
+        RaftConfig.getTokenAddress(collateralToken),
         debtAmount.toBigInt(Decimal.PRECISION),
         maxFeePercentage.toBigInt(Decimal.PRECISION),
       ],
@@ -149,16 +149,12 @@ export class Protocol {
    */
   async fetchBorrowingRate(collateralToken: UnderlyingCollateralToken): Promise<Decimal> {
     const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
-    if (collateralTokenAddress) {
-      this._borrowingRate = new Decimal(
-        await this.positionManager.getBorrowingRate(collateralTokenAddress),
-        Decimal.PRECISION,
-      );
+    this._borrowingRate = new Decimal(
+      await this.positionManager.getBorrowingRate(collateralTokenAddress),
+      Decimal.PRECISION,
+    );
 
-      return this._borrowingRate;
-    } else {
-      throw new Error(`Collateral token ${collateralToken} is not supported`);
-    }
+    return this._borrowingRate;
   }
 
   /**
@@ -183,10 +179,6 @@ export class Protocol {
     const redeemedFraction = collateralAmount.mul(collateralPrice).div(totalDebtSupply);
 
     const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
-    if (!collateralTokenAddress) {
-      throw new Error(`Unsupported underlying collateral token ${collateralToken}`);
-    }
-
     const [collateralInfo, lastBlock] = await Promise.all([
       this.positionManager.collateralInfo(collateralTokenAddress),
       this.provider.getBlock('latest'),
