@@ -55,11 +55,7 @@ export class PriceFeed {
             return this.getWstEthToStEthRate();
           case 'wstETH':
             return Decimal.ONE;
-          default:
-            throw new Error(`Collateral token ${collateralToken} is not supported`);
         }
-      default:
-        throw new Error(`Underlying collateral token ${underlyingCollateral} is not supported`);
     }
   }
 

@@ -3,7 +3,7 @@ import { JsonRpcProvider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import { ERC20Indexable, ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
-import { CollateralToken, TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
+import { TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
 import { sendTransactionWithGasLimit } from './utils';
 
 interface OpenPositionsResponse {
