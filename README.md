@@ -24,9 +24,9 @@ yarn add @raft-fi/sdk
 Opening a position in Raft is as simple as the following:
 
 ```ts
-import { Decimal } from "@tempusfinance/decimal";
-import { UserPosition } from "@raft-fi/sdk";
-import { Signer } from "ethers";
+import { Decimal } from '@tempusfinance/decimal';
+import { UserPosition } from '@raft-fi/sdk';
+import { Signer } from 'ethers';
 
 async function main() {
   const signer = new Signer(...);
@@ -39,6 +39,17 @@ Closing the position is just as easy:
 
 ```ts
 await position.close();
+```
+
+Although the SDK is designed to be as simple as possible, it requires a bit of configuration before use. The main point
+of configuration is the `RaftConfig` class, where the consumer can specify the network to use (either Mainnet or Goerli)
+as well as the URL of the subgraph endpoint (e.g. [our official subgraph](https://thegraph.com/explorer/subgraphs/93YgGPdoraNcpG6531Jo3KqTcrmQ4BR4Ny9MfkH49NLX)):
+
+```ts
+import { RaftConfig } from '@raft-fi/sdk';
+
+RaftConfig.setNetwork('mainnet');
+RaftConfig.setSubgraphEndpoint('https://gateway.thegraph.com/api/<api-key>/subgraphs/id/93YgGPdoraNcpG6531Jo3KqTcrmQ4BR4Ny9MfkH49NLX');
 ```
 
 ## Getting Started
