@@ -202,7 +202,7 @@ export class Protocol {
       throw new Error('Calculated base rate cannot be zero or less!');
     }
 
-    return newBaseRate.add(redemptionSpreadDecimal).add(DEVIATION);
+    return Decimal.max(newBaseRate.add(redemptionSpreadDecimal).add(DEVIATION), Decimal.ONE);
   }
 
   /**
