@@ -1,6 +1,6 @@
 {
   "name": "@raft-fi/sdk",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "type": "module",
   "main": "./dist/raft-sdk.umd.cjs",
   "module": "./dist/raft-sdk.js",
