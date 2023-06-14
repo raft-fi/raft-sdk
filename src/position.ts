@@ -60,7 +60,7 @@ interface ManagePositionStepsPrefetch {
 interface ManagePositionStep {
   type: ManagePositionStepType;
   numberOfSteps: number;
-  action: () => Promise<TransactionResponse>;
+  action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
 }
 
 export const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
@@ -583,7 +583,7 @@ export class UserPosition extends PositionWithRunner {
     collateralChange: Decimal,
     debtChange: Decimal,
     options: ManagePositionOptions & ManagePositionStepsPrefetch = {},
-  ): AsyncGenerator<ManagePositionStep | undefined, void, undefined> {
+  ): AsyncGenerator<ManagePositionStep, void, ERC20PermitSignatureStruct | undefined> {
     const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE, frontendTag } = options;
     let { collateralToken = this.underlyingCollateralToken } = options;
 
@@ -609,6 +609,7 @@ export class UserPosition extends PositionWithRunner {
     const maxFeePercentageValue = maxFeePercentage.value;
     const isUnderlyingToken = this.isUnderlyingCollateralToken(collateralToken);
 
+    const whitelistingRequired = !isUnderlyingToken;
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
     const collateralTokenAllowanceRequired = collateralTokenContract !== null && isCollateralIncrease;
     const rTokenAllowanceRequired = !isDebtIncrease && !isUnderlyingToken;
@@ -619,7 +620,7 @@ export class UserPosition extends PositionWithRunner {
     const userAddress = await this.getUserAddress();
 
     const {
-      isDelegateWhitelisted = this.isDelegateWhitelisted(collateralToken),
+      isDelegateWhitelisted = whitelistingRequired ? await this.isDelegateWhitelisted(collateralToken) : false,
       collateralTokenAllowance = collateralTokenAllowanceRequired
         ? await getTokenAllowance(collateralTokenContract, userAddress, positionManagerAddress)
         : Decimal.MAX_DECIMAL,
@@ -628,13 +629,14 @@ export class UserPosition extends PositionWithRunner {
         : Decimal.MAX_DECIMAL,
     } = options;
 
+    const whitelistingStepNeeded = whitelistingRequired && !isDelegateWhitelisted;
     const collateralApprovalStepNeeded =
       collateralTokenAllowanceRequired && collateralChange.gt(collateralTokenAllowance);
-    const rTokenApprovalStepNeeded = rTokenAllowanceRequired && debtChange.gt(rTokenAllowance);
+    const rTokenApprovalStepNeeded = rTokenAllowanceRequired && debtChange.abs().gt(rTokenAllowance);
     const numberOfSteps =
-      Number(!isDelegateWhitelisted) + Number(collateralApprovalStepNeeded) + Number(rTokenApprovalStepNeeded) + 1;
+      Number(whitelistingStepNeeded) + Number(collateralApprovalStepNeeded) + Number(rTokenApprovalStepNeeded) + 1;
 
-    if (!isDelegateWhitelisted) {
+    if (whitelistingStepNeeded) {
       yield {
         type: 'whitelist',
         numberOfSteps,
@@ -642,30 +644,53 @@ export class UserPosition extends PositionWithRunner {
       };
     }
 
-    // TODO: use permit signatures
-    const rPermitSignature = createEmptyPermitSignature();
-    const collateralPermitSignature = createEmptyPermitSignature();
+    let collateralPermitSignature = createEmptyPermitSignature();
+    let rPermitSignature = createEmptyPermitSignature();
 
     if (collateralApprovalStepNeeded) {
-      yield {
-        type: {
-          name: 'approve',
-          token: collateralToken,
-        },
-        numberOfSteps,
-        action: () => collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue),
-      };
+      if (TOKENS_WITH_PERMIT.has(collateralToken)) {
+        const signature = yield {
+          type: {
+            name: 'permit',
+            token: collateralToken,
+          },
+          numberOfSteps,
+          action: () =>
+            createPermitSignature(this.user, collateralChange, positionManagerAddress, collateralTokenContract),
+        };
+
+        if (!signature) {
+          throw new Error(`${collateralToken} permit signature is required`);
+        }
+
+        collateralPermitSignature = signature;
+      } else {
+        yield {
+          type: {
+            name: 'approve',
+            token: collateralToken,
+          },
+          numberOfSteps,
+          action: () => collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue),
+        };
+      }
     }
 
     if (rTokenApprovalStepNeeded) {
-      yield {
+      const signature = yield {
         type: {
-          name: 'approve',
+          name: 'permit',
           token: 'R',
         },
         numberOfSteps,
-        action: () => this.rToken.approve(positionManagerAddress, absoluteDebtChangeValue),
+        action: () => createPermitSignature(this.user, debtChange.abs(), positionManagerAddress, this.rToken),
       };
+
+      if (!signature) {
+        throw new Error(`${collateralToken} permit signature is required`);
+      }
+
+      rPermitSignature = signature;
     }
 
     switch (collateralToken) {

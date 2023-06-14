@@ -9,7 +9,7 @@ export async function getTokenAllowance(
   walletAddress: string,
   spender: string,
 ): Promise<Decimal> {
-  return tokenContract
+  return tokenContract !== null
     ? new Decimal(await tokenContract.allowance(walletAddress, spender), Decimal.PRECISION)
     : Decimal.MAX_DECIMAL;
 }
