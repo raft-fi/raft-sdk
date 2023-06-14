@@ -4,6 +4,16 @@ import { Token } from './types';
 import { ERC20, ERC20Permit } from './typechain';
 import { getTokenContract } from './utils';
 
+export async function getTokenAllowance(
+  tokenContract: ERC20 | ERC20Permit | null,
+  walletAddress: string,
+  spender: string,
+): Promise<Decimal> {
+  return tokenContract
+    ? new Decimal(await tokenContract.allowance(walletAddress, spender), Decimal.PRECISION)
+    : Decimal.MAX_DECIMAL;
+}
+
 export class Allowance {
   protected readonly token: Token;
 
@@ -33,15 +43,7 @@ export class Allowance {
    * Fetches and returns token allowance.
    */
   public async fetchAllowance(): Promise<Decimal | null> {
-    if (this.tokenContract) {
-      this.allowance = new Decimal(
-        await this.tokenContract.allowance(this.walletAddress, this.spender),
-        Decimal.PRECISION,
-      );
-    } else {
-      // In case token is ETH
-      this.allowance = Decimal.MAX_DECIMAL;
-    }
+    this.allowance = await getTokenAllowance(this.tokenContract, this.walletAddress, this.spender);
 
     return this.allowance;
   }
