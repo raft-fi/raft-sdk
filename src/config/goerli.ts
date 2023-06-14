@@ -10,5 +10,8 @@ export const goerliConfig: NetworkConfig = {
   raftDebtToken: '0xAABF1f5e5C9b559aaCD3c97B41B0B1ae593e31A8',
   positionManager: '0xeaf8aad45d563f14d8b443277dd51c426ad8607f',
   positionManagerStEth: '0x4e01f8c03893be67b60af6a1b49d6e51a8781e3c',
+  priceFeeds: {
+    wstETH: '0x0341b185e55A0860D6a7e853fd44D1f4fe37dB37',
+  },
   testNetwork: true,
 };

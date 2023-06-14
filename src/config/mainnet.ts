@@ -10,5 +10,8 @@ export const mainnetConfig: NetworkConfig = {
   raftDebtToken: '0x1C1D49D8F601f19D2Fa88b14BEf491759aaaF5d8',
   positionManager: '0x5f59b322eb3e16a0c78846195af1f588b77403fc',
   positionManagerStEth: '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6',
+  priceFeeds: {
+    wstETH: '0xDB5De0A34b29fFDeEc61E2D8ab4dB63f6641C730',
+  },
   testNetwork: false,
 };

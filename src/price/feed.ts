@@ -2,7 +2,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Contract, Provider } from 'ethers';
 import { request, gql } from 'graphql-request';
 import { RaftConfig } from '../config';
-import { PositionManager, PositionManager__factory, WstETH, WstETH__factory } from '../typechain';
+import { WstETH, WstETH__factory } from '../typechain';
 import { CollateralToken, R_TOKEN, Token, UnderlyingCollateralToken } from '../types';
 import { SUBGRAPH_PRICE_PRECISION } from '../constants';
 
@@ -12,13 +12,11 @@ export type PriceQueryResponse = {
 
 export class PriceFeed {
   private provider: Provider;
-  private positionManager: PositionManager;
   private priceFeeds = new Map<UnderlyingCollateralToken, Contract>();
   private collateralTokens = new Map<UnderlyingCollateralToken, WstETH>();
 
   public constructor(provider: Provider) {
     this.provider = provider;
-    this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, provider);
   }
 
   public async getPrice(token: Token): Promise<Decimal> {
@@ -61,9 +59,8 @@ export class PriceFeed {
 
   private async loadPriceFeed(token: UnderlyingCollateralToken): Promise<Contract> {
     if (!this.priceFeeds.has(token)) {
-      const priceFeedAddress = await this.positionManager.priceFeed(RaftConfig.getTokenAddress(token));
       const contract = new Contract(
-        priceFeedAddress,
+        RaftConfig.networkConfig.priceFeeds[token],
         RaftConfig.isTestNetwork
           ? ['function getPrice() view returns (uint256)']
           : ['function lastGoodPrice() view returns (uint256)'],
