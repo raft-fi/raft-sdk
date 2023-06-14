@@ -687,7 +687,7 @@ export class UserPosition extends PositionWithRunner {
       };
 
       if (!signature) {
-        throw new Error(`${collateralToken} permit signature is required`);
+        throw new Error('R permit signature is required');
       }
 
       rPermitSignature = signature;
