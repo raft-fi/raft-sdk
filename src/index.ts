@@ -7,6 +7,7 @@ export {
   PositionWithAddress,
   TOKENS_WITH_PERMIT,
   UserPosition,
+  type ManagePositionCallbacks,
   type ManagePositionOptions,
   type PositionTransaction,
   type PositionTransactionType,
