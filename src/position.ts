@@ -445,137 +445,25 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws If the collateral change is negative and the collateral token is ETH.
    */
   public async manage(
     collateralChange: Decimal,
     debtChange: Decimal,
     options: ManagePositionOptions = {},
-  ): Promise<TransactionResponse> {
-    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE, frontendTag } = options;
-    let { collateralToken = this.underlyingCollateralToken } = options;
+  ): Promise<void> {
+    const steps = this.getManageSteps(collateralChange, debtChange, options);
+    let collateralPermitSignature: ERC20PermitSignatureStruct | undefined;
 
-    if (!SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING[this.underlyingCollateralToken].has(collateralToken)) {
-      throw Error(
-        `Underlying collateral token ${this.underlyingCollateralToken} doesn't support collateral token ${collateralToken}`,
-      );
-    }
+    for (let step = await steps.next(); !step.done; step = await steps.next(collateralPermitSignature)) {
+      const result = await step.value.action();
 
-    // check whether it's closing position (i.e. collateralChange is ZERO while debtChange is -ve MAX)
-    if (collateralChange.isZero() && !debtChange.equals(DEBT_CHANGE_TO_CLOSE)) {
-      if (debtChange.isZero()) {
-        throw Error('Collateral and debt change cannot be both zero');
+      if (result instanceof TransactionResponse) {
+        await result.wait();
+        collateralPermitSignature = undefined;
+      } else {
+        collateralPermitSignature = result;
       }
-
-      // It saves gas by not using the delegate contract if the collateral token is not the underlying collateral token.
-      // It does it by skipping the delegate whitelisting (if it is not whitelisted) and approving the R token.
-      collateralToken = this.underlyingCollateralToken;
-    }
-
-    const absoluteCollateralChangeValue = collateralChange.abs().value;
-    const isCollateralIncrease = collateralChange.gt(Decimal.ZERO);
-    const absoluteDebtChangeValue = debtChange.abs().value;
-    const isDebtIncrease = debtChange.gt(Decimal.ZERO);
-    const maxFeePercentageValue = maxFeePercentage.value;
-
-    const userAddress = await this.getUserAddress();
-    const isUnderlyingToken = this.isUnderlyingCollateralToken(collateralToken);
-    const positionManagerAddress = RaftConfig.getPositionManagerAddress(
-      this.underlyingCollateralToken,
-      collateralToken,
-    );
-    const collateralTokenContract = this.loadCollateralToken(collateralToken);
-
-    if (!isUnderlyingToken) {
-      await this.checkDelegateWhitelisting(userAddress, positionManagerAddress, options);
-    }
-
-    /**
-     * In case of R repayment we need to approve delegate to spend user's R tokens.
-     * This is valid only if collateral used is not wstETH, because ETH and stETH go through a delegate contract.
-     */
-    let rPermitSignature = options.rPermitSignature ?? createEmptyPermitSignature();
-    if (!options.rPermitSignature && !isDebtIncrease && !isUnderlyingToken) {
-      rPermitSignature = await this.checkTokenAllowance(
-        this.rToken,
-        userAddress,
-        positionManagerAddress,
-        new Decimal(absoluteDebtChangeValue, Decimal.PRECISION),
-        true,
-        options,
-      );
-    }
-
-    let collateralPermitSignature = options.collateralPermitSignature ?? createEmptyPermitSignature();
-    if (!options.collateralPermitSignature && collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
-      const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
-
-      collateralPermitSignature = await this.checkTokenAllowance(
-        collateralTokenContract,
-        userAddress,
-        positionManagerAddress,
-        new Decimal(absoluteCollateralChangeValue, Decimal.PRECISION),
-        tokenConfig.supportsPermit,
-        options,
-      );
-    }
-
-    switch (this.underlyingCollateralToken) {
-      case 'wstETH':
-        switch (collateralToken) {
-          case 'ETH':
-            if (!isCollateralIncrease) {
-              throw new Error('ETH withdrawal from the position is not supported');
-            }
-
-            return sendTransactionWithGasLimit(
-              this.loadPositionManagerStETH().managePositionETH,
-              [absoluteDebtChangeValue, isDebtIncrease, maxFeePercentageValue, rPermitSignature],
-              gasLimitMultiplier,
-              frontendTag,
-              this.user,
-              absoluteCollateralChangeValue,
-            );
-
-          case 'stETH':
-            return sendTransactionWithGasLimit(
-              this.loadPositionManagerStETH().managePositionStETH,
-              [
-                absoluteCollateralChangeValue,
-                isCollateralIncrease,
-                absoluteDebtChangeValue,
-                isDebtIncrease,
-                maxFeePercentageValue,
-                rPermitSignature,
-              ],
-              gasLimitMultiplier,
-              frontendTag,
-              this.user,
-            );
-
-          case 'wstETH':
-            return sendTransactionWithGasLimit(
-              this.positionManager.managePosition,
-              [
-                RaftConfig.getTokenAddress(collateralToken),
-                userAddress,
-                absoluteCollateralChangeValue,
-                isCollateralIncrease,
-                absoluteDebtChangeValue,
-                isDebtIncrease,
-                maxFeePercentageValue,
-                collateralPermitSignature,
-              ],
-              gasLimitMultiplier,
-              frontendTag,
-              this.user,
-            );
-          default:
-            throw new Error(
-              `Underlying collateral token ${this.underlyingCollateralToken} does not support collateral token ${collateralToken}`,
-            );
-        }
     }
   }
 
@@ -759,6 +647,7 @@ export class UserPosition extends PositionWithRunner {
               this.user,
             ),
         };
+        break;
       }
     }
   }
@@ -878,7 +767,6 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws An error if the collateral amount is less than or equal to 0.
    * @throws An error if the debt amount is less than or equal to 0.
    */
@@ -886,7 +774,7 @@ export class UserPosition extends PositionWithRunner {
     collateralAmount: Decimal,
     debtAmount: Decimal,
     options: ManagePositionOptions = {},
-  ): Promise<TransactionResponse> {
+  ): Promise<void> {
     if (collateralAmount.lte(Decimal.ZERO)) {
       throw new Error('Collateral amount must be greater than 0');
     }
@@ -894,7 +782,7 @@ export class UserPosition extends PositionWithRunner {
       throw new Error('Debt amount must be greater than 0');
     }
 
-    return this.manage(collateralAmount, debtAmount, options);
+    this.manage(collateralAmount, debtAmount, options);
   }
 
   /**
@@ -913,10 +801,9 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    */
-  public async close(options: ManagePositionOptions = {}): Promise<TransactionResponse> {
-    return this.manage(Decimal.ZERO, DEBT_CHANGE_TO_CLOSE, options);
+  public async close(options: ManagePositionOptions = {}): Promise<void> {
+    this.manage(Decimal.ZERO, DEBT_CHANGE_TO_CLOSE, options);
   }
 
   /**
@@ -937,15 +824,14 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async addCollateral(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
+  public async addCollateral(amount: Decimal, options: ManagePositionOptions = {}): Promise<void> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
 
-    return this.manage(amount, Decimal.ZERO, options);
+    this.manage(amount, Decimal.ZERO, options);
   }
 
   /**
@@ -965,15 +851,14 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async withdrawCollateral(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
+  public async withdrawCollateral(amount: Decimal, options: ManagePositionOptions = {}): Promise<void> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
 
-    return this.manage(amount.mul(-1), Decimal.ZERO, options);
+    this.manage(amount.mul(-1), Decimal.ZERO, options);
   }
 
   /**
@@ -993,15 +878,14 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async borrow(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
+  public async borrow(amount: Decimal, options: ManagePositionOptions = {}): Promise<void> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
 
-    return this.manage(Decimal.ZERO, amount, options);
+    this.manage(Decimal.ZERO, amount, options);
   }
 
   /**
@@ -1021,15 +905,14 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async repayDebt(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
+  public async repayDebt(amount: Decimal, options: ManagePositionOptions = {}): Promise<void> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
 
-    return this.manage(Decimal.ZERO, amount.mul(-1), options);
+    this.manage(Decimal.ZERO, amount.mul(-1), options);
   }
 
   /**
@@ -1042,61 +925,6 @@ export class UserPosition extends PositionWithRunner {
     }
 
     return this.userAddress;
-  }
-
-  private async checkDelegateWhitelisting(
-    userAddress: string,
-    positionManagerAddress: string,
-    options: ManagePositionOptions,
-  ): Promise<void> {
-    const isDelegateWhitelisted = await this.positionManager.isDelegateWhitelisted(userAddress, positionManagerAddress);
-
-    if (!isDelegateWhitelisted) {
-      const { onDelegateWhitelistingStart, onDelegateWhitelistingEnd } = options;
-
-      onDelegateWhitelistingStart?.();
-
-      try {
-        const whitelistingTx = await this.positionManager.whitelistDelegate(positionManagerAddress, true);
-        await whitelistingTx.wait();
-        onDelegateWhitelistingEnd?.();
-      } catch (error) {
-        onDelegateWhitelistingEnd?.(error);
-        throw error;
-      }
-    }
-  }
-
-  private async checkTokenAllowance(
-    tokenContract: ERC20 | ERC20Permit,
-    userAddress: string,
-    spenderAddress: string,
-    amountToCheck: Decimal,
-    allowPermit: boolean,
-    options: ManagePositionOptions,
-  ): Promise<ERC20PermitSignatureStruct> {
-    const allowance = new Decimal(await tokenContract.allowance(userAddress, spenderAddress), Decimal.PRECISION);
-
-    if (allowance.lt(amountToCheck)) {
-      const { onApprovalStart, onApprovalEnd } = options;
-
-      try {
-        // Use permit when possible
-        if (allowPermit) {
-          return createPermitSignature(this.user, amountToCheck, spenderAddress, tokenContract);
-        }
-
-        onApprovalStart?.();
-        const approveTx = await tokenContract.approve(spenderAddress, amountToCheck.toBigInt(Decimal.PRECISION));
-        await approveTx.wait();
-        onApprovalEnd?.();
-      } catch (error) {
-        onApprovalEnd?.(error);
-        throw error;
-      }
-    }
-
-    return createEmptyPermitSignature();
   }
 
   private loadPositionManagerStETH(): PositionManagerStETH {
