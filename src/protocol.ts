@@ -51,11 +51,6 @@ export class Protocol {
     this.provider = provider;
 
     this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, this.provider);
-    /* this.raftCollateralToken = ERC20Indexable__factory.connect(
-      RaftConfig.networkConfig.raftCollateralTokens['wstETH'],
-      this.provider,
-    ); */
-    /* this.raftDebtToken = ERC20Indexable__factory.connect(RaftConfig.networkConfig.raftDebtToken, this.provider); */
   }
 
   /**

@@ -1,4 +1,4 @@
-import { CollateralToken, Token } from '../types';
+import { CollateralToken, TOKENS, Token } from '../types';
 import { goerliConfig } from './goerli';
 import { mainnetConfig } from './mainnet';
 import { NetworkConfig, SupportedNetwork } from './types';
@@ -46,13 +46,13 @@ export class RaftConfig {
   }
 
   static getTokenTicker(address: string): Token | null {
-    const tokenTicker = Object.keys(this.networkConfig.tokenTickerToTokenConfigMap).find(ticker => {
-      if (this.networkConfig.tokenTickerToTokenConfigMap[ticker as Token].address === address) {
+    const tokenTicker = TOKENS.find(ticker => {
+      if (this.networkConfig.tokenTickerToTokenConfigMap[ticker].address === address) {
         return true;
       }
     });
 
-    return tokenTicker ? (tokenTicker as Token) : null;
+    return tokenTicker ? tokenTicker : null;
   }
 
   static getPositionManagerAddress(collateralToken: CollateralToken): string {

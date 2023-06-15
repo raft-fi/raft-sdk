@@ -10,8 +10,6 @@ import {
   ERC20__factory,
   PositionManager,
   PositionManager__factory,
-  PositionManagerStETH,
-  PositionManagerStETH__factory,
   ERC20Permit,
   ERC20Permit__factory,
 } from './typechain';
