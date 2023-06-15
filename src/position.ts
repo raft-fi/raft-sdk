@@ -41,7 +41,8 @@ interface PositionTransactionsQuery {
 export const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
 
 const SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING: Record<UnderlyingCollateralToken, Set<CollateralToken>> = {
-  wstETH: new Set(['ETH', 'stETH', 'wstETH']),
+  wstETH: new Set(['stETH', 'wstETH']),
+  WETH: new Set(['ETH', 'WETH']),
 };
 
 const DEBT_CHANGE_TO_CLOSE = Decimal.MAX_DECIMAL.mul(-1);
@@ -445,7 +446,7 @@ export class UserPosition extends PositionWithRunner {
     const isUnderlyingToken = this.isUnderlyingCollateralToken(collateralToken);
     const positionManagerAddress = RaftConfig.getPositionManagerAddress(collateralToken);
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
-    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.r, this.user);
+    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.tokenTickerToAddressMap.R, this.user);
 
     if (!isUnderlyingToken) {
       await this.checkDelegateWhitelisting(userAddress, positionManagerAddress, options);
@@ -481,6 +482,7 @@ export class UserPosition extends PositionWithRunner {
 
     switch (collateralToken) {
       case 'ETH':
+        // TODO - Replace this code with new ETH delegate when it's deployed
         if (!isCollateralIncrease) {
           throw new Error('ETH withdrawal from the position is not supported');
         }
@@ -511,6 +513,7 @@ export class UserPosition extends PositionWithRunner {
         );
 
       case 'wstETH':
+      case 'WETH':
         return sendTransactionWithGasLimit(
           this.positionManager.managePosition,
           [
@@ -579,7 +582,7 @@ export class UserPosition extends PositionWithRunner {
     const absoluteDebtChangeValue = debtChange.abs().value;
     const isDebtDecrease = debtChange.lt(Decimal.ZERO);
     const positionManagerAddress = RaftConfig.getPositionManagerAddress(collateralToken);
-    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.r, this.user);
+    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.tokenTickerToAddressMap.R, this.user);
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
 
     /**

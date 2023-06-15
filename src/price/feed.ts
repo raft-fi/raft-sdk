@@ -91,7 +91,7 @@ export class PriceFeed {
 
   private async loadCollateralToken(): Promise<WstETH> {
     if (!this.collateralTokens.has('wstETH')) {
-      const contract = WstETH__factory.connect(RaftConfig.networkConfig.wstEth, this.provider);
+      const contract = WstETH__factory.connect(RaftConfig.networkConfig.tokenTickerToAddressMap.wstETH, this.provider);
 
       this.collateralTokens.set('wstETH', contract);
       return contract;
@@ -123,9 +123,9 @@ export class PriceFeed {
         return this.fetchStEthTestnetPrice();
       }
 
-      return (await this.fetchSubgraphPrice('ETH')) ?? this.fetchStEthPriceFromBlockchain();
+      return (await this.fetchSubgraphPrice('ETH')) ?? this.fetchWethPrice();
     } catch {
-      return this.fetchStEthPriceFromBlockchain();
+      return this.fetchWethPrice();
     }
   }
 

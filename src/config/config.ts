@@ -1,16 +1,7 @@
-import { ZeroAddress } from 'ethers';
 import { CollateralToken, Token } from '../types';
 import { goerliConfig } from './goerli';
 import { mainnetConfig } from './mainnet';
 import { NetworkConfig, SupportedNetwork } from './types';
-
-type TokenAddressType = {
-  ETH: null;
-  WETH: string;
-  stETH: string;
-  wstETH: string;
-  R: string;
-};
 
 const networkConfig: { [network in SupportedNetwork]: NetworkConfig } = {
   mainnet: mainnetConfig,
@@ -50,58 +41,15 @@ export class RaftConfig {
     return this._subgraphEndpoint;
   }
 
-  static getTokenAddress<T extends Token>(token: T): TokenAddressType[T] {
-    switch (token) {
-      case 'ETH':
-        return ZeroAddress as TokenAddressType[T];
-
-      case 'WETH':
-        return this.networkConfig.wEth as TokenAddressType[T];
-
-      case 'stETH':
-        return this.networkConfig.stEth as TokenAddressType[T];
-
-      case 'wstETH':
-        return this.networkConfig.wstEth as TokenAddressType[T];
-
-      case 'R':
-        return this.networkConfig.r as TokenAddressType[T];
-
-      default:
-        return null as TokenAddressType[T];
-    }
+  static getTokenAddress(token: Token): string {
+    return this.networkConfig.tokenTickerToAddressMap[token];
   }
 
   static getTokenTicker(address: string): Token | null {
-    switch (address.toLowerCase()) {
-      case ZeroAddress:
-        return 'ETH';
-
-      case this.networkConfig.wEth.toLowerCase():
-        return 'WETH';
-
-      case this.networkConfig.stEth.toLowerCase():
-        return 'stETH';
-
-      case this.networkConfig.wstEth.toLowerCase():
-        return 'wstETH';
-
-      case this.networkConfig.r.toLowerCase():
-        return 'R';
-    }
-
-    return null;
+    return this.networkConfig.tokenAddressToTickerMap[address.toLowerCase()] || null;
   }
 
   static getPositionManagerAddress(collateralToken: CollateralToken): string {
-    switch (collateralToken) {
-      // TODO - Add separate position manger for ETH token once it's deployed
-      case 'ETH':
-      case 'stETH':
-        return this.networkConfig.positionManagerStEth;
-
-      default:
-        return this.networkConfig.positionManager;
-    }
+    return this.networkConfig.collateralToPositionManagerMap[collateralToken];
   }
 }

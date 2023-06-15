@@ -1,21 +1,33 @@
-import { UnderlyingCollateralToken } from '../types';
+import { Token, UnderlyingCollateralToken } from '../types';
 
 export type SupportedNetwork = 'goerli' | 'mainnet';
 
-type TickerToAddressMap = {
+type UnderlyingTokenTickerToAddressMap = {
   [tokenTicker in UnderlyingCollateralToken]: string;
 };
 
+type TokenConfig = {
+  address: string;
+  ticker: Token;
+  supportsPermit: boolean;
+  positionManager: string;
+};
+
+export type TokenTickerToTokenConfigMap = {
+  [tokenTicker in Token]: TokenConfig;
+};
+
+export type TokenAddressToTokenConfigMap = {
+  [tokenAddress: string]: TokenConfig;
+};
+
 export interface NetworkConfig {
-  wEth: string;
-  eth: string;
-  wstEth: string;
-  stEth: string;
-  r: string;
-  raftCollateralTokens: TickerToAddressMap;
+  raftCollateralTokens: UnderlyingTokenTickerToAddressMap;
   raftDebtToken: string;
   positionManager: string;
   positionManagerStEth: string;
-  priceFeeds: TickerToAddressMap;
+  priceFeeds: UnderlyingTokenTickerToAddressMap;
+  tokenAddressToTokenConfigMap: TokenAddressToTokenConfigMap;
+  tokenTickerToTokenConfigMap: TokenTickerToTokenConfigMap;
   testNetwork: boolean;
 }
