@@ -23,19 +23,14 @@ export class Balance {
     this.walletAddress = walletAddress;
     this.provider = provider;
 
-    switch (this.token) {
-      case 'R':
-      case 'wstETH':
-        this.tokenContract = ERC20Permit__factory.connect(RaftConfig.getTokenAddress(this.token), this.provider);
-        break;
+    const tokenConfig = RaftConfig.networkConfig.tokenTickerToTokenConfigMap[token];
 
-      case 'ETH':
-        // ETH is not a contract
-        this.tokenContract = null;
-        break;
-
-      default:
-        this.tokenContract = ERC20__factory.connect(RaftConfig.getTokenAddress(this.token), this.provider);
+    if (tokenConfig.ticker === 'ETH') {
+      this.tokenContract = null;
+    } else if (tokenConfig.supportsPermit) {
+      this.tokenContract = ERC20Permit__factory.connect(RaftConfig.getTokenAddress(this.token), this.provider);
+    } else {
+      this.tokenContract = ERC20__factory.connect(RaftConfig.getTokenAddress(this.token), this.provider);
     }
   }
 

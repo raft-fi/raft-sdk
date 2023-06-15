@@ -42,14 +42,20 @@ export class RaftConfig {
   }
 
   static getTokenAddress(token: Token): string {
-    return this.networkConfig.tokenTickerToAddressMap[token];
+    return this.networkConfig.tokenTickerToTokenConfigMap[token].address;
   }
 
   static getTokenTicker(address: string): Token | null {
-    return this.networkConfig.tokenAddressToTickerMap[address.toLowerCase()] || null;
+    const tokenTicker = Object.keys(this.networkConfig.tokenTickerToTokenConfigMap).find(ticker => {
+      if (this.networkConfig.tokenTickerToTokenConfigMap[ticker as Token].address === address) {
+        return true;
+      }
+    });
+
+    return tokenTicker ? (tokenTicker as Token) : null;
   }
 
   static getPositionManagerAddress(collateralToken: CollateralToken): string {
-    return this.networkConfig.collateralToPositionManagerMap[collateralToken];
+    return this.networkConfig.tokenTickerToTokenConfigMap[collateralToken].positionManager;
   }
 }
