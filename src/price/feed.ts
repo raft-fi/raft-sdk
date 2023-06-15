@@ -26,6 +26,8 @@ export class PriceFeed {
 
       case 'ETH':
         return this.fetchEthPrice();
+      case 'WETH':
+        return this.fetchWethPrice();
       case 'stETH':
         return this.fetchStEthPrice();
       case 'wstETH':
@@ -47,12 +49,25 @@ export class PriceFeed {
     switch (underlyingCollateral) {
       case 'wstETH':
         switch (collateralToken) {
-          case 'ETH':
-            return this.getTokenRateFromPrice(underlyingCollateral, collateralToken);
           case 'stETH':
             return this.getWstEthToStEthRate();
           case 'wstETH':
             return Promise.resolve(Decimal.ONE);
+          default:
+            throw new Error(
+              `Underlying collateral token ${underlyingCollateral} does not support ${collateralToken} collateral!`,
+            );
+        }
+      case 'WETH':
+        switch (collateralToken) {
+          case 'ETH':
+            return Promise.resolve(Decimal.ONE);
+          case 'WETH':
+            return Promise.resolve(Decimal.ONE);
+          default:
+            throw new Error(
+              `Underlying collateral token ${underlyingCollateral} does not support ${collateralToken} collateral!`,
+            );
         }
     }
   }
@@ -111,6 +126,15 @@ export class PriceFeed {
       return (await this.fetchSubgraphPrice('ETH')) ?? this.fetchStEthPriceFromBlockchain();
     } catch {
       return this.fetchStEthPriceFromBlockchain();
+    }
+  }
+
+  private async fetchWethPrice(): Promise<Decimal> {
+    const priceFeed = await this.loadPriceFeed('WETH');
+    if (RaftConfig.isTestNetwork) {
+      return new Decimal(await priceFeed.getPrice.staticCall());
+    } else {
+      return new Decimal(await priceFeed.lastGoodPrice.staticCall());
     }
   }
 

@@ -7,6 +7,8 @@ type TickerToAddressMap = {
 };
 
 export interface NetworkConfig {
+  wEth: string;
+  eth: string;
   wstEth: string;
   stEth: string;
   r: string;

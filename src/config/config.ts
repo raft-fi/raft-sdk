@@ -6,6 +6,7 @@ import { NetworkConfig, SupportedNetwork } from './types';
 
 type TokenAddressType = {
   ETH: null;
+  WETH: string;
   stETH: string;
   wstETH: string;
   R: string;
@@ -51,6 +52,12 @@ export class RaftConfig {
 
   static getTokenAddress<T extends Token>(token: T): TokenAddressType[T] {
     switch (token) {
+      case 'ETH':
+        return ZeroAddress as TokenAddressType[T];
+
+      case 'WETH':
+        return this.networkConfig.wEth as TokenAddressType[T];
+
       case 'stETH':
         return this.networkConfig.stEth as TokenAddressType[T];
 
@@ -70,6 +77,9 @@ export class RaftConfig {
       case ZeroAddress:
         return 'ETH';
 
+      case this.networkConfig.wEth.toLowerCase():
+        return 'WETH';
+
       case this.networkConfig.stEth.toLowerCase():
         return 'stETH';
 
@@ -85,6 +95,7 @@ export class RaftConfig {
 
   static getPositionManagerAddress(collateralToken: CollateralToken): string {
     switch (collateralToken) {
+      // TODO - Add separate position manger for ETH token once it's deployed
       case 'ETH':
       case 'stETH':
         return this.networkConfig.positionManagerStEth;
