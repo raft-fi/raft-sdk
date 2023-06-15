@@ -10,17 +10,17 @@ interface OpenPositionsResponse {
   count: string;
 }
 
-interface CollateralTotalSupply {
+export interface CollateralTotalSupply {
   collateralToken: UnderlyingCollateralToken;
   amount: Decimal;
 }
 
-interface DebtTotalSupply {
+export interface DebtTotalSupply {
   collateralToken: UnderlyingCollateralToken;
   amount: Decimal;
 }
 
-interface BorrowingRate {
+export interface BorrowingRate {
   collateralToken: UnderlyingCollateralToken;
   rate: Decimal;
 }
@@ -139,6 +139,14 @@ export class Protocol {
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
         const collateralTokenAddress = RaftConfig.networkConfig.raftCollateralTokens[collateralToken];
 
+        // Return zero if address is not defined in config
+        if (!collateralTokenAddress) {
+          return {
+            collateralToken: collateralToken,
+            amount: Decimal.ZERO,
+          };
+        }
+
         const contract = ERC20Indexable__factory.connect(collateralTokenAddress, this.provider);
 
         return {
@@ -159,6 +167,14 @@ export class Protocol {
     this._debtSupply = await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
         const debtTokenAddress = RaftConfig.networkConfig.raftDebtTokens[collateralToken];
+
+        // Return zero if address is not defined in config
+        if (!debtTokenAddress) {
+          return {
+            collateralToken: collateralToken,
+            amount: Decimal.ZERO,
+          };
+        }
 
         const contract = ERC20Indexable__factory.connect(debtTokenAddress, this.provider);
 

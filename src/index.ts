@@ -12,7 +12,7 @@ export {
   type PositionTransactionType,
 } from './position';
 export { PriceFeed } from './price';
-export { Protocol } from './protocol';
+export { Protocol, type BorrowingRate, type CollateralTotalSupply, type DebtTotalSupply } from './protocol';
 export {
   COLLATERAL_TOKENS,
   R_TOKEN,

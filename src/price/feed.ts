@@ -43,7 +43,7 @@ export class PriceFeed {
 
       const underlyingCollateralPrice = await this.fetchPriceFromPriceFeed(tokenConfig.underlyingTokenTicker);
 
-      return underlyingToCollateralRate.mul(underlyingCollateralPrice);
+      return underlyingCollateralPrice.div(underlyingToCollateralRate);
     }
 
     throw new Error(`Failed to fetch ${token} price!`);
@@ -79,6 +79,12 @@ export class PriceFeed {
 
   private async fetchPriceFromPriceFeed(token: UnderlyingCollateralToken): Promise<Decimal> {
     const priceFeed = await this.loadPriceFeed(token);
+
+    // In case price feed is not defined in config, return price 1
+    if (!priceFeed) {
+      return Decimal.ONE;
+    }
+
     if (RaftConfig.isTestNetwork) {
       return new Decimal(await priceFeed.getPrice.staticCall());
     } else {
@@ -86,7 +92,11 @@ export class PriceFeed {
     }
   }
 
-  private async loadPriceFeed(token: UnderlyingCollateralToken): Promise<Contract> {
+  private async loadPriceFeed(token: UnderlyingCollateralToken): Promise<Contract | null> {
+    if (!RaftConfig.networkConfig.priceFeeds[token]) {
+      return null;
+    }
+
     if (!this.priceFeeds.has(token)) {
       const contract = new Contract(
         RaftConfig.networkConfig.priceFeeds[token],

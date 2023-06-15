@@ -307,16 +307,20 @@ class PositionWithRunner extends Position {
     return this.underlyingCollateralToken === collateralToken;
   }
 
-  private async fetchCollateral(): Promise<void> {
+  public async fetchCollateral(): Promise<Decimal> {
     const userAddress = await this.getUserAddress();
     const collateral = await this.indexCollateralToken.balanceOf(userAddress);
     this.setCollateral(new Decimal(collateral, Decimal.PRECISION));
+
+    return this.getCollateral();
   }
 
-  private async fetchDebt(): Promise<void> {
+  public async fetchDebt(): Promise<Decimal> {
     const userAddress = await this.getUserAddress();
     const debt = await this.indexDebtToken.balanceOf(userAddress);
     this.setDebt(new Decimal(debt, Decimal.PRECISION));
+
+    return this.getDebt();
   }
 }
 
