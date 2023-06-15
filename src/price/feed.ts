@@ -26,6 +26,8 @@ export class PriceFeed {
 
       case 'ETH':
         return this.fetchEthPrice();
+      case 'WETH':
+        return this.fetchEthPrice(); // TODO - Update to fetch WETH price
       case 'stETH':
         return this.fetchStEthPrice();
       case 'wstETH':
@@ -47,12 +49,25 @@ export class PriceFeed {
     switch (underlyingCollateral) {
       case 'wstETH':
         switch (collateralToken) {
-          case 'ETH':
-            return this.getTokenRateFromPrice(underlyingCollateral, collateralToken);
           case 'stETH':
             return this.getWstEthToStEthRate();
           case 'wstETH':
             return Promise.resolve(Decimal.ONE);
+          default:
+            throw new Error(
+              `Underlying collateral token ${underlyingCollateral} doesn't support collateral token ${collateralToken}!`,
+            );
+        }
+      case 'WETH':
+        switch (collateralToken) {
+          case 'ETH':
+            return Promise.resolve(Decimal.ONE);
+          case 'WETH':
+            return Promise.resolve(Decimal.ONE);
+          default:
+            throw new Error(
+              `Underlying collateral token ${underlyingCollateral} doesn't support collateral token ${collateralToken}!`,
+            );
         }
     }
   }

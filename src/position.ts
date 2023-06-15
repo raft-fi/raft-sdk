@@ -41,7 +41,8 @@ interface PositionTransactionsQuery {
 export const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
 
 const SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING: Record<UnderlyingCollateralToken, Set<CollateralToken>> = {
-  wstETH: new Set(['ETH', 'stETH', 'wstETH']),
+  wstETH: new Set(['stETH', 'wstETH']),
+  WETH: new Set(['ETH', 'WETH']),
 };
 
 const DEBT_CHANGE_TO_CLOSE = Decimal.MAX_DECIMAL.mul(-1);
@@ -480,7 +481,7 @@ export class UserPosition extends PositionWithRunner {
     }
 
     switch (collateralToken) {
-      case 'ETH':
+      case 'ETH': // TODO - Update this case to use new ETH delegate once it's deployed
         if (!isCollateralIncrease) {
           throw new Error('ETH withdrawal from the position is not supported');
         }
@@ -510,6 +511,7 @@ export class UserPosition extends PositionWithRunner {
           this.user,
         );
 
+      case 'WETH':
       case 'wstETH':
         return sendTransactionWithGasLimit(
           this.positionManager.managePosition,
