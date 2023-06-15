@@ -6,6 +6,7 @@ import { NetworkConfig, SupportedNetwork } from './types';
 
 type TokenAddressType = {
   ETH: null;
+  WETH: string;
   stETH: string;
   wstETH: string;
   R: string;
