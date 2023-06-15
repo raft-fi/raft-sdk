@@ -431,6 +431,10 @@ export class UserPosition extends PositionWithRunner {
    * {@link UserPosition.withdrawCollateral}, {@link UserPosition.borrow}, and {@link UserPosition.repayDebt}.
    * @param collateralChange The amount to change the collateral by. Positive values deposit collateral, negative values
    * withdraw collateral.
+   *
+   * For more granular control over the transaction, use {@link getManageSteps} instead.
+   * @param collateralChange The amount of collateral to deposit. Positive values deposit collateral, negative values
+   * withdraw it.
    * @param debtChange The amount to change the debt by. Positive values borrow debt, negative values repay debt.
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
@@ -494,6 +498,26 @@ export class UserPosition extends PositionWithRunner {
     }
   }
 
+  /**
+   * Returns the steps for managing the position's collateral and debt amounts. The steps are not dispatched
+   * automatically and it is the caller's response to dispatch them. Each step contains the type of the step, the total
+   * number of steps, and the action to perform. The action is either a transaction to dispatch or a function that
+   * returns a permit signature for the collateral token or R token.
+   * @param collateralChange The amount of change the collateral by. Positive values deposit collateral, negative values
+   * withdraw it.
+   * @param debtChange The amount to change the debt by. Positive values borrow debt, negative values repay debt.
+   * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
+   * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
+   * collateral token.
+   * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
+   * @param options.frontendTag The frontend operator tag for the transaction. Optional.
+   * @param options.isDelegateWhitelisted Whether the delegate is whitelisted for the position owner. If not provided,
+   * it will be fetched automatically.
+   * @param options.collateralTokenAllowance The collateral token allowance of the position owner for the position
+   * manager. If not provided, it will be fetched automatically.
+   * @param options.rTokenAllowance The R token allowance of the position owner for the position manager. If not
+   * provided, it will be fetched automatically.
+   */
   public async *getManageSteps(
     collateralChange: Decimal,
     debtChange: Decimal,

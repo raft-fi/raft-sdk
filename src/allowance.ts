@@ -4,6 +4,13 @@ import { Token } from './types';
 import { ERC20, ERC20Permit } from './typechain';
 import { getTokenContract } from './utils';
 
+/**
+ * Fetches and returns token allowance. In case of `null` token contract, returns infinity (`Decimal.MAX_DECIMAL`).
+ * @param tokenContract Token contract to check allowance for.
+ * @param walletAddress Wallet to check allowance for.
+ * @param spender Address to which allowance belongs.
+ * @returns Token allowance.
+ */
 export async function getTokenAllowance(
   tokenContract: ERC20 | ERC20Permit | null,
   walletAddress: string,
