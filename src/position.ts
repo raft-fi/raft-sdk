@@ -481,8 +481,7 @@ export class UserPosition extends PositionWithRunner {
     }
 
     switch (collateralToken) {
-      case 'ETH':
-        // TODO - Replace this code with new ETH delegate when it's deployed
+      case 'ETH': // TODO - Update this case to use new ETH delegate once it's deployed
         if (!isCollateralIncrease) {
           throw new Error('ETH withdrawal from the position is not supported');
         }

@@ -55,7 +55,7 @@ export class PriceFeed {
             return Promise.resolve(Decimal.ONE);
           default:
             throw new Error(
-              `Underlying collateral token ${underlyingCollateral} does not support ${collateralToken} collateral!`,
+              `Underlying collateral token ${underlyingCollateral} doesn't support collateral token ${collateralToken}!`,
             );
         }
       case 'WETH':
@@ -66,7 +66,7 @@ export class PriceFeed {
             return Promise.resolve(Decimal.ONE);
           default:
             throw new Error(
-              `Underlying collateral token ${underlyingCollateral} does not support ${collateralToken} collateral!`,
+              `Underlying collateral token ${underlyingCollateral} doesn't support collateral token ${collateralToken}!`,
             );
         }
     }
