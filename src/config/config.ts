@@ -1,4 +1,4 @@
-import { CollateralToken, TOKENS, Token } from '../types';
+import { CollateralToken, TOKENS, Token, UnderlyingCollateralToken } from '../types';
 import { goerliConfig } from './goerli';
 import { mainnetConfig } from './mainnet';
 import { NetworkConfig, SupportedNetwork } from './types';
@@ -43,23 +43,32 @@ export class RaftConfig {
 
   static getTokenAddress(token: Token): string {
     try {
-      return this.networkConfig.tokenTickerToTokenConfigMap[token].address;
+      return this.networkConfig.tokens[token].address;
     } catch (error) {
       throw new Error(`Failed to fetch ${token} address!`);
     }
   }
 
   static getTokenTicker(address: string): Token | null {
-    const tokenTicker = TOKENS.find(ticker => {
-      if (this.networkConfig.tokenTickerToTokenConfigMap[ticker].address === address) {
-        return true;
-      }
-    });
+    const tokenTicker = TOKENS.find(
+      ticker => this.networkConfig.tokens[ticker].address.toLowerCase() === address.toLowerCase(),
+    );
 
-    return tokenTicker ? tokenTicker : null;
+    return tokenTicker ?? null;
   }
 
-  static getPositionManagerAddress(collateralToken: CollateralToken): string {
-    return this.networkConfig.tokenTickerToTokenConfigMap[collateralToken].positionManager;
+  static getPositionManagerAddress(
+    underlyingCollateralToken: UnderlyingCollateralToken,
+    collateralToken: CollateralToken,
+  ): string {
+    const collateralConfig =
+      this.networkConfig.underlyingTokens[underlyingCollateralToken].supportedCollateralTokens[collateralToken];
+    if (!collateralConfig) {
+      throw new Error(
+        `Underlying collateral token ${underlyingCollateralToken} does not support collateral token ${collateralToken}`,
+      );
+    }
+
+    return collateralConfig.positionManager;
   }
 }

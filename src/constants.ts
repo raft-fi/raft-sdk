@@ -4,3 +4,4 @@ import { Decimal } from '@tempusfinance/decimal';
 
 export const MIN_COLLATERAL_RATIO = new Decimal(1.2); // 120%
 export const MIN_NET_DEBT = new Decimal(3000); // 3000 R
+export const SUBGRAPH_PRICE_PRECISION = 8;

@@ -1,5 +1,5 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { ContractRunner, Provider, Signer, ContractTransactionResponse, TransactionResponse, Contract } from 'ethers';
+import { ContractRunner, Provider, Signer, ContractTransactionResponse, TransactionResponse } from 'ethers';
 import { request, gql } from 'graphql-request';
 import { RaftConfig } from './config';
 import { MIN_COLLATERAL_RATIO, MIN_NET_DEBT } from './constants';
@@ -12,6 +12,8 @@ import {
   PositionManager__factory,
   ERC20Permit,
   ERC20Permit__factory,
+  PositionManagerStETH__factory,
+  PositionManagerStETH,
 } from './typechain';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
 import { CollateralToken, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
@@ -39,7 +41,7 @@ interface PositionTransactionsQuery {
 export const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
 
 const SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING: Record<UnderlyingCollateralToken, Set<CollateralToken>> = {
-  wstETH: new Set(['stETH', 'wstETH']),
+  wstETH: new Set(['ETH', 'stETH', 'wstETH']),
   WETH: new Set(['ETH', 'WETH']),
 };
 
@@ -452,12 +454,12 @@ export class UserPosition extends PositionWithRunner {
 
     const userAddress = await this.getUserAddress();
     const isUnderlyingToken = this.isUnderlyingCollateralToken(collateralToken);
-    const positionManagerAddress = RaftConfig.getPositionManagerAddress(collateralToken);
-    const collateralTokenContract = this.loadCollateralToken(collateralToken);
-    const rTokenContract = ERC20Permit__factory.connect(
-      RaftConfig.networkConfig.tokenTickerToTokenConfigMap['R'].address,
-      this.user,
+    const positionManagerAddress = RaftConfig.getPositionManagerAddress(
+      this.underlyingCollateralToken,
+      collateralToken,
     );
+    const collateralTokenContract = this.loadCollateralToken(collateralToken);
+    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.tokens['R'].address, this.user);
 
     if (!isUnderlyingToken) {
       await this.checkDelegateWhitelisting(userAddress, positionManagerAddress, options);
@@ -481,7 +483,7 @@ export class UserPosition extends PositionWithRunner {
 
     let collateralPermitSignature = options.collateralPermitSignature ?? createEmptyPermitSignature();
     if (!options.collateralPermitSignature && collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
-      const tokenConfig = RaftConfig.networkConfig.tokenTickerToTokenConfigMap[collateralToken];
+      const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
 
       collateralPermitSignature = await this.checkTokenAllowance(
         collateralTokenContract,
@@ -493,40 +495,88 @@ export class UserPosition extends PositionWithRunner {
       );
     }
 
-    if (isUnderlyingToken) {
-      return sendTransactionWithGasLimit(
-        this.positionManager.managePosition,
-        [
-          RaftConfig.getTokenAddress(collateralToken),
-          userAddress,
-          absoluteCollateralChangeValue,
-          isCollateralIncrease,
-          absoluteDebtChangeValue,
-          isDebtIncrease,
-          maxFeePercentageValue,
-          collateralPermitSignature,
-        ],
-        gasLimitMultiplier,
-        frontendTag,
-        this.user,
-      );
-    }
+    switch (this.underlyingCollateralToken) {
+      case 'wstETH':
+        switch (collateralToken) {
+          case 'ETH':
+            if (!isCollateralIncrease) {
+              throw new Error('ETH withdrawal from the position is not supported');
+            }
 
-    const tokenConfig = RaftConfig.networkConfig.tokenTickerToTokenConfigMap[collateralToken];
-    return sendTransactionWithGasLimit(
-      this.loadDelegate(collateralToken)[tokenConfig.positionMangerManageFunc],
-      [
-        absoluteCollateralChangeValue,
-        isCollateralIncrease,
-        absoluteDebtChangeValue,
-        isDebtIncrease,
-        maxFeePercentageValue,
-        rPermitSignature,
-      ],
-      gasLimitMultiplier,
-      frontendTag,
-      this.user,
-    );
+            return sendTransactionWithGasLimit(
+              this.loadPositionManagerStETH().managePositionETH,
+              [absoluteDebtChangeValue, isDebtIncrease, maxFeePercentageValue, rPermitSignature],
+              gasLimitMultiplier,
+              frontendTag,
+              this.user,
+              absoluteCollateralChangeValue,
+            );
+
+          case 'stETH':
+            return sendTransactionWithGasLimit(
+              this.loadPositionManagerStETH().managePositionStETH,
+              [
+                absoluteCollateralChangeValue,
+                isCollateralIncrease,
+                absoluteDebtChangeValue,
+                isDebtIncrease,
+                maxFeePercentageValue,
+                rPermitSignature,
+              ],
+              gasLimitMultiplier,
+              frontendTag,
+              this.user,
+            );
+
+          case 'wstETH':
+            return sendTransactionWithGasLimit(
+              this.positionManager.managePosition,
+              [
+                RaftConfig.getTokenAddress(collateralToken),
+                userAddress,
+                absoluteCollateralChangeValue,
+                isCollateralIncrease,
+                absoluteDebtChangeValue,
+                isDebtIncrease,
+                maxFeePercentageValue,
+                collateralPermitSignature,
+              ],
+              gasLimitMultiplier,
+              frontendTag,
+              this.user,
+            );
+          default:
+            throw new Error(
+              `Underlying collateral token ${this.underlyingCollateralToken} does not support collateral token ${collateralToken}`,
+            );
+        }
+      case 'WETH':
+        switch (collateralToken) {
+          case 'ETH':
+            throw new Error('Not implemented! WETH -> ETH deposit');
+          case 'WETH':
+            return sendTransactionWithGasLimit(
+              this.positionManager.managePosition,
+              [
+                RaftConfig.getTokenAddress(collateralToken),
+                userAddress,
+                absoluteCollateralChangeValue,
+                isCollateralIncrease,
+                absoluteDebtChangeValue,
+                isDebtIncrease,
+                maxFeePercentageValue,
+                collateralPermitSignature,
+              ],
+              gasLimitMultiplier,
+              frontendTag,
+              this.user,
+            );
+          default:
+            throw new Error(
+              `Underlying collateral token ${this.underlyingCollateralToken} does not support collateral token ${collateralToken}`,
+            );
+        }
+    }
   }
 
   /**
@@ -537,7 +587,10 @@ export class UserPosition extends PositionWithRunner {
    */
   public async isDelegateWhitelisted(collateralToken: CollateralToken): Promise<boolean> {
     if (!this.isUnderlyingCollateralToken(collateralToken)) {
-      const positionManagerAddress = RaftConfig.getPositionManagerAddress(collateralToken);
+      const positionManagerAddress = RaftConfig.getPositionManagerAddress(
+        this.underlyingCollateralToken,
+        collateralToken,
+      );
       const userAddress = await this.getUserAddress();
 
       return await this.positionManager.isDelegateWhitelisted(userAddress, positionManagerAddress);
@@ -555,7 +608,10 @@ export class UserPosition extends PositionWithRunner {
    */
   public async whitelistDelegate(collateralToken: CollateralToken): Promise<ContractTransactionResponse | null> {
     if (!this.isUnderlyingCollateralToken(collateralToken)) {
-      return await this.positionManager.whitelistDelegate(RaftConfig.getPositionManagerAddress(collateralToken), true);
+      return await this.positionManager.whitelistDelegate(
+        RaftConfig.getPositionManagerAddress(this.underlyingCollateralToken, collateralToken),
+        true,
+      );
     }
 
     return null;
@@ -576,11 +632,11 @@ export class UserPosition extends PositionWithRunner {
     const absoluteCollateralChangeValue = collateralChange.abs().value;
     const absoluteDebtChangeValue = debtChange.abs().value;
     const isDebtDecrease = debtChange.lt(Decimal.ZERO);
-    const positionManagerAddress = RaftConfig.getPositionManagerAddress(collateralToken);
-    const rTokenContract = ERC20Permit__factory.connect(
-      RaftConfig.networkConfig.tokenTickerToTokenConfigMap['R'].address,
-      this.user,
+    const positionManagerAddress = RaftConfig.getPositionManagerAddress(
+      this.underlyingCollateralToken,
+      collateralToken,
     );
+    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.tokens['R'].address, this.user);
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
 
     /**
@@ -599,7 +655,7 @@ export class UserPosition extends PositionWithRunner {
 
     let collateralPermitSignature = createEmptyPermitSignature();
     if (collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
-      const tokenConfig = RaftConfig.networkConfig.tokenTickerToTokenConfigMap[collateralToken];
+      const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
 
       // Use permit when possible
       if (tokenConfig.supportsPermit) {
@@ -860,10 +916,13 @@ export class UserPosition extends PositionWithRunner {
     return createEmptyPermitSignature();
   }
 
-  private loadDelegate(collateralToken: CollateralToken): Contract {
-    const tokenConfig = RaftConfig.networkConfig.tokenTickerToTokenConfigMap[collateralToken];
+  private loadPositionManagerStETH(): PositionManagerStETH {
+    const positionManagerStETH = PositionManagerStETH__factory.connect(
+      RaftConfig.networkConfig.positionManagerStEth,
+      this.user,
+    );
 
-    return new Contract(tokenConfig.positionManager, JSON.parse(tokenConfig.positionManagerABI), this.user);
+    return positionManagerStETH;
   }
 
   private loadCollateralToken(collateralToken: CollateralToken): ERC20 | null {

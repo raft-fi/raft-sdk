@@ -1,7 +1,10 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Contract, Provider } from 'ethers';
+import { request, gql } from 'graphql-request';
 import { RaftConfig } from '../config';
 import { CollateralToken, Token, UnderlyingCollateralToken } from '../types';
+import { SUBGRAPH_PRICE_PRECISION } from '../constants';
+import { CollateralTokenConfig } from '../config/types';
 
 export type PriceQueryResponse = {
   value: string;
@@ -16,7 +19,7 @@ export class PriceFeed {
   }
 
   public async getPrice(token: Token): Promise<Decimal> {
-    const tokenConfig = RaftConfig.networkConfig.tokenTickerToTokenConfigMap[token];
+    const tokenConfig = RaftConfig.networkConfig.tokens[token];
 
     if (tokenConfig.hardcodedPrice) {
       return tokenConfig.hardcodedPrice;
@@ -26,13 +29,15 @@ export class PriceFeed {
       return this.fetchPriceFromPriceFeed(tokenConfig.priceFeedTicker);
     }
 
-    if (tokenConfig.underlyingTokenTicker) {
+    const collateralTokenConfig = this.getTokenCollateralConfig(token);
+
+    if (collateralTokenConfig) {
       let underlyingToCollateralRate: Decimal | null = null;
-      if (tokenConfig.underlyingCollateralRate instanceof Decimal) {
-        underlyingToCollateralRate = tokenConfig.underlyingCollateralRate;
-      } else if (typeof tokenConfig.underlyingCollateralRate === 'function') {
-        underlyingToCollateralRate = await tokenConfig.underlyingCollateralRate(
-          RaftConfig.getTokenAddress(tokenConfig.underlyingTokenTicker),
+      if (collateralTokenConfig.underlyingCollateralRate instanceof Decimal) {
+        underlyingToCollateralRate = collateralTokenConfig.underlyingCollateralRate;
+      } else if (typeof collateralTokenConfig.underlyingCollateralRate === 'function') {
+        underlyingToCollateralRate = await collateralTokenConfig.underlyingCollateralRate(
+          RaftConfig.getTokenAddress(collateralTokenConfig.underlyingTokenTicker),
           this.provider,
         );
       }
@@ -41,7 +46,7 @@ export class PriceFeed {
         throw new Error(`Failed to fetch underlying to collateral rate for token ${tokenConfig.ticker}!`);
       }
 
-      const underlyingCollateralPrice = await this.fetchPriceFromPriceFeed(tokenConfig.underlyingTokenTicker);
+      const underlyingCollateralPrice = await this.fetchPriceFromPriceFeed(collateralTokenConfig.underlyingTokenTicker);
 
       return underlyingCollateralPrice.div(underlyingToCollateralRate);
     }
@@ -56,25 +61,31 @@ export class PriceFeed {
    * @param collateralToken Collateral token which rate converts to.
    * @returns Conversion rate from underlying collateral token to collateral token.
    */
-  public getUnderlyingCollateralRate(token: CollateralToken): Promise<Decimal> {
-    const tokenConfig = RaftConfig.networkConfig.tokenTickerToTokenConfigMap[token];
+  public getUnderlyingCollateralRate(
+    underlyingCollateral: UnderlyingCollateralToken,
+    collateralToken: CollateralToken,
+  ): Promise<Decimal> {
+    const collateralTokenConfig =
+      RaftConfig.networkConfig.underlyingTokens[underlyingCollateral].supportedCollateralTokens[collateralToken];
 
-    if (tokenConfig.underlyingCollateralRate instanceof Decimal) {
-      return Promise.resolve(tokenConfig.underlyingCollateralRate);
-    } else if (typeof tokenConfig.underlyingCollateralRate === 'function') {
-      if (!tokenConfig.underlyingTokenTicker) {
-        throw new Error(
-          `Failed to fetch underlying collateral rate for token ${token} without underlying token ticker!`,
-        );
-      }
+    if (!collateralTokenConfig) {
+      throw new Error(
+        `Underlying collateral token ${underlyingCollateral} does not support collateral token ${collateralToken}`,
+      );
+    }
 
-      return tokenConfig.underlyingCollateralRate(
-        RaftConfig.getTokenAddress(tokenConfig.underlyingTokenTicker),
+    if (collateralTokenConfig.underlyingCollateralRate instanceof Decimal) {
+      return Promise.resolve(collateralTokenConfig.underlyingCollateralRate);
+    } else if (typeof collateralTokenConfig.underlyingCollateralRate === 'function') {
+      return collateralTokenConfig.underlyingCollateralRate(
+        RaftConfig.getTokenAddress(collateralTokenConfig.underlyingTokenTicker),
         this.provider,
       );
     }
 
-    throw new Error(`Failed to fetch underlying collateral rate for token ${token}!`);
+    throw new Error(
+      `Failed to fetch underlying collateral ${underlyingCollateral} rate for collateral token ${collateralToken}!`,
+    );
   }
 
   private async fetchPriceFromPriceFeed(token: UnderlyingCollateralToken): Promise<Decimal> {
@@ -111,5 +122,45 @@ export class PriceFeed {
     }
 
     return this.priceFeeds.get(token) as Contract;
+  }
+
+  private async fetchSubgraphPrice(token: Token) {
+    const query = gql`
+      query getTokenPrice($token: String!) {
+        price(id: $token) {
+          value
+        }
+      }
+    `;
+    const variables = {
+      token,
+    };
+
+    const response = await request<{ price: PriceQueryResponse }>(RaftConfig.subgraphEndpoint, query, variables);
+
+    return new Decimal(BigInt(response.price.value), SUBGRAPH_PRICE_PRECISION);
+  }
+
+  private getTokenCollateralConfig(token: Token) {
+    if (token === 'R') {
+      return null;
+    }
+
+    let collateralTokenConfig: CollateralTokenConfig | null = null;
+    const underlyingTokenList = Object.entries(RaftConfig.networkConfig.underlyingTokens);
+
+    for (let i = 0; i < underlyingTokenList.length; i++) {
+      const [, config] = underlyingTokenList[i];
+
+      if (config.supportedCollateralTokens[token]) {
+        collateralTokenConfig = config.supportedCollateralTokens[token];
+      }
+    }
+
+    if (!collateralTokenConfig) {
+      throw new Error(`Failed to find collateral token config for token ${token}!`);
+    }
+
+    return collateralTokenConfig;
   }
 }

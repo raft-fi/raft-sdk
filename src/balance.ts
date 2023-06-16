@@ -1,8 +1,8 @@
 import { JsonRpcProvider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { RaftConfig } from './config';
 import { Token } from './types';
-import { ERC20, ERC20Permit, ERC20Permit__factory, ERC20__factory } from './typechain';
+import { ERC20, ERC20Permit } from './typechain';
+import { getTokenContract } from './utils';
 
 export class Balance {
   protected readonly token: Token;
@@ -23,15 +23,7 @@ export class Balance {
     this.walletAddress = walletAddress;
     this.provider = provider;
 
-    const tokenConfig = RaftConfig.networkConfig.tokenTickerToTokenConfigMap[token];
-
-    if (tokenConfig.ticker === 'ETH') {
-      this.tokenContract = null;
-    } else if (tokenConfig.supportsPermit) {
-      this.tokenContract = ERC20Permit__factory.connect(RaftConfig.getTokenAddress(this.token), this.provider);
-    } else {
-      this.tokenContract = ERC20__factory.connect(RaftConfig.getTokenAddress(this.token), this.provider);
-    }
+    this.tokenContract = getTokenContract(this.token, this.provider);
   }
 
   /**
