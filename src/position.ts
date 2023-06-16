@@ -1,5 +1,12 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { ContractRunner, Provider, Signer, ContractTransactionResponse, TransactionResponse } from 'ethers';
+import {
+  ContractRunner,
+  Provider,
+  Signer,
+  ContractTransactionResponse,
+  TransactionResponse,
+  ZeroAddress,
+} from 'ethers';
 import { request, gql } from 'graphql-request';
 import { getTokenAllowance } from './allowance';
 import { RaftConfig } from './config';
@@ -991,7 +998,7 @@ export class UserPosition extends PositionWithRunner {
 
     const tokenAddress = RaftConfig.getTokenAddress(collateralToken);
 
-    if (!tokenAddress) {
+    if (!tokenAddress || tokenAddress === ZeroAddress) {
       return null;
     }
 
