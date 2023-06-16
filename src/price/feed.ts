@@ -33,26 +33,31 @@ export class PriceFeed {
       return this.fetchSubgraphPrice(tokenConfig.subgraphPriceDataTicker);
     }
 
-    const collateralTokenConfig = this.getTokenCollateralConfig(token);
+    // Fetch price using collateral conversion rate which does not apply to R token
+    if (token !== 'R') {
+      const collateralTokenConfig = this.getTokenCollateralConfig(token);
 
-    if (collateralTokenConfig) {
-      let underlyingToCollateralRate: Decimal | null = null;
-      if (collateralTokenConfig.underlyingCollateralRate instanceof Decimal) {
-        underlyingToCollateralRate = collateralTokenConfig.underlyingCollateralRate;
-      } else if (typeof collateralTokenConfig.underlyingCollateralRate === 'function') {
-        underlyingToCollateralRate = await collateralTokenConfig.underlyingCollateralRate(
-          RaftConfig.getTokenAddress(collateralTokenConfig.underlyingTokenTicker),
-          this.provider,
+      if (collateralTokenConfig) {
+        let underlyingToCollateralRate: Decimal | null = null;
+        if (collateralTokenConfig.underlyingCollateralRate instanceof Decimal) {
+          underlyingToCollateralRate = collateralTokenConfig.underlyingCollateralRate;
+        } else if (typeof collateralTokenConfig.underlyingCollateralRate === 'function') {
+          underlyingToCollateralRate = await collateralTokenConfig.underlyingCollateralRate(
+            RaftConfig.getTokenAddress(collateralTokenConfig.underlyingTokenTicker),
+            this.provider,
+          );
+        }
+
+        if (!underlyingToCollateralRate) {
+          throw new Error(`Failed to fetch underlying to collateral rate for token ${tokenConfig.ticker}!`);
+        }
+
+        const underlyingCollateralPrice = await this.fetchPriceFromPriceFeed(
+          collateralTokenConfig.underlyingTokenTicker,
         );
+
+        return underlyingCollateralPrice.div(underlyingToCollateralRate);
       }
-
-      if (!underlyingToCollateralRate) {
-        throw new Error(`Failed to fetch underlying to collateral rate for token ${tokenConfig.ticker}!`);
-      }
-
-      const underlyingCollateralPrice = await this.fetchPriceFromPriceFeed(collateralTokenConfig.underlyingTokenTicker);
-
-      return underlyingCollateralPrice.div(underlyingToCollateralRate);
     }
 
     throw new Error(`Failed to fetch ${token} price!`);
@@ -80,15 +85,11 @@ export class PriceFeed {
 
     if (collateralTokenConfig.underlyingCollateralRate instanceof Decimal) {
       return Promise.resolve(collateralTokenConfig.underlyingCollateralRate);
-    } else if (typeof collateralTokenConfig.underlyingCollateralRate === 'function') {
-      return collateralTokenConfig.underlyingCollateralRate(
-        RaftConfig.getTokenAddress(collateralTokenConfig.underlyingTokenTicker),
-        this.provider,
-      );
     }
 
-    throw new Error(
-      `Failed to fetch underlying collateral ${underlyingCollateral} rate for collateral token ${collateralToken}!`,
+    return collateralTokenConfig.underlyingCollateralRate(
+      RaftConfig.getTokenAddress(collateralTokenConfig.underlyingTokenTicker),
+      this.provider,
     );
   }
 
@@ -145,16 +146,12 @@ export class PriceFeed {
     return new Decimal(BigInt(response.price.value), SUBGRAPH_PRICE_PRECISION);
   }
 
-  private getTokenCollateralConfig(token: Token) {
-    if (token === 'R') {
-      return null;
-    }
-
+  private getTokenCollateralConfig(token: CollateralToken) {
     let collateralTokenConfig: CollateralTokenConfig | null = null;
     const underlyingTokenList = Object.entries(RaftConfig.networkConfig.underlyingTokens);
 
-    for (let i = 0; i < underlyingTokenList.length; i++) {
-      const [, config] = underlyingTokenList[i];
+    for (const value of Object.values(underlyingTokenList)) {
+      const [, config] = value;
 
       if (config.supportedCollateralTokens[token]) {
         collateralTokenConfig = config.supportedCollateralTokens[token];

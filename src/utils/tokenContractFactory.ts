@@ -10,7 +10,7 @@ export function getTokenContract(collateralToken: Token, provider: Provider) {
     return null;
   } else if (tokenConfig.supportsPermit) {
     return ERC20Permit__factory.connect(RaftConfig.getTokenAddress(collateralToken), provider);
-  } else {
-    return ERC20__factory.connect(RaftConfig.getTokenAddress(collateralToken), provider);
   }
+
+  return ERC20__factory.connect(RaftConfig.getTokenAddress(collateralToken), provider);
 }

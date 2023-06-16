@@ -5,12 +5,10 @@ import { CollateralToken, Token, UnderlyingCollateralToken } from '../types';
 export type SupportedNetwork = 'goerli' | 'mainnet';
 
 export type UnderlyingCollateralTokenConfig = {
-  address: string;
   supportedCollateralTokens: Record<CollateralToken, CollateralTokenConfig | null>;
 };
 
 export type CollateralTokenConfig = {
-  address: string;
   positionManager: string;
   underlyingTokenTicker: UnderlyingCollateralToken;
   underlyingCollateralRate: Decimal | ((address: string, provider: Provider) => Promise<Decimal>);

@@ -42,11 +42,7 @@ export class RaftConfig {
   }
 
   static getTokenAddress(token: Token): string {
-    try {
-      return this.networkConfig.tokens[token].address;
-    } catch (error) {
-      throw new Error(`Failed to fetch ${token} address!`);
-    }
+    return this.networkConfig.tokens[token].address;
   }
 
   static getTokenTicker(address: string): Token | null {

@@ -10,21 +10,6 @@ interface OpenPositionsResponse {
   count: string;
 }
 
-export interface CollateralTotalSupply {
-  collateralToken: UnderlyingCollateralToken;
-  amount: Decimal;
-}
-
-export interface DebtTotalSupply {
-  collateralToken: UnderlyingCollateralToken;
-  amount: Decimal;
-}
-
-export interface BorrowingRate {
-  collateralToken: UnderlyingCollateralToken;
-  rate: Decimal;
-}
-
 const BETA = new Decimal(2);
 const DEVIATION = new Decimal(0.01);
 const SECONDS_IN_MINUTE = 60;

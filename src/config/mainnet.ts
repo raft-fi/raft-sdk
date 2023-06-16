@@ -6,22 +6,18 @@ import { Token, UnderlyingCollateralToken } from '../types';
 
 const underlyingTokensConfig: Record<UnderlyingCollateralToken, UnderlyingCollateralTokenConfig> = {
   wstETH: {
-    address: '0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0',
     supportedCollateralTokens: {
       ETH: {
-        address: ZeroAddress,
         positionManager: '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6',
         underlyingCollateralRate: getWstEthToStEthRate,
         underlyingTokenTicker: 'wstETH',
       },
       stETH: {
-        address: '0xae7ab96520de3a18e5e111b5eaab095312d7fe84',
         positionManager: '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6',
         underlyingCollateralRate: getWstEthToStEthRate,
         underlyingTokenTicker: 'wstETH',
       },
       wstETH: {
-        address: '0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0',
         positionManager: '0x5f59b322eb3e16a0c78846195af1f588b77403fc',
         underlyingCollateralRate: Decimal.ONE,
         underlyingTokenTicker: 'wstETH',
@@ -30,16 +26,13 @@ const underlyingTokensConfig: Record<UnderlyingCollateralToken, UnderlyingCollat
     },
   },
   WETH: {
-    address: '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2',
     supportedCollateralTokens: {
       ETH: {
-        address: ZeroAddress,
         positionManager: '', // wait for PositionManagerWETH deployment
         underlyingCollateralRate: Decimal.ONE,
         underlyingTokenTicker: 'WETH',
       },
       WETH: {
-        address: '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2',
         positionManager: '0x5f59b322eb3e16a0c78846195af1f588b77403fc',
         underlyingCollateralRate: Decimal.ONE,
         underlyingTokenTicker: 'WETH',
