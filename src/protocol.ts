@@ -136,6 +136,7 @@ export class Protocol {
         // Return zero if address is not defined in config
         if (!collateralTokenAddress) {
           this._collateralSupply[collateralToken] = Decimal.ZERO;
+          return this._collateralSupply;
         }
 
         const contract = ERC20Indexable__factory.connect(collateralTokenAddress, this.provider);
@@ -159,6 +160,7 @@ export class Protocol {
         // Return zero if address is not defined in config
         if (!debtTokenAddress) {
           this._debtSupply[collateralToken] = Decimal.ZERO;
+          return this._debtSupply;
         }
 
         const contract = ERC20Indexable__factory.connect(debtTokenAddress, this.provider);
