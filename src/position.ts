@@ -404,7 +404,6 @@ export class UserPosition extends PositionWithRunner {
   private user: Signer;
   private collateralTokens = new Map<CollateralToken, ERC20>();
   private positionManager: PositionManager;
-  private positionManagerStETH: PositionManagerStETH | null = null;
   private rToken: ERC20Permit;
 
   /**
