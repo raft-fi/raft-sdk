@@ -2,9 +2,9 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Contract, Provider } from 'ethers';
 import { request, gql } from 'graphql-request';
 import { RaftConfig } from '../config';
-import { WstETH, WstETH__factory } from '../typechain';
-import { CollateralToken, R_TOKEN, Token, UnderlyingCollateralToken } from '../types';
+import { CollateralToken, Token, UnderlyingCollateralToken } from '../types';
 import { SUBGRAPH_PRICE_PRECISION } from '../constants';
+import { CollateralTokenConfig } from '../config/types';
 
 export type PriceQueryResponse = {
   value: string;
@@ -13,26 +13,54 @@ export type PriceQueryResponse = {
 export class PriceFeed {
   private provider: Provider;
   private priceFeeds = new Map<UnderlyingCollateralToken, Contract>();
-  private collateralTokens = new Map<UnderlyingCollateralToken, WstETH>();
 
   public constructor(provider: Provider) {
     this.provider = provider;
   }
 
   public async getPrice(token: Token): Promise<Decimal> {
-    switch (token) {
-      case R_TOKEN:
-        return Decimal.ONE;
+    const tokenConfig = RaftConfig.networkConfig.tokens[token];
 
-      case 'ETH':
-        return this.fetchEthPrice();
-      case 'WETH':
-        return this.fetchEthPrice(); // TODO - Update to fetch WETH price
-      case 'stETH':
-        return this.fetchStEthPrice();
-      case 'wstETH':
-        return this.fetchWstEthPrice();
+    if (tokenConfig.hardcodedPrice) {
+      return tokenConfig.hardcodedPrice;
     }
+
+    if (tokenConfig.priceFeedTicker) {
+      return this.fetchPriceFromPriceFeed(tokenConfig.priceFeedTicker);
+    }
+
+    if (tokenConfig.subgraphPriceDataTicker) {
+      return this.fetchSubgraphPrice(tokenConfig.subgraphPriceDataTicker);
+    }
+
+    // Fetch price using collateral conversion rate which does not apply to R token
+    if (token !== 'R') {
+      const collateralTokenConfig = this.getTokenCollateralConfig(token);
+
+      if (collateralTokenConfig) {
+        let underlyingToCollateralRate: Decimal | null = null;
+        if (collateralTokenConfig.underlyingCollateralRate instanceof Decimal) {
+          underlyingToCollateralRate = collateralTokenConfig.underlyingCollateralRate;
+        } else if (typeof collateralTokenConfig.underlyingCollateralRate === 'function') {
+          underlyingToCollateralRate = await collateralTokenConfig.underlyingCollateralRate(
+            RaftConfig.getTokenAddress(collateralTokenConfig.underlyingTokenTicker),
+            this.provider,
+          );
+        }
+
+        if (!underlyingToCollateralRate) {
+          throw new Error(`Failed to fetch underlying to collateral rate for token ${tokenConfig.ticker}!`);
+        }
+
+        const underlyingCollateralPrice = await this.fetchPriceFromPriceFeed(
+          collateralTokenConfig.underlyingTokenTicker,
+        );
+
+        return underlyingCollateralPrice.div(underlyingToCollateralRate);
+      }
+    }
+
+    throw new Error(`Failed to fetch ${token} price!`);
   }
 
   /**
@@ -42,37 +70,49 @@ export class PriceFeed {
    * @param collateralToken Collateral token which rate converts to.
    * @returns Conversion rate from underlying collateral token to collateral token.
    */
-  public getUnderlyingToCollateralRate(
+  public getUnderlyingCollateralRate(
     underlyingCollateral: UnderlyingCollateralToken,
     collateralToken: CollateralToken,
   ): Promise<Decimal> {
-    switch (underlyingCollateral) {
-      case 'wstETH':
-        switch (collateralToken) {
-          case 'stETH':
-            return this.getWstEthToStEthRate();
-          case 'wstETH':
-            return Promise.resolve(Decimal.ONE);
-          default:
-            throw new Error(
-              `Underlying collateral token ${underlyingCollateral} doesn't support collateral token ${collateralToken}!`,
-            );
-        }
-      case 'WETH':
-        switch (collateralToken) {
-          case 'ETH':
-            return Promise.resolve(Decimal.ONE);
-          case 'WETH':
-            return Promise.resolve(Decimal.ONE);
-          default:
-            throw new Error(
-              `Underlying collateral token ${underlyingCollateral} doesn't support collateral token ${collateralToken}!`,
-            );
-        }
+    const collateralTokenConfig =
+      RaftConfig.networkConfig.underlyingTokens[underlyingCollateral].supportedCollateralTokens[collateralToken];
+
+    if (!collateralTokenConfig) {
+      throw new Error(
+        `Underlying collateral token ${underlyingCollateral} does not support collateral token ${collateralToken}`,
+      );
+    }
+
+    if (collateralTokenConfig.underlyingCollateralRate instanceof Decimal) {
+      return Promise.resolve(collateralTokenConfig.underlyingCollateralRate);
+    }
+
+    return collateralTokenConfig.underlyingCollateralRate(
+      RaftConfig.getTokenAddress(collateralTokenConfig.underlyingTokenTicker),
+      this.provider,
+    );
+  }
+
+  private async fetchPriceFromPriceFeed(token: UnderlyingCollateralToken): Promise<Decimal> {
+    const priceFeed = await this.loadPriceFeed(token);
+
+    // In case price feed is not defined in config, return price 1
+    if (!priceFeed) {
+      return Decimal.ONE;
+    }
+
+    if (RaftConfig.isTestNetwork) {
+      return new Decimal(await priceFeed.getPrice.staticCall());
+    } else {
+      return new Decimal(await priceFeed.lastGoodPrice.staticCall());
     }
   }
 
-  private async loadPriceFeed(token: UnderlyingCollateralToken): Promise<Contract> {
+  private async loadPriceFeed(token: UnderlyingCollateralToken): Promise<Contract | null> {
+    if (!RaftConfig.networkConfig.priceFeeds[token]) {
+      return null;
+    }
+
     if (!this.priceFeeds.has(token)) {
       const contract = new Contract(
         RaftConfig.networkConfig.priceFeeds[token],
@@ -89,18 +129,7 @@ export class PriceFeed {
     return this.priceFeeds.get(token) as Contract;
   }
 
-  private async loadCollateralToken(): Promise<WstETH> {
-    if (!this.collateralTokens.has('wstETH')) {
-      const contract = WstETH__factory.connect(RaftConfig.networkConfig.wstEth, this.provider);
-
-      this.collateralTokens.set('wstETH', contract);
-      return contract;
-    }
-
-    return this.collateralTokens.get('wstETH') as WstETH;
-  }
-
-  private async fetchSubgraphPrice(token: CollateralToken) {
+  private async fetchSubgraphPrice(token: Token) {
     const query = gql`
       query getTokenPrice($token: String!) {
         price(id: $token) {
@@ -117,70 +146,22 @@ export class PriceFeed {
     return new Decimal(BigInt(response.price.value), SUBGRAPH_PRICE_PRECISION);
   }
 
-  private async fetchEthPrice(): Promise<Decimal> {
-    try {
-      if (RaftConfig.isTestNetwork) {
-        return this.fetchStEthTestnetPrice();
+  private getTokenCollateralConfig(token: CollateralToken) {
+    let collateralTokenConfig: CollateralTokenConfig | null = null;
+    const underlyingTokenList = Object.entries(RaftConfig.networkConfig.underlyingTokens);
+
+    for (const value of Object.values(underlyingTokenList)) {
+      const [, config] = value;
+
+      if (config.supportedCollateralTokens[token]) {
+        collateralTokenConfig = config.supportedCollateralTokens[token];
       }
-
-      return (await this.fetchSubgraphPrice('ETH')) ?? this.fetchStEthPriceFromBlockchain();
-    } catch {
-      return this.fetchStEthPriceFromBlockchain();
     }
-  }
 
-  private async fetchStEthPrice(): Promise<Decimal> {
-    try {
-      if (RaftConfig.isTestNetwork) {
-        return this.fetchStEthTestnetPrice();
-      }
-
-      return (await this.fetchSubgraphPrice('stETH')) ?? this.fetchStEthPriceFromBlockchain();
-    } catch {
-      return this.fetchStEthPriceFromBlockchain();
+    if (!collateralTokenConfig) {
+      throw new Error(`Failed to find collateral token config for token ${token}!`);
     }
-  }
 
-  private async fetchWstEthPrice(): Promise<Decimal> {
-    const priceFeed = await this.loadPriceFeed('wstETH');
-    if (RaftConfig.isTestNetwork) {
-      return new Decimal(await priceFeed.getPrice.staticCall());
-    } else {
-      return new Decimal(await priceFeed.lastGoodPrice.staticCall());
-    }
-  }
-
-  private async fetchStEthPriceFromBlockchain(): Promise<Decimal> {
-    const wstEthPrice = await this.fetchWstEthPrice();
-    const wstEthContract = await this.loadCollateralToken();
-    const wstEthPerStEth = await wstEthContract.getWstETHByStETH(Decimal.ONE.value);
-
-    return wstEthPrice.mul(new Decimal(wstEthPerStEth, Decimal.PRECISION)).div(Decimal.ONE);
-  }
-
-  private async fetchStEthTestnetPrice(): Promise<Decimal> {
-    const priceFeed = await this.loadPriceFeed('wstETH');
-    const wstEthPrice = new Decimal(await priceFeed.getPrice.staticCall());
-
-    const wstEthContract = await this.loadCollateralToken();
-    const wstEthPerStEth = new Decimal(await wstEthContract.getWstETHByStETH(Decimal.ONE.value), Decimal.PRECISION);
-
-    return wstEthPrice.mul(wstEthPerStEth).div(Decimal.ONE);
-  }
-
-  private async getTokenRateFromPrice(
-    fromToken: UnderlyingCollateralToken,
-    toToken: CollateralToken,
-  ): Promise<Decimal> {
-    const [toTokenPrice, fromTokenPrice] = await Promise.all([this.getPrice(toToken), this.getPrice(fromToken)]);
-
-    return toTokenPrice.div(fromTokenPrice);
-  }
-
-  private async getWstEthToStEthRate() {
-    const wstEthContract = await this.loadCollateralToken();
-    const wstEthPerStEth = await wstEthContract.stEthPerToken();
-
-    return new Decimal(wstEthPerStEth, Decimal.PRECISION);
+    return collateralTokenConfig;
   }
 }

@@ -1,19 +1,35 @@
-import { UnderlyingCollateralToken } from '../types';
+import { Provider } from 'ethers';
+import { Decimal } from '@tempusfinance/decimal';
+import { CollateralToken, Token, UnderlyingCollateralToken } from '../types';
 
 export type SupportedNetwork = 'goerli' | 'mainnet';
 
-type TickerToAddressMap = {
-  [tokenTicker in UnderlyingCollateralToken]: string;
+export type UnderlyingCollateralTokenConfig = {
+  supportedCollateralTokens: Record<CollateralToken, CollateralTokenConfig | null>;
+};
+
+export type CollateralTokenConfig = {
+  positionManager: string;
+  underlyingTokenTicker: UnderlyingCollateralToken;
+  underlyingCollateralRate: Decimal | ((address: string, provider: Provider) => Promise<Decimal>);
+};
+
+export type TokenConfig = {
+  address: string;
+  ticker: Token;
+  supportsPermit: boolean;
+  priceFeedTicker: UnderlyingCollateralToken | null;
+  hardcodedPrice: Decimal | null;
+  subgraphPriceDataTicker: Token | null;
 };
 
 export interface NetworkConfig {
-  wstEth: string;
-  stEth: string;
-  r: string;
-  raftCollateralTokens: TickerToAddressMap;
-  raftDebtToken: string;
   positionManager: string;
   positionManagerStEth: string;
-  priceFeeds: TickerToAddressMap;
+  raftCollateralTokens: Record<UnderlyingCollateralToken, string>;
+  raftDebtTokens: Record<UnderlyingCollateralToken, string>;
+  priceFeeds: Record<UnderlyingCollateralToken, string>;
+  underlyingTokens: Record<UnderlyingCollateralToken, UnderlyingCollateralTokenConfig>;
+  tokens: Record<Token, TokenConfig>;
   testNetwork: boolean;
 }

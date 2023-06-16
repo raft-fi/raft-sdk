@@ -1,16 +1,7 @@
-import { ZeroAddress } from 'ethers';
-import { CollateralToken, Token } from '../types';
+import { CollateralToken, TOKENS, Token, UnderlyingCollateralToken } from '../types';
 import { goerliConfig } from './goerli';
 import { mainnetConfig } from './mainnet';
 import { NetworkConfig, SupportedNetwork } from './types';
-
-type TokenAddressType = {
-  ETH: null;
-  WETH: string;
-  stETH: string;
-  wstETH: string;
-  R: string;
-};
 
 const networkConfig: { [network in SupportedNetwork]: NetworkConfig } = {
   mainnet: mainnetConfig,
@@ -50,48 +41,30 @@ export class RaftConfig {
     return this._subgraphEndpoint;
   }
 
-  static getTokenAddress<T extends Token>(token: T): TokenAddressType[T] {
-    switch (token) {
-      case 'stETH':
-        return this.networkConfig.stEth as TokenAddressType[T];
-
-      case 'wstETH':
-        return this.networkConfig.wstEth as TokenAddressType[T];
-
-      case 'R':
-        return this.networkConfig.r as TokenAddressType[T];
-
-      default:
-        return null as TokenAddressType[T];
-    }
+  static getTokenAddress(token: Token): string {
+    return this.networkConfig.tokens[token].address;
   }
 
   static getTokenTicker(address: string): Token | null {
-    switch (address.toLowerCase()) {
-      case ZeroAddress:
-        return 'ETH';
+    const tokenTicker = TOKENS.find(
+      ticker => this.networkConfig.tokens[ticker].address.toLowerCase() === address.toLowerCase(),
+    );
 
-      case this.networkConfig.stEth.toLowerCase():
-        return 'stETH';
-
-      case this.networkConfig.wstEth.toLowerCase():
-        return 'wstETH';
-
-      case this.networkConfig.r.toLowerCase():
-        return 'R';
-    }
-
-    return null;
+    return tokenTicker ?? null;
   }
 
-  static getPositionManagerAddress(collateralToken: CollateralToken): string {
-    switch (collateralToken) {
-      case 'ETH':
-      case 'stETH':
-        return this.networkConfig.positionManagerStEth;
-
-      default:
-        return this.networkConfig.positionManager;
+  static getPositionManagerAddress(
+    underlyingCollateralToken: UnderlyingCollateralToken,
+    collateralToken: CollateralToken,
+  ): string {
+    const collateralConfig =
+      this.networkConfig.underlyingTokens[underlyingCollateralToken].supportedCollateralTokens[collateralToken];
+    if (!collateralConfig) {
+      throw new Error(
+        `Underlying collateral token ${underlyingCollateralToken} does not support collateral token ${collateralToken}`,
+      );
     }
+
+    return collateralConfig.positionManager;
   }
 }

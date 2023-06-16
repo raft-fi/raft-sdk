@@ -2,8 +2,8 @@ import { request, gql } from 'graphql-request';
 import { JsonRpcProvider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
-import { ERC20Indexable, ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
-import { TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
+import { ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
+import { TransactionWithFeesOptions, UNDERLYING_COLLATERAL_TOKENS, UnderlyingCollateralToken } from './types';
 import { sendTransactionWithGasLimit } from './utils';
 
 interface OpenPositionsResponse {
@@ -20,12 +20,19 @@ export class Protocol {
 
   private provider: JsonRpcProvider;
   private positionManager: PositionManager;
-  private raftCollateralToken: ERC20Indexable;
-  private raftDebtToken: ERC20Indexable;
 
-  private _collateralSupply: Decimal | null = null;
-  private _debtSupply: Decimal | null = null;
-  private _borrowingRate: Decimal | null = null;
+  private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
+    WETH: null,
+    wstETH: null,
+  };
+  private _debtSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
+    WETH: null,
+    wstETH: null,
+  };
+  private _borrowingRate: Record<UnderlyingCollateralToken, Decimal | null> = {
+    WETH: null,
+    wstETH: null,
+  };
   private _redemptionRate: Decimal | null = null;
   private _openPositionCount: number | null = null;
 
@@ -38,11 +45,6 @@ export class Protocol {
     this.provider = provider;
 
     this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, this.provider);
-    this.raftCollateralToken = ERC20Indexable__factory.connect(
-      RaftConfig.networkConfig.raftCollateralTokens['wstETH'],
-      this.provider,
-    );
-    this.raftDebtToken = ERC20Indexable__factory.connect(RaftConfig.networkConfig.raftDebtToken, this.provider);
   }
 
   /**
@@ -90,21 +92,21 @@ export class Protocol {
   /**
    * Raft protocol collateral supply denominated in wstETH token.
    */
-  get collateralSupply(): Decimal | null {
+  get collateralSupply(): Record<UnderlyingCollateralToken, Decimal | null> {
     return this._collateralSupply;
   }
 
   /**
    * Raft protocol debt supply denominated in R token.
    */
-  get debtSupply(): Decimal | null {
+  get debtSupply(): Record<UnderlyingCollateralToken, Decimal | null> {
     return this._debtSupply;
   }
 
   /**
    * Raft protocol current borrowing rate.
    */
-  get borrowingRate(): Decimal | null {
+  get borrowingRate(): Record<UnderlyingCollateralToken, Decimal | null> {
     return this._borrowingRate;
   }
 
@@ -123,21 +125,49 @@ export class Protocol {
   }
 
   /**
-   * Fetches current collateral supply (Amount of wstETH locked in Raft protocol).
-   * @returns Fetched collateral supply
+   * Fetches current collateral supply for each underlying token.
+   * @returns Fetched collateral supplies per underlying collateral token.
    */
-  async fetchCollateralSupply(): Promise<Decimal> {
-    this._collateralSupply = new Decimal(await this.raftCollateralToken.totalSupply(), Decimal.PRECISION);
+  async fetchCollateralSupply(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
+    await Promise.all(
+      UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
+        const collateralTokenAddress = RaftConfig.networkConfig.raftCollateralTokens[collateralToken];
+
+        // Return zero if address is not defined in config
+        if (!collateralTokenAddress) {
+          this._collateralSupply[collateralToken] = Decimal.ZERO;
+          return this._collateralSupply;
+        }
+
+        const contract = ERC20Indexable__factory.connect(collateralTokenAddress, this.provider);
+
+        this._collateralSupply[collateralToken] = new Decimal(await contract.totalSupply(), Decimal.PRECISION);
+      }),
+    );
 
     return this._collateralSupply;
   }
 
   /**
-   * Fetches current debt supply (Amount of R users borrowed).
-   * @returns Fetched debt supply
+   * Fetches current debt supply for each underlying token.
+   * @returns Fetched debt supplies per underlying collateral token.
    */
-  async fetchDebtSupply(): Promise<Decimal> {
-    this._debtSupply = new Decimal(await this.raftDebtToken.totalSupply(), Decimal.PRECISION);
+  async fetchDebtSupply(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
+    await Promise.all(
+      UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
+        const debtTokenAddress = RaftConfig.networkConfig.raftDebtTokens[collateralToken];
+
+        // Return zero if address is not defined in config
+        if (!debtTokenAddress) {
+          this._debtSupply[collateralToken] = Decimal.ZERO;
+          return this._debtSupply;
+        }
+
+        const contract = ERC20Indexable__factory.connect(debtTokenAddress, this.provider);
+
+        this._debtSupply[collateralToken] = new Decimal(await contract.totalSupply(), Decimal.PRECISION);
+      }),
+    );
 
     return this._debtSupply;
   }
@@ -147,11 +177,16 @@ export class Protocol {
    * @param collateralToken Collateral token to fetch borrowing rate for.
    * @returns Fetched borrowing rate.
    */
-  async fetchBorrowingRate(collateralToken: UnderlyingCollateralToken): Promise<Decimal> {
-    const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
-    this._borrowingRate = new Decimal(
-      await this.positionManager.getBorrowingRate(collateralTokenAddress),
-      Decimal.PRECISION,
+  async fetchBorrowingRate(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
+    await Promise.all(
+      UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
+        const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
+
+        this._borrowingRate[collateralToken] = new Decimal(
+          await this.positionManager.getBorrowingRate(collateralTokenAddress),
+          Decimal.PRECISION,
+        );
+      }),
     );
 
     return this._borrowingRate;

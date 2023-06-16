@@ -1,8 +1,8 @@
 import { JsonRpcProvider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { RaftConfig } from './config';
 import { Token } from './types';
-import { ERC20, ERC20Permit, ERC20Permit__factory, ERC20__factory } from './typechain';
+import { ERC20, ERC20Permit } from './typechain';
+import { getTokenContract } from './utils';
 
 export class Allowance {
   protected readonly token: Token;
@@ -26,20 +26,7 @@ export class Allowance {
     this.spender = spender;
     this.provider = provider;
 
-    switch (this.token) {
-      case 'R':
-      case 'wstETH':
-        this.tokenContract = ERC20Permit__factory.connect(RaftConfig.getTokenAddress(this.token), this.provider);
-        break;
-
-      case 'ETH':
-        // ETH is not a contract
-        this.tokenContract = null;
-        break;
-
-      default:
-        this.tokenContract = ERC20__factory.connect(RaftConfig.getTokenAddress(this.token), this.provider);
-    }
+    this.tokenContract = getTokenContract(this.token, this.provider);
   }
 
   /**
