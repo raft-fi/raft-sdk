@@ -5,7 +5,6 @@ export { MIN_COLLATERAL_RATIO } from './constants';
 export {
   Position,
   PositionWithAddress,
-  TOKENS_WITH_PERMIT,
   UserPosition,
   type ManagePositionCallbacks,
   type ManagePositionOptions,

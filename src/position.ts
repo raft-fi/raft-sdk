@@ -70,8 +70,6 @@ interface ManagePositionStep {
   action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
 }
 
-export const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
-
 const SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING: Record<UnderlyingCollateralToken, Set<CollateralToken>> = {
   wstETH: new Set(['ETH', 'stETH', 'wstETH']),
 };
@@ -593,7 +591,8 @@ export class UserPosition extends PositionWithRunner {
     let rPermitSignature = createEmptyPermitSignature();
 
     if (collateralApprovalStepNeeded) {
-      if (TOKENS_WITH_PERMIT.has(collateralToken)) {
+      const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
+      if (tokenConfig.supportsPermit) {
         const signature = yield {
           type: {
             name: 'permit',
