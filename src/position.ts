@@ -42,7 +42,6 @@ export const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
 
 const SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING: Record<UnderlyingCollateralToken, Set<CollateralToken>> = {
   wstETH: new Set(['ETH', 'stETH', 'wstETH']),
-  WETH: new Set(['ETH', 'WETH']),
 };
 
 const DEBT_CHANGE_TO_CLOSE = Decimal.MAX_DECIMAL.mul(-1);
@@ -529,32 +528,6 @@ export class UserPosition extends PositionWithRunner {
             );
 
           case 'wstETH':
-            return sendTransactionWithGasLimit(
-              this.positionManager.managePosition,
-              [
-                RaftConfig.getTokenAddress(collateralToken),
-                userAddress,
-                absoluteCollateralChangeValue,
-                isCollateralIncrease,
-                absoluteDebtChangeValue,
-                isDebtIncrease,
-                maxFeePercentageValue,
-                collateralPermitSignature,
-              ],
-              gasLimitMultiplier,
-              frontendTag,
-              this.user,
-            );
-          default:
-            throw new Error(
-              `Underlying collateral token ${this.underlyingCollateralToken} does not support collateral token ${collateralToken}`,
-            );
-        }
-      case 'WETH':
-        switch (collateralToken) {
-          case 'ETH':
-            throw new Error('Not implemented! WETH -> ETH deposit');
-          case 'WETH':
             return sendTransactionWithGasLimit(
               this.positionManager.managePosition,
               [
