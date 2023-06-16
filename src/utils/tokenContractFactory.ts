@@ -8,7 +8,9 @@ export function getTokenContract(collateralToken: Token, provider: Provider) {
 
   if (tokenConfig.ticker === 'ETH') {
     return null;
-  } else if (tokenConfig.supportsPermit) {
+  }
+
+  if (tokenConfig.supportsPermit) {
     return ERC20Permit__factory.connect(RaftConfig.getTokenAddress(collateralToken), provider);
   }
 

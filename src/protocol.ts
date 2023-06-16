@@ -126,7 +126,7 @@ export class Protocol {
 
   /**
    * Fetches current collateral supply for each underlying token.
-   * @returns List of fetched collateral supplies.
+   * @returns Fetched collateral supplies per underlying collateral token.
    */
   async fetchCollateralSupply(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
     await Promise.all(
@@ -150,7 +150,7 @@ export class Protocol {
 
   /**
    * Fetches current debt supply for each underlying token.
-   * @returns List of fetched debt supplies.
+   * @returns Fetched debt supplies per underlying collateral token.
    */
   async fetchDebtSupply(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
     await Promise.all(
