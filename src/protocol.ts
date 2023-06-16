@@ -22,15 +22,12 @@ export class Protocol {
   private positionManager: PositionManager;
 
   private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
-    WETH: null,
     wstETH: null,
   };
   private _debtSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
-    WETH: null,
     wstETH: null,
   };
   private _borrowingRate: Record<UnderlyingCollateralToken, Decimal | null> = {
-    WETH: null,
     wstETH: null,
   };
   private _redemptionRate: Decimal | null = null;

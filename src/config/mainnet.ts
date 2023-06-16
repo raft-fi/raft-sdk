@@ -22,23 +22,6 @@ const underlyingTokensConfig: Record<UnderlyingCollateralToken, UnderlyingCollat
         underlyingCollateralRate: Decimal.ONE,
         underlyingTokenTicker: 'wstETH',
       },
-      WETH: null,
-    },
-  },
-  WETH: {
-    supportedCollateralTokens: {
-      ETH: {
-        positionManager: '', // wait for PositionManagerWETH deployment
-        underlyingCollateralRate: Decimal.ONE,
-        underlyingTokenTicker: 'WETH',
-      },
-      WETH: {
-        positionManager: '0x5f59b322eb3e16a0c78846195af1f588b77403fc',
-        underlyingCollateralRate: Decimal.ONE,
-        underlyingTokenTicker: 'WETH',
-      },
-      stETH: null,
-      wstETH: null,
     },
   },
 };
@@ -68,14 +51,6 @@ const tokensConfig: Record<Token, TokenConfig> = {
     supportsPermit: true,
     ticker: 'wstETH',
   },
-  WETH: {
-    address: '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2',
-    hardcodedPrice: null,
-    priceFeedTicker: 'WETH',
-    subgraphPriceDataTicker: null,
-    supportsPermit: false,
-    ticker: 'WETH',
-  },
   R: {
     address: '0x183015a9ba6ff60230fdeadc3f43b3d788b13e21',
     hardcodedPrice: Decimal.ONE,
@@ -91,15 +66,12 @@ export const mainnetConfig: NetworkConfig = {
   positionManagerStEth: '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6',
   raftCollateralTokens: {
     wstETH: '0xa7820009f79687d39f51909a01e7fd4b4d0663f8',
-    WETH: '', // Add address once deployed
   },
   raftDebtTokens: {
     wstETH: '0x1C1D49D8F601f19D2Fa88b14BEf491759aaaF5d8',
-    WETH: '', // Add address once deployed
   },
   priceFeeds: {
     wstETH: '0xDB5De0A34b29fFDeEc61E2D8ab4dB63f6641C730',
-    WETH: '', // Add address once deployed
   },
   underlyingTokens: underlyingTokensConfig,
   tokens: tokensConfig,
