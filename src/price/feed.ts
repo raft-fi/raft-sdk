@@ -29,6 +29,10 @@ export class PriceFeed {
       return this.fetchPriceFromPriceFeed(tokenConfig.priceFeedTicker);
     }
 
+    if (tokenConfig.subgraphPriceDataTicker) {
+      return this.fetchSubgraphPrice(tokenConfig.subgraphPriceDataTicker);
+    }
+
     const collateralTokenConfig = this.getTokenCollateralConfig(token);
 
     if (collateralTokenConfig) {
