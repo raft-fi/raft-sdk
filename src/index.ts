@@ -1,12 +1,12 @@
 export { Balance } from './balance';
-export { Allowance } from './allowance';
+export { Allowance, getTokenAllowance } from './allowance';
 export { RaftConfig, type SupportedNetwork } from './config';
 export { MIN_COLLATERAL_RATIO } from './constants';
 export {
   Position,
   PositionWithAddress,
-  TOKENS_WITH_PERMIT,
   UserPosition,
+  type ManagePositionCallbacks,
   type ManagePositionOptions,
   type PositionTransaction,
   type PositionTransactionType,

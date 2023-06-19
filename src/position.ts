@@ -1,6 +1,14 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { ContractRunner, Provider, Signer, ContractTransactionResponse, TransactionResponse } from 'ethers';
+import {
+  ContractRunner,
+  Provider,
+  Signer,
+  ContractTransactionResponse,
+  TransactionResponse,
+  ZeroAddress,
+} from 'ethers';
 import { request, gql } from 'graphql-request';
+import { getTokenAllowance } from './allowance';
 import { RaftConfig } from './config';
 import { MIN_COLLATERAL_RATIO, MIN_NET_DEBT } from './constants';
 import {
@@ -16,10 +24,22 @@ import {
   PositionManagerStETH,
 } from './typechain';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
-import { CollateralToken, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
+import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
 import { createEmptyPermitSignature, createPermitSignature, sendTransactionWithGasLimit } from './utils';
 
 export type PositionTransactionType = 'OPEN' | 'ADJUST' | 'CLOSE' | 'LIQUIDATION';
+
+export type ManagePositionStepType =
+  | 'whitelist'
+  | {
+      name: 'approve';
+      token: Token;
+    }
+  | {
+      name: 'permit';
+      token: Token;
+    }
+  | 'manage';
 
 interface PositionTransactionQuery {
   id: string;
@@ -38,7 +58,17 @@ interface PositionTransactionsQuery {
   } | null;
 }
 
-export const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
+interface ManagePositionStepsPrefetch {
+  isDelegateWhitelisted?: boolean;
+  collateralTokenAllowance?: Decimal;
+  rTokenAllowance?: Decimal;
+}
+
+interface ManagePositionStep {
+  type: ManagePositionStepType;
+  numberOfSteps: number;
+  action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
+}
 
 const SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING: Record<UnderlyingCollateralToken, Set<CollateralToken>> = {
   wstETH: new Set(['ETH', 'stETH', 'wstETH']),
@@ -69,19 +99,21 @@ export interface PositionTransaction {
 /**
  * Options for managing a position.
  * @property collateralToken The collateral token to use for the operation.
- * @property collateralPermitSignature The permit signature for the collateral token.
- * @property rPermitSignature The permit signature for the R token.
  * @property frontendTag The frontend operator tag for the transaction.
+ */
+export interface ManagePositionOptions extends TransactionWithFeesOptions {
+  collateralToken?: CollateralToken;
+  frontendTag?: string;
+}
+
+/**
+ * Callbacks for managing a position.
  * @property onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
  * @property onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends.
  * @property onApprovalStart A callback that is called when the collateral token or R approval starts.
  * @property onApprovalEnd A callback that is called when the approval ends.
  */
-export interface ManagePositionOptions extends TransactionWithFeesOptions {
-  collateralToken?: CollateralToken;
-  collateralPermitSignature?: ERC20PermitSignatureStruct;
-  rPermitSignature?: ERC20PermitSignatureStruct;
-  frontendTag?: string;
+export interface ManagePositionCallbacks {
   onDelegateWhitelistingStart?: () => void;
   onDelegateWhitelistingEnd?: (error?: unknown) => void;
   onApprovalStart?: () => void;
@@ -370,6 +402,7 @@ export class UserPosition extends PositionWithRunner {
   private user: Signer;
   private collateralTokens = new Map<CollateralToken, ERC20>();
   private positionManager: PositionManager;
+  private rToken: ERC20Permit;
 
   /**
    * Creates a new representation of a position or a given user with given initial collateral and debt amounts.
@@ -388,6 +421,7 @@ export class UserPosition extends PositionWithRunner {
 
     this.user = user;
     this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, user);
+    this.rToken = ERC20Permit__factory.connect(RaftConfig.networkConfig.tokens[R_TOKEN].address, this.user);
   }
 
   /**
@@ -401,14 +435,14 @@ export class UserPosition extends PositionWithRunner {
    * {@link UserPosition.withdrawCollateral}, {@link UserPosition.borrow}, and {@link UserPosition.repayDebt}.
    * @param collateralChange The amount to change the collateral by. Positive values deposit collateral, negative values
    * withdraw collateral.
+   *
+   * For more granular control over the transaction, use {@link getManageSteps} instead.
+   * @param collateralChange The amount of collateral to deposit. Positive values deposit collateral, negative values
+   * withdraw it.
    * @param debtChange The amount to change the debt by. Positive values borrow debt, negative values repay debt.
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.collateralPermitSignature The permit signature for the collateral token. Skips the manual permit
-   * signature generation if this parameter is set.
-   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
-   * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
@@ -417,22 +451,84 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws If the collateral change is negative and the collateral token is ETH.
    */
   public async manage(
     collateralChange: Decimal,
     debtChange: Decimal,
-    options: ManagePositionOptions = {},
-  ): Promise<TransactionResponse> {
+    options: ManagePositionOptions & ManagePositionCallbacks = {},
+  ): Promise<void> {
+    const { onDelegateWhitelistingStart, onDelegateWhitelistingEnd, onApprovalStart, onApprovalEnd, ...otherOptions } =
+      options;
+
+    const steps = this.getManageSteps(collateralChange, debtChange, otherOptions);
+    let collateralPermitSignature: ERC20PermitSignatureStruct | undefined;
+
+    for (let step = await steps.next(); !step.done; step = await steps.next(collateralPermitSignature)) {
+      const { type: stepType, action } = step.value;
+
+      switch (stepType) {
+        case 'whitelist':
+          onDelegateWhitelistingStart?.();
+          break;
+
+        case 'manage':
+          break;
+
+        default:
+          onApprovalStart?.();
+      }
+
+      const result = await action();
+
+      if (result instanceof TransactionResponse) {
+        await result.wait();
+        collateralPermitSignature = undefined;
+
+        switch (stepType) {
+          case 'whitelist':
+            onDelegateWhitelistingEnd?.();
+            break;
+
+          case 'manage':
+            break;
+
+          default:
+            onApprovalEnd?.();
+        }
+      } else {
+        collateralPermitSignature = result;
+      }
+    }
+  }
+
+  /**
+   * Returns the steps for managing the position's collateral and debt amounts. The steps are not dispatched
+   * automatically and it is the caller's response to dispatch them. Each step contains the type of the step, the total
+   * number of steps, and the action to perform. The action is either a transaction to dispatch or a function that
+   * returns a permit signature for the collateral token or R token.
+   * @param collateralChange The amount of change the collateral by. Positive values deposit collateral, negative values
+   * withdraw it.
+   * @param debtChange The amount to change the debt by. Positive values borrow debt, negative values repay debt.
+   * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
+   * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
+   * collateral token.
+   * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
+   * @param options.frontendTag The frontend operator tag for the transaction. Optional.
+   * @param options.isDelegateWhitelisted Whether the delegate is whitelisted for the position owner. If not provided,
+   * it will be fetched automatically.
+   * @param options.collateralTokenAllowance The collateral token allowance of the position owner for the position
+   * manager. If not provided, it will be fetched automatically.
+   * @param options.rTokenAllowance The R token allowance of the position owner for the position manager. If not
+   * provided, it will be fetched automatically.
+   */
+  public async *getManageSteps(
+    collateralChange: Decimal,
+    debtChange: Decimal,
+    options: ManagePositionOptions & ManagePositionStepsPrefetch = {},
+  ): AsyncGenerator<ManagePositionStep, void, ERC20PermitSignatureStruct | undefined> {
     const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE, frontendTag } = options;
     let { collateralToken = this.underlyingCollateralToken } = options;
-
-    if (!SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING[this.underlyingCollateralToken].has(collateralToken)) {
-      throw Error(
-        `Underlying collateral token ${this.underlyingCollateralToken} doesn't support collateral token ${collateralToken}`,
-      );
-    }
 
     // check whether it's closing position (i.e. collateralChange is ZERO while debtChange is -ve MAX)
     if (collateralChange.isZero() && !debtChange.equals(DEBT_CHANGE_TO_CLOSE)) {
@@ -445,74 +541,143 @@ export class UserPosition extends PositionWithRunner {
       collateralToken = this.underlyingCollateralToken;
     }
 
+    if (!SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING[this.underlyingCollateralToken].has(collateralToken)) {
+      throw Error('Unsupported collateral token');
+    }
+
     const absoluteCollateralChangeValue = collateralChange.abs().value;
     const isCollateralIncrease = collateralChange.gt(Decimal.ZERO);
     const absoluteDebtChangeValue = debtChange.abs().value;
     const isDebtIncrease = debtChange.gt(Decimal.ZERO);
     const maxFeePercentageValue = maxFeePercentage.value;
-
-    const userAddress = await this.getUserAddress();
     const isUnderlyingToken = this.isUnderlyingCollateralToken(collateralToken);
+
+    const whitelistingRequired = !isUnderlyingToken;
+    const collateralTokenContract = this.loadCollateralToken(collateralToken);
+    const collateralTokenAllowanceRequired = collateralTokenContract !== null && isCollateralIncrease;
+    const rTokenAllowanceRequired = !isDebtIncrease && !isUnderlyingToken;
     const positionManagerAddress = RaftConfig.getPositionManagerAddress(
       this.underlyingCollateralToken,
       collateralToken,
     );
-    const collateralTokenContract = this.loadCollateralToken(collateralToken);
-    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.tokens['R'].address, this.user);
+    const userAddress = await this.getUserAddress();
 
-    if (!isUnderlyingToken) {
-      await this.checkDelegateWhitelisting(userAddress, positionManagerAddress, options);
+    let { isDelegateWhitelisted, collateralTokenAllowance, rTokenAllowance } = options;
+
+    // In case the delegate whitelisting check is not passed externally, check the whitelist status
+    if (isDelegateWhitelisted === undefined) {
+      isDelegateWhitelisted = whitelistingRequired ? await this.isDelegateWhitelisted(collateralToken) : false;
     }
 
-    /**
-     * In case of R repayment we need to approve delegate to spend user's R tokens.
-     * This is valid only if collateral used is not wstETH, because ETH and stETH go through a delegate contract.
-     */
-    let rPermitSignature = options.rPermitSignature ?? createEmptyPermitSignature();
-    if (!options.rPermitSignature && !isDebtIncrease && !isUnderlyingToken) {
-      rPermitSignature = await this.checkTokenAllowance(
-        rTokenContract,
-        userAddress,
-        positionManagerAddress,
-        new Decimal(absoluteDebtChangeValue, Decimal.PRECISION),
-        true,
-        options,
-      );
+    // In case the collateral token allowance check is not passed externally, check the allowance
+    if (collateralTokenAllowance === undefined) {
+      collateralTokenAllowance = collateralTokenAllowanceRequired
+        ? await getTokenAllowance(collateralTokenContract, userAddress, positionManagerAddress)
+        : Decimal.MAX_DECIMAL;
     }
 
-    let collateralPermitSignature = options.collateralPermitSignature ?? createEmptyPermitSignature();
-    if (!options.collateralPermitSignature && collateralTokenContract !== null && collateralChange.gt(Decimal.ZERO)) {
+    // In case the R token allowance check is not passed externally, check the allowance
+    if (rTokenAllowance === undefined) {
+      rTokenAllowance = rTokenAllowanceRequired
+        ? await getTokenAllowance(this.rToken, userAddress, positionManagerAddress)
+        : Decimal.MAX_DECIMAL;
+    }
+
+    const whitelistingStepNeeded = whitelistingRequired && !isDelegateWhitelisted;
+    const collateralApprovalStepNeeded =
+      collateralTokenAllowanceRequired && collateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO);
+    const rTokenApprovalStepNeeded = rTokenAllowanceRequired && debtChange.abs().gt(rTokenAllowance ?? Decimal.ZERO);
+
+    // The number of steps is the number of optional steps that are required based on input values plus one required
+    // step (`manage`)
+    const numberOfSteps =
+      Number(whitelistingStepNeeded) + Number(collateralApprovalStepNeeded) + Number(rTokenApprovalStepNeeded) + 1;
+
+    if (whitelistingStepNeeded) {
+      yield {
+        type: 'whitelist',
+        numberOfSteps,
+        action: () => this.positionManager.whitelistDelegate(positionManagerAddress, true),
+      };
+    }
+
+    let collateralPermitSignature = createEmptyPermitSignature();
+    let rPermitSignature = createEmptyPermitSignature();
+
+    if (collateralApprovalStepNeeded) {
       const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
+      if (tokenConfig.supportsPermit) {
+        const signature = yield {
+          type: {
+            name: 'permit',
+            token: collateralToken,
+          },
+          numberOfSteps,
+          action: () =>
+            createPermitSignature(this.user, collateralChange, positionManagerAddress, collateralTokenContract),
+        };
 
-      collateralPermitSignature = await this.checkTokenAllowance(
-        collateralTokenContract,
-        userAddress,
-        positionManagerAddress,
-        new Decimal(absoluteCollateralChangeValue, Decimal.PRECISION),
-        tokenConfig.supportsPermit,
-        options,
-      );
+        if (!signature) {
+          throw new Error(`${collateralToken} permit signature is required`);
+        }
+
+        collateralPermitSignature = signature;
+      } else {
+        yield {
+          type: {
+            name: 'approve',
+            token: collateralToken,
+          },
+          numberOfSteps,
+          action: () => collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue),
+        };
+      }
     }
 
-    switch (this.underlyingCollateralToken) {
-      case 'wstETH':
-        switch (collateralToken) {
-          case 'ETH':
-            if (!isCollateralIncrease) {
-              throw new Error('ETH withdrawal from the position is not supported');
-            }
+    if (rTokenApprovalStepNeeded) {
+      const signature = yield {
+        type: {
+          name: 'permit',
+          token: 'R',
+        },
+        numberOfSteps,
+        action: () => createPermitSignature(this.user, debtChange.abs(), positionManagerAddress, this.rToken),
+      };
 
-            return sendTransactionWithGasLimit(
+      if (!signature) {
+        throw new Error('R permit signature is required');
+      }
+
+      rPermitSignature = signature;
+    }
+
+    switch (collateralToken) {
+      case 'ETH':
+        if (!isCollateralIncrease) {
+          throw new Error('ETH withdrawal from the position is not supported');
+        }
+
+        yield {
+          type: 'manage',
+          numberOfSteps,
+          action: () =>
+            sendTransactionWithGasLimit(
               this.loadPositionManagerStETH().managePositionETH,
               [absoluteDebtChangeValue, isDebtIncrease, maxFeePercentageValue, rPermitSignature],
               gasLimitMultiplier,
               frontendTag,
               this.user,
               absoluteCollateralChangeValue,
-            );
+            ),
+        };
+        break;
 
-          case 'stETH':
-            return sendTransactionWithGasLimit(
+      case 'stETH':
+        yield {
+          type: 'manage',
+          numberOfSteps,
+          action: () =>
+            sendTransactionWithGasLimit(
               this.loadPositionManagerStETH().managePositionStETH,
               [
                 absoluteCollateralChangeValue,
@@ -525,13 +690,20 @@ export class UserPosition extends PositionWithRunner {
               gasLimitMultiplier,
               frontendTag,
               this.user,
-            );
+            ),
+        };
+        break;
 
-          case 'wstETH':
-            return sendTransactionWithGasLimit(
+      case 'wstETH': {
+        const tokenAddress = RaftConfig.getTokenAddress(collateralToken);
+        yield {
+          type: 'manage',
+          numberOfSteps,
+          action: () =>
+            sendTransactionWithGasLimit(
               this.positionManager.managePosition,
               [
-                RaftConfig.getTokenAddress(collateralToken),
+                tokenAddress,
                 userAddress,
                 absoluteCollateralChangeValue,
                 isCollateralIncrease,
@@ -543,12 +715,10 @@ export class UserPosition extends PositionWithRunner {
               gasLimitMultiplier,
               frontendTag,
               this.user,
-            );
-          default:
-            throw new Error(
-              `Underlying collateral token ${this.underlyingCollateralToken} does not support collateral token ${collateralToken}`,
-            );
-        }
+            ),
+        };
+        break;
+      }
     }
   }
 
@@ -609,7 +779,6 @@ export class UserPosition extends PositionWithRunner {
       this.underlyingCollateralToken,
       collateralToken,
     );
-    const rTokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.tokens['R'].address, this.user);
     const collateralTokenContract = this.loadCollateralToken(collateralToken);
 
     /**
@@ -622,7 +791,7 @@ export class UserPosition extends PositionWithRunner {
         this.user,
         new Decimal(absoluteDebtChangeValue, Decimal.PRECISION),
         positionManagerAddress,
-        rTokenContract,
+        this.rToken,
       );
     }
 
@@ -658,8 +827,6 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
-   * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
@@ -668,15 +835,14 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws An error if the collateral amount is less than or equal to 0.
    * @throws An error if the debt amount is less than or equal to 0.
    */
   public async open(
     collateralAmount: Decimal,
     debtAmount: Decimal,
-    options: ManagePositionOptions = {},
-  ): Promise<TransactionResponse> {
+    options: ManagePositionOptions & ManagePositionCallbacks = {},
+  ): Promise<void> {
     if (collateralAmount.lte(Decimal.ZERO)) {
       throw new Error('Collateral amount must be greater than 0');
     }
@@ -684,7 +850,7 @@ export class UserPosition extends PositionWithRunner {
       throw new Error('Debt amount must be greater than 0');
     }
 
-    return this.manage(collateralAmount, debtAmount, options);
+    this.manage(collateralAmount, debtAmount, options);
   }
 
   /**
@@ -693,8 +859,6 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
-   * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
@@ -703,10 +867,9 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    */
-  public async close(options: ManagePositionOptions = {}): Promise<TransactionResponse> {
-    return this.manage(Decimal.ZERO, DEBT_CHANGE_TO_CLOSE, options);
+  public async close(options: ManagePositionOptions & ManagePositionCallbacks = {}): Promise<void> {
+    this.manage(Decimal.ZERO, DEBT_CHANGE_TO_CLOSE, options);
   }
 
   /**
@@ -717,8 +880,6 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
-   * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
@@ -727,15 +888,17 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async addCollateral(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
+  public async addCollateral(
+    amount: Decimal,
+    options: ManagePositionOptions & ManagePositionCallbacks = {},
+  ): Promise<void> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
 
-    return this.manage(amount, Decimal.ZERO, options);
+    this.manage(amount, Decimal.ZERO, options);
   }
 
   /**
@@ -745,8 +908,6 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the withdrawal. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
-   * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
@@ -755,15 +916,17 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async withdrawCollateral(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
+  public async withdrawCollateral(
+    amount: Decimal,
+    options: ManagePositionOptions & ManagePositionCallbacks = {},
+  ): Promise<void> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
 
-    return this.manage(amount.mul(-1), Decimal.ZERO, options);
+    this.manage(amount.mul(-1), Decimal.ZERO, options);
   }
 
   /**
@@ -773,8 +936,6 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
-   * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
@@ -783,15 +944,14 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async borrow(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
+  public async borrow(amount: Decimal, options: ManagePositionOptions & ManagePositionCallbacks = {}): Promise<void> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
 
-    return this.manage(Decimal.ZERO, amount, options);
+    this.manage(Decimal.ZERO, amount, options);
   }
 
   /**
@@ -801,8 +961,6 @@ export class UserPosition extends PositionWithRunner {
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
    * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
    * collateral token.
-   * @param options.rPermitSignature The permit signature for the R token. Skips the manual permit signature generation
-   * if this parameter is set.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
@@ -811,15 +969,17 @@ export class UserPosition extends PositionWithRunner {
    * @param options.onApprovalStart A callback that is called when the collateral token or R approval starts. If
    * approval is not needed, the callback will never be called. Optional.
    * @param options.onApprovalEnd A callback that is called when the approval ends. Optional.
-   * @returns The dispatched transaction of the operation.
    * @throws An error if the amount is less than or equal to 0.
    */
-  public async repayDebt(amount: Decimal, options: ManagePositionOptions = {}): Promise<TransactionResponse> {
+  public async repayDebt(
+    amount: Decimal,
+    options: ManagePositionOptions & ManagePositionCallbacks = {},
+  ): Promise<void> {
     if (amount.lte(Decimal.ZERO)) {
       throw new Error('Amount must be greater than 0.');
     }
 
-    return this.manage(Decimal.ZERO, amount.mul(-1), options);
+    this.manage(Decimal.ZERO, amount.mul(-1), options);
   }
 
   /**
@@ -832,61 +992,6 @@ export class UserPosition extends PositionWithRunner {
     }
 
     return this.userAddress;
-  }
-
-  private async checkDelegateWhitelisting(
-    userAddress: string,
-    positionManagerAddress: string,
-    options: ManagePositionOptions,
-  ): Promise<void> {
-    const isDelegateWhitelisted = await this.positionManager.isDelegateWhitelisted(userAddress, positionManagerAddress);
-
-    if (!isDelegateWhitelisted) {
-      const { onDelegateWhitelistingStart, onDelegateWhitelistingEnd } = options;
-
-      onDelegateWhitelistingStart?.();
-
-      try {
-        const whitelistingTx = await this.positionManager.whitelistDelegate(positionManagerAddress, true);
-        await whitelistingTx.wait();
-        onDelegateWhitelistingEnd?.();
-      } catch (error) {
-        onDelegateWhitelistingEnd?.(error);
-        throw error;
-      }
-    }
-  }
-
-  private async checkTokenAllowance(
-    tokenContract: ERC20 | ERC20Permit,
-    userAddress: string,
-    spenderAddress: string,
-    amountToCheck: Decimal,
-    allowPermit: boolean,
-    options: ManagePositionOptions,
-  ): Promise<ERC20PermitSignatureStruct> {
-    const allowance = new Decimal(await tokenContract.allowance(userAddress, spenderAddress), Decimal.PRECISION);
-
-    if (allowance.lt(amountToCheck)) {
-      const { onApprovalStart, onApprovalEnd } = options;
-
-      try {
-        // Use permit when possible
-        if (allowPermit) {
-          return createPermitSignature(this.user, amountToCheck, spenderAddress, tokenContract);
-        }
-
-        onApprovalStart?.();
-        const approveTx = await tokenContract.approve(spenderAddress, amountToCheck.toBigInt(Decimal.PRECISION));
-        await approveTx.wait();
-        onApprovalEnd?.();
-      } catch (error) {
-        onApprovalEnd?.(error);
-        throw error;
-      }
-    }
-
-    return createEmptyPermitSignature();
   }
 
   private loadPositionManagerStETH(): PositionManagerStETH {
@@ -905,7 +1010,7 @@ export class UserPosition extends PositionWithRunner {
 
     const tokenAddress = RaftConfig.getTokenAddress(collateralToken);
 
-    if (!tokenAddress) {
+    if (!tokenAddress || tokenAddress === ZeroAddress) {
       return null;
     }
 
