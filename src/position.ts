@@ -562,20 +562,34 @@ export class UserPosition extends PositionWithRunner {
     );
     const userAddress = await this.getUserAddress();
 
-    const {
-      isDelegateWhitelisted = whitelistingRequired ? await this.isDelegateWhitelisted(collateralToken) : false,
+    let { isDelegateWhitelisted, collateralTokenAllowance, rTokenAllowance } = options;
+
+    // In case the delegate whitelisting check is not passed externally, check the whitelist status
+    if (isDelegateWhitelisted === undefined) {
+      isDelegateWhitelisted = whitelistingRequired ? await this.isDelegateWhitelisted(collateralToken) : false;
+    }
+
+    // In case the collateral token allowance check is not passed externally, check the allowance
+    if (collateralTokenAllowance === undefined) {
       collateralTokenAllowance = collateralTokenAllowanceRequired
         ? await getTokenAllowance(collateralTokenContract, userAddress, positionManagerAddress)
-        : Decimal.MAX_DECIMAL,
+        : Decimal.MAX_DECIMAL;
+    }
+
+    // In case the R token allowance check is not passed externally, check the allowance
+    if (rTokenAllowance === undefined) {
       rTokenAllowance = rTokenAllowanceRequired
         ? await getTokenAllowance(this.rToken, userAddress, positionManagerAddress)
-        : Decimal.MAX_DECIMAL,
-    } = options;
+        : Decimal.MAX_DECIMAL;
+    }
 
     const whitelistingStepNeeded = whitelistingRequired && !isDelegateWhitelisted;
     const collateralApprovalStepNeeded =
-      collateralTokenAllowanceRequired && collateralChange.gt(collateralTokenAllowance);
-    const rTokenApprovalStepNeeded = rTokenAllowanceRequired && debtChange.abs().gt(rTokenAllowance);
+      collateralTokenAllowanceRequired && collateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO);
+    const rTokenApprovalStepNeeded = rTokenAllowanceRequired && debtChange.abs().gt(rTokenAllowance ?? Decimal.ZERO);
+
+    // The number of steps is the number of optional steps that are required based on input values plus one required
+    // step (`manage`)
     const numberOfSteps =
       Number(whitelistingStepNeeded) + Number(collateralApprovalStepNeeded) + Number(rTokenApprovalStepNeeded) + 1;
 
