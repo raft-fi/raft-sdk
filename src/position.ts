@@ -295,6 +295,14 @@ class PositionWithRunner extends Position {
   }
 
   /**
+   * Returns the underlying collateral token of the position.
+   * @returns The underlying collateral token.
+   */
+  public getUnderlyingCollateralToken(): UnderlyingCollateralToken {
+    return this.underlyingCollateralToken;
+  }
+
+  /**
    * Fetches the list of transactions of the position.
    * @returns The list of transactions.
    */
