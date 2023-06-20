@@ -16,7 +16,13 @@ import {
   PositionManagerStETH,
 } from './typechain';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
-import { CollateralToken, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
+import {
+  CollateralToken,
+  Token,
+  TransactionWithFeesOptions,
+  UNDERLYING_COLLATERAL_TOKENS,
+  UnderlyingCollateralToken,
+} from './types';
 import { createEmptyPermitSignature, createPermitSignature, sendTransactionWithGasLimit } from './utils';
 
 export type PositionTransactionType = 'OPEN' | 'ADJUST' | 'CLOSE' | 'LIQUIDATION';
@@ -36,6 +42,10 @@ interface PositionTransactionsQuery {
   position: {
     transactions: PositionTransactionQuery[];
   } | null;
+}
+
+interface UserPositionResponse {
+  underlyingCollateralToken: string | null;
 }
 
 export const TOKENS_WITH_PERMIT = new Set<Token>(['wstETH', 'R']);
@@ -216,14 +226,14 @@ class PositionWithRunner extends Position {
    * @param userAddress The address of the owner of the position.
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
-   * @param underlyingCollateralToken The underlying collateral token. Defaults to wstETH.
+   * @param underlyingCollateralToken The underlying collateral token.
    */
   public constructor(
     userAddress: string,
     runner: ContractRunner,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
-    underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH',
+    underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH', // TODO: remove default value
   ) {
     super(collateral, debt);
 
@@ -338,14 +348,14 @@ export class PositionWithAddress extends PositionWithRunner {
    * @param provider The blockchain provider.
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
-   * @param underlyingCollateralToken The underlying collateral token. Defaults to wstETH.
+   * @param underlyingCollateralToken The underlying collateral token.
    */
   public constructor(
     userAddress: string,
     provider: Provider,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
-    underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH',
+    underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH', // TODO: remove default value
   ) {
     super(userAddress, provider, collateral, debt, underlyingCollateralToken);
   }
@@ -370,6 +380,54 @@ export class UserPosition extends PositionWithRunner {
   private user: Signer;
   private collateralTokens = new Map<CollateralToken, ERC20>();
   private positionManager: PositionManager;
+
+  /**
+   * Fetches the position of a given user or returns null if the user does not have a position. Differs from the
+   * constructor in that it fetches the underlying collateral token of the position and checks whether it is valid,
+   * where it is required to know the position's underlying collateral token when calling the constructor.
+   * @param user The signer of the position's owner.
+   * @returns The position of the user or null.
+   */
+  public static async fromUser(user: Signer): Promise<UserPosition | null> {
+    const query = gql`
+      query getPosition($positionId: String!) {
+        position(id: $positionId) {
+          underlyingCollateralToken
+        }
+      }
+    `;
+    const variables = {
+      positionId: (await user.getAddress()).toLowerCase(),
+    };
+
+    const response = await request<{ position: UserPositionResponse | null }>(
+      RaftConfig.subgraphEndpoint,
+      query,
+      variables,
+    );
+    const underlyingCollateralTokenAddress = response.position?.underlyingCollateralToken;
+
+    if (!underlyingCollateralTokenAddress) {
+      return null;
+    }
+
+    const underlyingCollateralToken = RaftConfig.getTokenTicker(underlyingCollateralTokenAddress);
+    const underlyingCollateralTokens = new Set<string>(UNDERLYING_COLLATERAL_TOKENS);
+
+    if (underlyingCollateralToken === null || !underlyingCollateralTokens.has(underlyingCollateralToken)) {
+      return null;
+    }
+
+    const position = new UserPosition(
+      user,
+      Decimal.ZERO,
+      Decimal.ZERO,
+      underlyingCollateralToken as UnderlyingCollateralToken,
+    );
+    await position.fetch();
+
+    return position;
+  }
 
   /**
    * Creates a new representation of a position or a given user with given initial collateral and debt amounts.
