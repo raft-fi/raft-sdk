@@ -16,14 +16,13 @@ import {
   PositionManagerStETH,
 } from './typechain';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
+import { CollateralToken, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
 import {
-  CollateralToken,
-  Token,
-  TransactionWithFeesOptions,
-  UNDERLYING_COLLATERAL_TOKENS,
-  UnderlyingCollateralToken,
-} from './types';
-import { createEmptyPermitSignature, createPermitSignature, sendTransactionWithGasLimit } from './utils';
+  createEmptyPermitSignature,
+  createPermitSignature,
+  isUnderlyingCollateralToken,
+  sendTransactionWithGasLimit,
+} from './utils';
 
 export type PositionTransactionType = 'OPEN' | 'ADJUST' | 'CLOSE' | 'LIQUIDATION';
 
@@ -420,18 +419,12 @@ export class UserPosition extends PositionWithRunner {
     }
 
     const underlyingCollateralToken = RaftConfig.getTokenTicker(underlyingCollateralTokenAddress);
-    const underlyingCollateralTokens = new Set<string>(UNDERLYING_COLLATERAL_TOKENS);
 
-    if (underlyingCollateralToken === null || !underlyingCollateralTokens.has(underlyingCollateralToken)) {
+    if (underlyingCollateralToken === null || !isUnderlyingCollateralToken(underlyingCollateralToken)) {
       return null;
     }
 
-    const position = new UserPosition(
-      user,
-      Decimal.ZERO,
-      Decimal.ZERO,
-      underlyingCollateralToken as UnderlyingCollateralToken,
-    );
+    const position = new UserPosition(user, Decimal.ZERO, Decimal.ZERO, underlyingCollateralToken);
     await position.fetch();
 
     return position;
