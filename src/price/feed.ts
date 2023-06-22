@@ -4,7 +4,7 @@ import { request, gql } from 'graphql-request';
 import { RaftConfig } from '../config';
 import { CollateralToken, Token, UnderlyingCollateralToken } from '../types';
 import { SUBGRAPH_PRICE_PRECISION } from '../constants';
-import { CollateralTokenConfig } from '../config/types';
+import { CollateralTokenConfig, SupportedCollateralTokens } from '../config/types';
 
 export type PriceQueryResponse = {
   value: string;
@@ -70,18 +70,12 @@ export class PriceFeed {
    * @param collateralToken Collateral token which rate converts to.
    * @returns Conversion rate from underlying collateral token to collateral token.
    */
-  public getUnderlyingCollateralRate(
-    underlyingCollateral: UnderlyingCollateralToken,
-    collateralToken: CollateralToken,
+  public getUnderlyingCollateralRate<U extends UnderlyingCollateralToken>(
+    underlyingCollateral: U,
+    collateralToken: SupportedCollateralTokens[U],
   ): Promise<Decimal> {
     const collateralTokenConfig =
       RaftConfig.networkConfig.underlyingTokens[underlyingCollateral].supportedCollateralTokens[collateralToken];
-
-    if (!collateralTokenConfig) {
-      throw new Error(
-        `Underlying collateral token ${underlyingCollateral} does not support collateral token ${collateralToken}`,
-      );
-    }
 
     if (collateralTokenConfig.underlyingCollateralRate instanceof Decimal) {
       return Promise.resolve(collateralTokenConfig.underlyingCollateralRate);
@@ -146,22 +140,21 @@ export class PriceFeed {
     return new Decimal(BigInt(response.price.value), SUBGRAPH_PRICE_PRECISION);
   }
 
-  private getTokenCollateralConfig(token: CollateralToken) {
-    let collateralTokenConfig: CollateralTokenConfig | null = null;
-    const underlyingTokenList = Object.entries(RaftConfig.networkConfig.underlyingTokens);
-
-    for (const value of Object.values(underlyingTokenList)) {
-      const [, config] = value;
-
-      if (config.supportedCollateralTokens[token]) {
-        collateralTokenConfig = config.supportedCollateralTokens[token];
+  private getTokenCollateralConfig(token: CollateralToken): CollateralTokenConfig {
+    for (const config of Object.values(RaftConfig.networkConfig.underlyingTokens)) {
+      if (this.isSupportedCollateralToken(config.supportedCollateralTokens, token)) {
+        return config.supportedCollateralTokens[token];
       }
     }
 
-    if (!collateralTokenConfig) {
-      throw new Error(`Failed to find collateral token config for token ${token}!`);
-    }
+    throw new Error(`Failed to find collateral token config for token ${token}!`);
+  }
 
-    return collateralTokenConfig;
+  private isSupportedCollateralToken<X extends object, Y extends PropertyKey>(
+    object: X,
+    property: Y,
+  ): object is Record<Y, CollateralTokenConfig> & X {
+    // eslint-disable-next-line no-prototype-builtins
+    return object.hasOwnProperty(property);
   }
 }
