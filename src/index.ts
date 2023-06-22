@@ -18,10 +18,14 @@ export {
   R_TOKEN,
   TOKENS,
   UNDERLYING_COLLATERAL_TOKENS,
+  WRAPPABLE_CAPPED_COLLATERAL_TOKENS,
+  WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS,
   type CollateralToken,
   type RToken,
   type Token,
   type UnderlyingCollateralToken,
   type TransactionWithFeesOptions,
+  type WrappableCappedCollateralToken,
+  type WrappedCappedUnderlyingCollateralToken,
 } from './types';
 export type { ERC20PermitSignatureStruct } from './typechain/PositionManager';

@@ -1,20 +1,20 @@
-import { CollateralToken, TOKENS, Token, UnderlyingCollateralToken } from '../types';
+import { TOKENS, Token, UnderlyingCollateralToken } from '../types';
 import { goerliConfig } from './goerli';
 import { mainnetConfig } from './mainnet';
-import { NetworkConfig, SupportedNetwork } from './types';
+import { NetworkConfig, SupportedCollateralTokens, SupportedNetwork } from './types';
 
-const networkConfig: { [network in SupportedNetwork]: NetworkConfig } = {
+const networkConfig: Record<SupportedNetwork, NetworkConfig> = {
   mainnet: mainnetConfig,
   goerli: goerliConfig,
 };
 
-const networkIds: { [network in SupportedNetwork]: number } = {
+const networkIds: Record<SupportedNetwork, number> = {
   mainnet: 1,
   goerli: 5,
 };
 
 export class RaftConfig {
-  private static _network: SupportedNetwork = 'goerli'; // TODO: change to mainnet
+  private static _network: SupportedNetwork = 'mainnet';
   private static _subgraphEndpoint = '';
 
   public static setNetwork(network: SupportedNetwork) {
@@ -53,18 +53,11 @@ export class RaftConfig {
     return tokenTicker ?? null;
   }
 
-  static getPositionManagerAddress(
-    underlyingCollateralToken: UnderlyingCollateralToken,
-    collateralToken: CollateralToken,
+  static getPositionManagerAddress<U extends UnderlyingCollateralToken>(
+    underlyingCollateralToken: U,
+    collateralToken: SupportedCollateralTokens[U],
   ): string {
-    const collateralConfig =
-      this.networkConfig.underlyingTokens[underlyingCollateralToken].supportedCollateralTokens[collateralToken];
-    if (!collateralConfig) {
-      throw new Error(
-        `Underlying collateral token ${underlyingCollateralToken} does not support collateral token ${collateralToken}`,
-      );
-    }
-
-    return collateralConfig.positionManager;
+    return this.networkConfig.underlyingTokens[underlyingCollateralToken].supportedCollateralTokens[collateralToken]
+      .positionManager;
   }
 }
