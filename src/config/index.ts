@@ -1,2 +1,2 @@
 export { RaftConfig } from './config';
-export type { SupportedNetwork } from './types';
+export type { SupportedCollateralTokens, SupportedNetwork } from './types';

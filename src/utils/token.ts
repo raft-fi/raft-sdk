@@ -9,10 +9,26 @@ import {
   Token,
   UNDERLYING_COLLATERAL_TOKENS,
   UnderlyingCollateralToken,
+  WRAPPABLE_CAPPED_COLLATERAL_TOKENS,
+  WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS,
+  WrappableCappedCollateralToken,
+  WrappedCappedUnderlyingCollateralToken,
 } from '../types';
 
+const WRAPPABLE_CAPPED_COLLATERAL_TOKEN_SET = new Set<string>(WRAPPABLE_CAPPED_COLLATERAL_TOKENS);
+const WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKEN_SET = new Set<string>(WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS);
 const UNDERLYING_COLLATERAL_TOKEN_SET = new Set<string>(UNDERLYING_COLLATERAL_TOKENS);
 const COLLATERAL_TOKEN_SET = new Set<string>(COLLATERAL_TOKENS);
+
+export function isWrappableCappedCollateralToken(token: Token): token is WrappableCappedCollateralToken {
+  return WRAPPABLE_CAPPED_COLLATERAL_TOKEN_SET.has(token);
+}
+
+export function isWrappedCappedUnderlyingCollateralToken(
+  token: Token,
+): token is WrappedCappedUnderlyingCollateralToken {
+  return WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKEN_SET.has(token);
+}
 
 export function isUnderlyingCollateralToken(token: Token): token is UnderlyingCollateralToken {
   return UNDERLYING_COLLATERAL_TOKEN_SET.has(token);
