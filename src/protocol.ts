@@ -6,7 +6,6 @@ import {
   ERC20Indexable__factory,
   ERC20Permit,
   PositionManager,
-  PositionManagerWrappedCollateralToken,
   PositionManagerWrappedCollateralToken__factory,
   PositionManager__factory,
 } from './typechain';
@@ -32,7 +31,6 @@ export class Protocol {
 
   private provider: JsonRpcProvider;
   private positionManager: PositionManager;
-  private positionManagerWrappedCollateralToken: PositionManagerWrappedCollateralToken;
   private rToken: ERC20Permit;
 
   private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
@@ -58,10 +56,6 @@ export class Protocol {
   private constructor(provider: JsonRpcProvider) {
     this.provider = provider;
     this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, this.provider);
-    this.positionManagerWrappedCollateralToken = PositionManagerWrappedCollateralToken__factory.connect(
-      RaftConfig.networkConfig.positionManagerWrappedCollateralToken,
-      this.provider,
-    );
     this.rToken = getTokenContract(R_TOKEN, this.provider);
   }
 
@@ -98,11 +92,12 @@ export class Protocol {
 
     if (isWrappedCappedUnderlyingCollateralToken(collateralToken)) {
       // TODO: Needs `getRedeemCollateralSteps` for more granular control
-      const positionManagerAddress = RaftConfig.networkConfig.positionManagerWrappedCollateralToken;
+      const positionManagerAddress = RaftConfig.networkConfig.wrappedCollateralTokenPositionManagers[collateralToken];
+      const positionManager = PositionManagerWrappedCollateralToken__factory.connect(positionManagerAddress, redeemer);
       const rPermitSignature = await createPermitSignature(redeemer, debtAmount, positionManagerAddress, this.rToken);
 
       return sendTransactionWithGasLimit(
-        this.positionManagerWrappedCollateralToken.redeemCollateral,
+        positionManager.redeemCollateral,
         [debtAmount.toBigInt(Decimal.PRECISION), maxFeePercentage.toBigInt(Decimal.PRECISION), rPermitSignature],
         gasLimitMultiplier,
       );

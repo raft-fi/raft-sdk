@@ -6,7 +6,7 @@ import { Token } from '../types';
 
 const POSITION_MANAGER_ADDRESS = '0xeaf8aad45d563f14d8b443277dd51c426ad8607f';
 const POSITION_MANAGER_STETH_ADDRESS = '0x4e01f8c03893be67b60af6a1b49d6e51a8781e3c';
-const POSITION_MANAGER_WRAPPED_COLLATERAL_TOKEN_ADDRESS = '0x55962533dB37144B974Dfd347B0FC492860a1Cb2';
+const POSITION_MANAGER_WRAPPED_RETH = '0x55962533dB37144B974Dfd347B0FC492860a1Cb2';
 
 const underlyingTokensConfig: UnderlyingTokens = {
   wstETH: {
@@ -31,7 +31,7 @@ const underlyingTokensConfig: UnderlyingTokens = {
   wcrETH: {
     supportedCollateralTokens: {
       rETH: {
-        positionManager: POSITION_MANAGER_WRAPPED_COLLATERAL_TOKEN_ADDRESS,
+        positionManager: POSITION_MANAGER_WRAPPED_RETH,
         underlyingCollateralRate: Decimal.ONE,
         underlyingTokenTicker: 'wcrETH',
       },
@@ -98,7 +98,9 @@ const tokensConfig: Record<Token, TokenConfig> = {
 export const goerliConfig: NetworkConfig = {
   positionManager: POSITION_MANAGER_ADDRESS,
   positionManagerStEth: POSITION_MANAGER_STETH_ADDRESS,
-  positionManagerWrappedCollateralToken: POSITION_MANAGER_WRAPPED_COLLATERAL_TOKEN_ADDRESS,
+  wrappedCollateralTokenPositionManagers: {
+    wcrETH: POSITION_MANAGER_WRAPPED_RETH,
+  },
   raftCollateralTokens: {
     wstETH: '0x86695745Ce31FBd45Db7F6866d5d3Abe048ce033',
     wcrETH: '0x542C3C65C15ab92d585cb3BE6657CEa6B045c8b8',

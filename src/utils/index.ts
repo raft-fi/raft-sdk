@@ -2,6 +2,7 @@ export { createEmptyPermitSignature, createPermitSignature } from './permit';
 export { sendTransactionWithGasLimit } from './transactions';
 export {
   getTokenContract,
+  getWrappedCappedCollateralToken,
   isCollateralToken,
   isUnderlyingCollateralToken,
   isRToken,

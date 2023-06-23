@@ -6,7 +6,7 @@ import { Token } from '../types';
 
 const POSITION_MANAGER_ADDRESS = '0x5f59b322eb3e16a0c78846195af1f588b77403fc';
 const POSITION_MANAGER_STETH_ADDRESS = '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6';
-const POSITION_MANAGER_WRAPPED_COLLATERAL_TOKEN_ADDRESS = ''; // TODO: Add wrapped collateral token position manager
+const POSITION_MANAGER_RETH = ''; // TODO: Add wrapped collateral token position manager
 
 const underlyingTokensConfig: UnderlyingTokens = {
   wstETH: {
@@ -31,7 +31,7 @@ const underlyingTokensConfig: UnderlyingTokens = {
   wcrETH: {
     supportedCollateralTokens: {
       rETH: {
-        positionManager: POSITION_MANAGER_WRAPPED_COLLATERAL_TOKEN_ADDRESS,
+        positionManager: POSITION_MANAGER_RETH,
         underlyingCollateralRate: Decimal.ONE,
         underlyingTokenTicker: 'wcrETH',
       },
@@ -98,7 +98,9 @@ const tokensConfig: Record<Token, TokenConfig> = {
 export const mainnetConfig: NetworkConfig = {
   positionManager: POSITION_MANAGER_ADDRESS,
   positionManagerStEth: POSITION_MANAGER_STETH_ADDRESS,
-  positionManagerWrappedCollateralToken: '', // TODO: Add wrapped collateral token position manager
+  wrappedCollateralTokenPositionManagers: {
+    wcrETH: POSITION_MANAGER_RETH,
+  },
   raftCollateralTokens: {
     wstETH: '0xa7820009f79687d39f51909a01e7fd4b4d0663f8',
     wcrETH: '', // TODO: Add collateral token address
