@@ -26,10 +26,19 @@ import {
   PositionManagerWrappedCollateralToken__factory,
 } from './typechain';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
-import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
+import {
+  CollateralToken,
+  R_TOKEN,
+  Token,
+  TransactionWithFeesOptions,
+  UnderlyingCollateralToken,
+  WrappableCappedCollateralToken,
+  WrappedCappedUnderlyingCollateralToken,
+} from './types';
 import {
   createEmptyPermitSignature,
   createPermitSignature,
+  getWrappedCappedCollateralToken,
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
   sendTransactionWithGasLimit,
@@ -764,7 +773,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       (collateralToken === 'stETH' && this.underlyingCollateralToken === 'wstETH')
     ) {
       const method = isWrappableCappedCollateralToken(collateralToken)
-        ? this.loadPositionManagerWrappedCollateralToken().managePosition
+        ? this.loadPositionManagerWrappedCollateralToken(collateralToken).managePosition
         : this.loadPositionManagerStETH().managePositionStETH;
 
       yield {
@@ -1104,9 +1113,15 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     return PositionManagerStETH__factory.connect(RaftConfig.networkConfig.positionManagerStEth, this.user);
   }
 
-  private loadPositionManagerWrappedCollateralToken(): PositionManagerWrappedCollateralToken {
+  private loadPositionManagerWrappedCollateralToken(
+    collateralToken: WrappableCappedCollateralToken | WrappedCappedUnderlyingCollateralToken,
+  ): PositionManagerWrappedCollateralToken {
+    const underlyingCollateralToken = isWrappableCappedCollateralToken(collateralToken)
+      ? getWrappedCappedCollateralToken(collateralToken)
+      : collateralToken;
+
     return PositionManagerWrappedCollateralToken__factory.connect(
-      RaftConfig.networkConfig.positionManagerWrappedCollateralToken,
+      RaftConfig.networkConfig.wrappedCollateralTokenPositionManagers[underlyingCollateralToken],
       this.user,
     );
   }

@@ -51,6 +51,12 @@ export function isRToken(token: Token): token is RToken {
   return token === R_TOKEN;
 }
 
+export function getWrappedCappedCollateralToken<T extends WrappableCappedCollateralToken>(
+  underlyingToken: T,
+): WrappedCappedUnderlyingCollateralToken {
+  return `wc${underlyingToken}`;
+}
+
 export function getTokenContract<T extends Token>(collateralToken: T, provider: Provider): TokenContractTypes[T] {
   const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
   const tokenAddress = RaftConfig.getTokenAddress(collateralToken);
