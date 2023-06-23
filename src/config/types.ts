@@ -1,6 +1,6 @@
 import { Provider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { Token, UnderlyingCollateralToken } from '../types';
+import { Token, UnderlyingCollateralToken, WrappedCappedUnderlyingCollateralToken } from '../types';
 
 export type SupportedNetwork = 'goerli' | 'mainnet';
 
@@ -35,7 +35,7 @@ export type TokenConfig = {
 export interface NetworkConfig {
   positionManager: string;
   positionManagerStEth: string;
-  positionManagerWrappedCollateralToken: string;
+  wrappedCollateralTokenPositionManagers: Record<WrappedCappedUnderlyingCollateralToken, string>;
   raftCollateralTokens: Record<UnderlyingCollateralToken, string>;
   raftDebtTokens: Record<UnderlyingCollateralToken, string>;
   priceFeeds: Record<UnderlyingCollateralToken, string>;

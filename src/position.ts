@@ -18,10 +18,18 @@ import {
   PositionManagerWrappedCollateralToken__factory,
 } from './typechain';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
-import { CollateralToken, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from './types';
+import {
+  CollateralToken,
+  Token,
+  TransactionWithFeesOptions,
+  UnderlyingCollateralToken,
+  WrappableCappedCollateralToken,
+  WrappedCappedUnderlyingCollateralToken,
+} from './types';
 import {
   createEmptyPermitSignature,
   createPermitSignature,
+  getWrappedCappedCollateralToken,
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
   sendTransactionWithGasLimit,
@@ -565,15 +573,26 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       );
     }
 
-    const isWrappableToken = isWrappableCappedCollateralToken(collateralToken);
-
-    if (isWrappableToken || (collateralToken === 'stETH' && this.underlyingCollateralToken === 'wstETH')) {
-      const method = isWrappableToken
-        ? this.loadPositionManagerWrappedCollateralToken().managePosition
-        : this.loadPositionManagerStETH().managePositionStETH;
-
+    if (isWrappableCappedCollateralToken(collateralToken)) {
       return sendTransactionWithGasLimit(
-        method,
+        this.loadPositionManagerWrappedCollateralToken(collateralToken).managePosition,
+        [
+          absoluteCollateralChangeValue,
+          isCollateralIncrease,
+          absoluteDebtChangeValue,
+          isDebtIncrease,
+          maxFeePercentageValue,
+          rPermitSignature,
+        ],
+        gasLimitMultiplier,
+        frontendTag,
+        this.user,
+      );
+    }
+
+    if (collateralToken === 'stETH' && this.underlyingCollateralToken === 'wstETH') {
+      return sendTransactionWithGasLimit(
+        this.loadPositionManagerStETH().managePositionStETH,
         [
           absoluteCollateralChangeValue,
           isCollateralIncrease,
@@ -961,9 +980,15 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     return PositionManagerStETH__factory.connect(RaftConfig.networkConfig.positionManagerStEth, this.user);
   }
 
-  private loadPositionManagerWrappedCollateralToken(): PositionManagerWrappedCollateralToken {
+  private loadPositionManagerWrappedCollateralToken(
+    collateralToken: WrappableCappedCollateralToken | WrappedCappedUnderlyingCollateralToken,
+  ): PositionManagerWrappedCollateralToken {
+    const underlyingCollateralToken = isWrappableCappedCollateralToken(collateralToken)
+      ? getWrappedCappedCollateralToken(collateralToken)
+      : collateralToken;
+
     return PositionManagerWrappedCollateralToken__factory.connect(
-      RaftConfig.networkConfig.positionManagerWrappedCollateralToken,
+      RaftConfig.networkConfig.wrappedCollateralTokenPositionManagers[underlyingCollateralToken],
       this.user,
     );
   }
