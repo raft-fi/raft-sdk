@@ -8,11 +8,20 @@ import {
   PositionManager,
   PositionManagerWrappedCollateralToken__factory,
   PositionManager__factory,
+  WrappedCollateralToken,
 } from './typechain';
-import { R_TOKEN, TransactionWithFeesOptions, UNDERLYING_COLLATERAL_TOKENS, UnderlyingCollateralToken } from './types';
+import {
+  CollateralToken,
+  R_TOKEN,
+  TransactionWithFeesOptions,
+  UNDERLYING_COLLATERAL_TOKENS,
+  UnderlyingCollateralToken,
+} from './types';
 import {
   createPermitSignature,
   getTokenContract,
+  getWrappedCappedCollateralToken,
+  isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
   sendTransactionWithGasLimit,
 } from './utils';
@@ -283,5 +292,46 @@ export class Protocol {
     this._openPositionCount = Number(response.openPositionCounter.count);
 
     return this._openPositionCount;
+  }
+
+  /**
+   * Return the maximum amount of collateral that one can deposit into the protocol.
+   * @param collateralToken The collateral token to check.
+   * @returns The maximum amount of collateral that can be deposited or null if there is no limit.
+   */
+  public async getPositionCollateralCap(collateralToken: CollateralToken): Promise<Decimal | null> {
+    const contract = this.getWrappedCappedCollateralTokenContract(collateralToken);
+
+    if (!contract) {
+      return null;
+    }
+
+    return new Decimal(await contract.maxBalance(), Decimal.PRECISION);
+  }
+
+  /**
+   * Return the maximum amount of collateral that the protocol can have for a given collateral token.
+   * @param collateralToken The collateral token to check.
+   * @returns The maximum amount of collateral that the protocol can have or null if there is no limit.
+   */
+  public async getTotalCollateralCap(collateralToken: CollateralToken): Promise<Decimal | null> {
+    const contract = this.getWrappedCappedCollateralTokenContract(collateralToken);
+
+    if (!contract) {
+      return null;
+    }
+
+    return new Decimal(await contract.cap(), Decimal.PRECISION);
+  }
+
+  private getWrappedCappedCollateralTokenContract(collateralToken: CollateralToken): WrappedCollateralToken | null {
+    const isWrappableToken = isWrappableCappedCollateralToken(collateralToken);
+
+    if (!isWrappedCappedUnderlyingCollateralToken(collateralToken) && !isWrappableToken) {
+      return null;
+    }
+
+    const underlyingToken = isWrappableToken ? getWrappedCappedCollateralToken(collateralToken) : collateralToken;
+    return getTokenContract(underlyingToken, this.provider);
   }
 }

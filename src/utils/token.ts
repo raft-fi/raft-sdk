@@ -1,6 +1,13 @@
 import { Provider, ZeroAddress } from 'ethers';
 import { RaftConfig } from '../config';
-import { ERC20, ERC20Permit, ERC20Permit__factory, ERC20__factory } from '../typechain';
+import {
+  ERC20,
+  ERC20Permit,
+  ERC20Permit__factory,
+  ERC20__factory,
+  WrappedCollateralToken,
+  WrappedCollateralToken__factory,
+} from '../typechain';
 import {
   COLLATERAL_TOKENS,
   CollateralToken,
@@ -25,7 +32,7 @@ type TokenContractTypes = {
   stETH: ERC20;
   wstETH: ERC20Permit;
   rETH: ERC20;
-  wcrETH: ERC20Permit;
+  wcrETH: WrappedCollateralToken;
   R: ERC20Permit;
 };
 
@@ -63,6 +70,10 @@ export function getTokenContract<T extends Token>(collateralToken: T, provider: 
 
   if (tokenAddress === ZeroAddress) {
     return null as TokenContractTypes[T];
+  }
+
+  if (isWrappedCappedUnderlyingCollateralToken(collateralToken)) {
+    return WrappedCollateralToken__factory.connect(tokenAddress, provider) as TokenContractTypes[T];
   }
 
   if (tokenConfig.supportsPermit) {
