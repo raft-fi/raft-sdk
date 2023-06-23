@@ -2,9 +2,21 @@ import { request, gql } from 'graphql-request';
 import { JsonRpcProvider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
-import { ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
-import { TransactionWithFeesOptions, UNDERLYING_COLLATERAL_TOKENS, UnderlyingCollateralToken } from './types';
-import { sendTransactionWithGasLimit } from './utils';
+import {
+  ERC20Indexable__factory,
+  ERC20Permit,
+  PositionManager,
+  PositionManagerWrappedCollateralToken,
+  PositionManagerWrappedCollateralToken__factory,
+  PositionManager__factory,
+} from './typechain';
+import { R_TOKEN, TransactionWithFeesOptions, UNDERLYING_COLLATERAL_TOKENS, UnderlyingCollateralToken } from './types';
+import {
+  createPermitSignature,
+  getTokenContract,
+  isWrappedCappedUnderlyingCollateralToken,
+  sendTransactionWithGasLimit,
+} from './utils';
 
 interface OpenPositionsResponse {
   count: string;
@@ -20,6 +32,8 @@ export class Protocol {
 
   private provider: JsonRpcProvider;
   private positionManager: PositionManager;
+  private positionManagerWrappedCollateralToken: PositionManagerWrappedCollateralToken;
+  private rToken: ERC20Permit;
 
   private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
     wstETH: null,
@@ -43,8 +57,12 @@ export class Protocol {
    */
   private constructor(provider: JsonRpcProvider) {
     this.provider = provider;
-
     this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, this.provider);
+    this.positionManagerWrappedCollateralToken = PositionManagerWrappedCollateralToken__factory.connect(
+      RaftConfig.networkConfig.positionManagerWrappedCollateralToken,
+      this.provider,
+    );
+    this.rToken = getTokenContract(R_TOKEN, this.provider);
   }
 
   /**
@@ -77,6 +95,18 @@ export class Protocol {
   ): Promise<TransactionResponse> {
     const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE } = options;
     const positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, redeemer);
+
+    if (isWrappedCappedUnderlyingCollateralToken(collateralToken)) {
+      // TODO: Needs `getRedeemCollateralSteps` for more granular control
+      const positionManagerAddress = RaftConfig.networkConfig.positionManagerWrappedCollateralToken;
+      const rPermitSignature = await createPermitSignature(redeemer, debtAmount, positionManagerAddress, this.rToken);
+
+      return sendTransactionWithGasLimit(
+        this.positionManagerWrappedCollateralToken.redeemCollateral,
+        [debtAmount.toBigInt(Decimal.PRECISION), maxFeePercentage.toBigInt(Decimal.PRECISION), rPermitSignature],
+        gasLimitMultiplier,
+      );
+    }
 
     return sendTransactionWithGasLimit(
       positionManager.redeemCollateral,
