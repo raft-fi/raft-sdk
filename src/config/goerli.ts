@@ -6,7 +6,7 @@ import { Token } from '../types';
 
 const POSITION_MANAGER_ADDRESS = '0xeaf8aad45d563f14d8b443277dd51c426ad8607f';
 const POSITION_MANAGER_STETH_ADDRESS = '0x4e01f8c03893be67b60af6a1b49d6e51a8781e3c';
-const POSITION_MANAGER_WRAPPED_RETH = '0xA36FDBBAE3c9d55a1d67EE5821d53B50B63A1aB9';
+const POSITION_MANAGER_WRAPPED_RETH = '0x109a9dace6e89cc5ddffebe374e15f029f6b1440';
 
 const underlyingTokensConfig: UnderlyingTokens = {
   wstETH: {
