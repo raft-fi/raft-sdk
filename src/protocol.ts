@@ -97,7 +97,6 @@ export class Protocol {
     options: TransactionWithFeesOptions = {},
   ): Promise<TransactionResponse> {
     const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE } = options;
-    const positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, redeemer);
 
     if (isWrappedCappedUnderlyingCollateralToken(collateralToken)) {
       // TODO: Needs `getRedeemCollateralSteps` for more granular control
@@ -111,6 +110,8 @@ export class Protocol {
         gasLimitMultiplier,
       );
     }
+
+    const positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, redeemer);
 
     return sendTransactionWithGasLimit(
       positionManager.redeemCollateral,

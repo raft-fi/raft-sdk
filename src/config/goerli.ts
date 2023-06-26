@@ -6,7 +6,7 @@ import { Token } from '../types';
 
 const POSITION_MANAGER_ADDRESS = '0xeaf8aad45d563f14d8b443277dd51c426ad8607f';
 const POSITION_MANAGER_STETH_ADDRESS = '0x4e01f8c03893be67b60af6a1b49d6e51a8781e3c';
-const POSITION_MANAGER_WRAPPED_RETH = '0x55962533dB37144B974Dfd347B0FC492860a1Cb2';
+const POSITION_MANAGER_WRAPPED_RETH = '0xA36FDBBAE3c9d55a1d67EE5821d53B50B63A1aB9';
 
 const underlyingTokensConfig: UnderlyingTokens = {
   wstETH: {
@@ -78,7 +78,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
     ticker: 'rETH',
   },
   wcrETH: {
-    address: '0xf917Bfb5e02a4478b0FaD45A00A0a1B96e3b61fe',
+    address: '0x27d7f9921933DfA737B1006E5EFb637cC4b21fc8',
     hardcodedPrice: null,
     priceFeedTicker: 'wcrETH',
     subgraphPriceDataTicker: null,
@@ -103,11 +103,11 @@ export const goerliConfig: NetworkConfig = {
   },
   raftCollateralTokens: {
     wstETH: '0x86695745Ce31FBd45Db7F6866d5d3Abe048ce033',
-    wcrETH: '0x542C3C65C15ab92d585cb3BE6657CEa6B045c8b8',
+    wcrETH: '0x1678f15179dF5608786561A8d56E498449dF2f28',
   },
   raftDebtTokens: {
     wstETH: '0xAABF1f5e5C9b559aaCD3c97B41B0B1ae593e31A8',
-    wcrETH: '0xA4dfeB0932Bc355c71E37E1a3919fec942ef8EFb',
+    wcrETH: '0xB9F64d21b776abCA4aD2d04846D65cB0d072925F',
   },
   priceFeeds: {
     wstETH: '0x0341b185e55A0860D6a7e853fd44D1f4fe37dB37',
