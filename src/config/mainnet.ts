@@ -6,7 +6,7 @@ import { Token } from '../types';
 
 const POSITION_MANAGER_ADDRESS = '0x5f59b322eb3e16a0c78846195af1f588b77403fc';
 const POSITION_MANAGER_STETH_ADDRESS = '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6';
-const POSITION_MANAGER_RETH = ''; // TODO: Add wrapped collateral token position manager
+const POSITION_MANAGER_RETH = '0x29f8abb4cab4bbb56f617d9a3c0f62d33758e74e';
 
 const underlyingTokensConfig: UnderlyingTokens = {
   wstETH: {
@@ -78,7 +78,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
     ticker: 'rETH',
   },
   wcrETH: {
-    address: '', // TODO: Add wcrETH address
+    address: '0xb69e35fb4a157028b92f42655090b984609ae598',
     hardcodedPrice: null,
     priceFeedTicker: 'wcrETH',
     subgraphPriceDataTicker: null,
@@ -103,15 +103,15 @@ export const mainnetConfig: NetworkConfig = {
   },
   raftCollateralTokens: {
     wstETH: '0xa7820009f79687d39f51909a01e7fd4b4d0663f8',
-    wcrETH: '', // TODO: Add collateral token address
+    wcrETH: '0xc38a040faC5769bDed5dDa8Dea1aef609e755363',
   },
   raftDebtTokens: {
     wstETH: '0x1C1D49D8F601f19D2Fa88b14BEf491759aaaF5d8',
-    wcrETH: '', // TODO: Add token debt address
+    wcrETH: '0xF22Cd22B5Cf439825C6B75c816A4daf8fB44375B',
   },
   priceFeeds: {
     wstETH: '0xDB5De0A34b29fFDeEc61E2D8ab4dB63f6641C730',
-    wcrETH: '', // TODO: Add price feed address
+    wcrETH: '0x62ac8d1ebf61636e17d92ec3b24e8e03fb853cda',
   },
   underlyingTokens: underlyingTokensConfig,
   tokens: tokensConfig,
