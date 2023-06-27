@@ -100,10 +100,13 @@ export interface PositionTransaction {
  * Options for managing a position.
  * @property collateralToken The collateral token to use for the operation.
  * @property frontendTag The frontend operator tag for the transaction.
+ * @property approvalType The approval type for the collateral token or R token. Smart contract position owners have to
+ * use `approve` since they don't support signing. Defaults to permit.
  */
 export interface ManagePositionOptions extends TransactionWithFeesOptions {
   collateralToken?: CollateralToken;
   frontendTag?: string;
+  approvalType?: 'permit' | 'approve';
 }
 
 /**
@@ -445,6 +448,8 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
+   * @param options.approvalType The approval type for the collateral token or R token. Smart contract position owners
+   * have to use `approve` since they don't support signing. Defaults to permit.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -515,6 +520,8 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
+   * @param options.approvalType The approval type for the collateral token or R token. Smart contract position owners
+   * have to use `approve` since they don't support signing. Defaults to permit.
    * @param options.isDelegateWhitelisted Whether the delegate is whitelisted for the position owner. If not provided,
    * it will be fetched automatically.
    * @param options.collateralTokenAllowance The collateral token allowance of the position owner for the position
@@ -527,7 +534,12 @@ export class UserPosition extends PositionWithRunner {
     debtChange: Decimal,
     options: ManagePositionOptions & ManagePositionStepsPrefetch = {},
   ): AsyncGenerator<ManagePositionStep, void, ERC20PermitSignatureStruct | undefined> {
-    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE, frontendTag } = options;
+    const {
+      maxFeePercentage = Decimal.ONE,
+      gasLimitMultiplier = Decimal.ONE,
+      frontendTag,
+      approvalType = 'permit',
+    } = options;
     let { collateralToken = this.underlyingCollateralToken } = options;
 
     // check whether it's closing position (i.e. collateralChange is ZERO while debtChange is -ve MAX)
@@ -606,7 +618,7 @@ export class UserPosition extends PositionWithRunner {
 
     if (collateralApprovalStepNeeded) {
       const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
-      if (tokenConfig.supportsPermit) {
+      if (tokenConfig.supportsPermit && approvalType === 'permit') {
         const signature = yield {
           type: {
             name: 'permit',
@@ -635,20 +647,31 @@ export class UserPosition extends PositionWithRunner {
     }
 
     if (rTokenApprovalStepNeeded) {
-      const signature = yield {
-        type: {
-          name: 'permit',
-          token: 'R',
-        },
-        numberOfSteps,
-        action: () => createPermitSignature(this.user, debtChange.abs(), positionManagerAddress, this.rToken),
-      };
+      if (approvalType === 'permit') {
+        const signature = yield {
+          type: {
+            name: 'permit',
+            token: R_TOKEN,
+          },
+          numberOfSteps,
+          action: () => createPermitSignature(this.user, debtChange.abs(), positionManagerAddress, this.rToken),
+        };
 
-      if (!signature) {
-        throw new Error('R permit signature is required');
+        if (!signature) {
+          throw new Error('R permit signature is required');
+        }
+
+        rPermitSignature = signature;
+      } else {
+        yield {
+          type: {
+            name: 'approve',
+            token: R_TOKEN,
+          },
+          numberOfSteps,
+          action: () => this.rToken.approve(positionManagerAddress, absoluteDebtChangeValue),
+        };
       }
-
-      rPermitSignature = signature;
     }
 
     switch (collateralToken) {
@@ -829,6 +852,8 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
+   * @param options.approvalType The approval type for the collateral token or R token. Smart contract position owners
+   * have to use `approve` since they don't support signing. Defaults to permit.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -861,6 +886,8 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
+   * @param options.approvalType The approval type for the collateral token or R token. Smart contract position owners
+   * have to use `approve` since they don't support signing. Defaults to permit.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -882,6 +909,8 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
+   * @param options.approvalType The approval type for the collateral token or R token. Smart contract position owners
+   * have to use `approve` since they don't support signing. Defaults to permit.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -910,6 +939,8 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
+   * @param options.approvalType The approval type for the collateral token or R token. Smart contract position owners
+   * have to use `approve` since they don't support signing. Defaults to permit.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -938,6 +969,8 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
+   * @param options.approvalType The approval type for the collateral token or R token. Smart contract position owners
+   * have to use `approve` since they don't support signing. Defaults to permit.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
@@ -963,6 +996,8 @@ export class UserPosition extends PositionWithRunner {
    * collateral token.
    * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
+   * @param options.approvalType The approval type for the collateral token or R token. Smart contract position owners
+   * have to use `approve` since they don't support signing. Defaults to permit.
    * @param options.onDelegateWhitelistingStart A callback that is called when the delegate whitelisting starts.
    * Optional.
    * @param options.onDelegateWhitelistingEnd A callback that is called when the delegate whitelisting ends. Optional.
