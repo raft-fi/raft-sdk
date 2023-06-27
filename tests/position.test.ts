@@ -103,6 +103,44 @@ describe('UserPosition', () => {
       expect(termination.done).toBe(true);
     });
 
+    it('should generate steps [approve wstETH + manage] for wstETH deposit + R borrowing in case of approval type config', async () => {
+      const signer = {
+        getAddress: () => Promise.resolve('0x123'),
+      } as Signer;
+      const userPosition = new UserPosition(signer, Decimal.ZERO, Decimal.ZERO, 'wstETH');
+      const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, {
+        collateralToken: 'wstETH',
+        approvalType: 'approve',
+      });
+
+      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+
+      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+
+      const numberOfSteps = 2;
+
+      const firstStep = await steps.next();
+
+      expect(firstStep.done).toBe(false);
+      expect(firstStep.value?.type).toEqual({
+        name: 'approve',
+        token: 'wstETH',
+      });
+      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const secondStep = await steps.next();
+
+      expect(secondStep.done).toBe(false);
+      expect(secondStep.value?.type).toEqual('manage');
+      expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const termination = await steps.next();
+
+      expect(termination.done).toBe(true);
+    });
+
     it('should generate steps [wstETH permit + manage] for wstETH deposit + R repayment', async () => {
       const signer = {
         getAddress: () => Promise.resolve('0x123'),
@@ -420,6 +458,50 @@ describe('UserPosition', () => {
       expect(signature).toEqual(EMPTY_SIGNATURE);
 
       const thirdStep = await steps.next(signature as ERC20PermitSignatureStruct);
+
+      expect(thirdStep.done).toBe(false);
+      expect(thirdStep.value?.type).toEqual('manage');
+      expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const termination = await steps.next();
+
+      expect(termination.done).toBe(true);
+    });
+
+    it('should generate steps [whitelist + approve R + manage] for stETH deposit + R repayment in case of approval type config', async () => {
+      const signer = {
+        getAddress: () => Promise.resolve('0x123'),
+      } as Signer;
+      const userPosition = new UserPosition(signer, Decimal.ZERO, Decimal.ZERO, 'wstETH');
+      const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), {
+        collateralToken: 'ETH',
+        approvalType: 'approve',
+      });
+
+      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+
+      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+
+      const numberOfSteps = 3;
+
+      const firstStep = await steps.next();
+
+      expect(firstStep.done).toBe(false);
+      expect(firstStep.value?.type).toEqual('whitelist');
+      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const secondStep = await steps.next();
+
+      expect(secondStep.done).toBe(false);
+      expect(secondStep.value?.type).toEqual({
+        name: 'approve',
+        token: 'R',
+      });
+      expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const thirdStep = await steps.next();
 
       expect(thirdStep.done).toBe(false);
       expect(thirdStep.value?.type).toEqual('manage');
