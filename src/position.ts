@@ -39,6 +39,7 @@ import {
   createEmptyPermitSignature,
   createPermitSignature,
   getWrappedCappedCollateralToken,
+  isEoaAddress,
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
   sendTransactionWithGasLimit,
@@ -262,6 +263,7 @@ export class Position {
 }
 
 class PositionWithRunner extends Position {
+  protected readonly contractRunner: ContractRunner;
   protected userAddress: string;
   protected readonly underlyingCollateralToken: UnderlyingCollateralToken;
 
@@ -271,28 +273,30 @@ class PositionWithRunner extends Position {
   /**
    * Creates a new representation of a position with attached address and given initial collateral and debt amounts.
    * @param userAddress The address of the owner of the position.
+   * @param contractRunner The blockchain contract runner (either provider or signer).
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
    * @param underlyingCollateralToken The underlying collateral token.
    */
   public constructor(
     userAddress: string,
-    runner: ContractRunner,
+    contractRunner: ContractRunner,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
     underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH', // TODO: remove default value
   ) {
     super(collateral, debt);
 
+    this.contractRunner = contractRunner;
     this.userAddress = userAddress;
     this.underlyingCollateralToken = underlyingCollateralToken;
     this.indexCollateralToken = ERC20Indexable__factory.connect(
       RaftConfig.networkConfig.raftCollateralTokens[underlyingCollateralToken],
-      runner,
+      contractRunner,
     );
     this.indexDebtToken = ERC20Indexable__factory.connect(
       RaftConfig.networkConfig.raftDebtTokens[underlyingCollateralToken],
-      runner,
+      contractRunner,
     );
   }
 
@@ -688,9 +692,11 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     let collateralPermitSignature = createEmptyPermitSignature();
     let rPermitSignature = createEmptyPermitSignature();
 
+    const isEoaPositionOwner = await isEoaAddress(userAddress, this.contractRunner);
+
     if (collateralApprovalStepNeeded) {
       const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
-      if (tokenConfig.supportsPermit && approvalType === 'permit') {
+      if (tokenConfig.supportsPermit && approvalType === 'permit' && isEoaPositionOwner) {
         const signature = yield {
           type: {
             name: 'permit',
@@ -719,7 +725,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
 
     if (rTokenApprovalStepNeeded) {
-      if (approvalType === 'permit') {
+      if (approvalType === 'permit' && isEoaPositionOwner) {
         const signature = yield {
           type: {
             name: 'permit',
