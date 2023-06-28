@@ -1,11 +1,20 @@
 import { Provider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { CollateralToken, Token, UnderlyingCollateralToken } from '../types';
+import { Token, UnderlyingCollateralToken, WrappedCappedUnderlyingCollateralToken } from '../types';
 
 export type SupportedNetwork = 'goerli' | 'mainnet';
 
-export type UnderlyingCollateralTokenConfig = {
-  supportedCollateralTokens: Record<CollateralToken, CollateralTokenConfig | null>;
+export type SupportedCollateralTokens = {
+  wstETH: 'ETH' | 'stETH' | 'wstETH';
+  wcrETH: 'rETH' | 'wcrETH';
+};
+
+export type UnderlyingCollateralTokenConfig<U extends UnderlyingCollateralToken> = {
+  supportedCollateralTokens: Record<SupportedCollateralTokens[U], CollateralTokenConfig>;
+};
+
+export type UnderlyingTokens = {
+  [underlyingToken in UnderlyingCollateralToken]: UnderlyingCollateralTokenConfig<underlyingToken>;
 };
 
 export type CollateralTokenConfig = {
@@ -26,10 +35,11 @@ export type TokenConfig = {
 export interface NetworkConfig {
   positionManager: string;
   positionManagerStEth: string;
+  wrappedCollateralTokenPositionManagers: Record<WrappedCappedUnderlyingCollateralToken, string>;
   raftCollateralTokens: Record<UnderlyingCollateralToken, string>;
   raftDebtTokens: Record<UnderlyingCollateralToken, string>;
   priceFeeds: Record<UnderlyingCollateralToken, string>;
-  underlyingTokens: Record<UnderlyingCollateralToken, UnderlyingCollateralTokenConfig>;
+  underlyingTokens: UnderlyingTokens;
   tokens: Record<Token, TokenConfig>;
   testNetwork: boolean;
 }

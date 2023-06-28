@@ -2,16 +2,39 @@ import { request, gql } from 'graphql-request';
 import { JsonRpcProvider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
-import { ERC20Indexable__factory, PositionManager, PositionManager__factory } from './typechain';
-import { TransactionWithFeesOptions, UNDERLYING_COLLATERAL_TOKENS, UnderlyingCollateralToken } from './types';
-import { sendTransactionWithGasLimit } from './utils';
+import {
+  ERC20Indexable__factory,
+  ERC20Permit,
+  PositionManager,
+  PositionManagerWrappedCollateralToken__factory,
+  PositionManager__factory,
+  WrappedCollateralToken,
+} from './typechain';
+import {
+  CollateralToken,
+  R_TOKEN,
+  TransactionWithFeesOptions,
+  UNDERLYING_COLLATERAL_TOKENS,
+  UnderlyingCollateralToken,
+} from './types';
+import {
+  createPermitSignature,
+  getTokenContract,
+  getWrappedCappedCollateralToken,
+  isWrappableCappedCollateralToken,
+  isWrappedCappedUnderlyingCollateralToken,
+  sendTransactionWithGasLimit,
+} from './utils';
 
 interface OpenPositionsResponse {
   count: string;
 }
 
 const BETA = new Decimal(2);
-const DEVIATION = new Decimal(0.01);
+const ORACLE_DEVIATION: Record<UnderlyingCollateralToken, Decimal> = {
+  wstETH: new Decimal(0.01), // 1%
+  wcrETH: new Decimal(0.015), // 1.5%
+};
 const SECONDS_IN_MINUTE = 60;
 const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)
 
@@ -20,15 +43,19 @@ export class Protocol {
 
   private provider: JsonRpcProvider;
   private positionManager: PositionManager;
+  private rToken: ERC20Permit;
 
   private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
     wstETH: null,
+    wcrETH: null,
   };
   private _debtSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
     wstETH: null,
+    wcrETH: null,
   };
   private _borrowingRate: Record<UnderlyingCollateralToken, Decimal | null> = {
     wstETH: null,
+    wcrETH: null,
   };
   private _redemptionRate: Decimal | null = null;
   private _openPositionCount: number | null = null;
@@ -40,8 +67,8 @@ export class Protocol {
    */
   private constructor(provider: JsonRpcProvider) {
     this.provider = provider;
-
     this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, this.provider);
+    this.rToken = getTokenContract(R_TOKEN, this.provider);
   }
 
   /**
@@ -73,6 +100,20 @@ export class Protocol {
     options: TransactionWithFeesOptions = {},
   ): Promise<TransactionResponse> {
     const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE } = options;
+
+    if (isWrappedCappedUnderlyingCollateralToken(collateralToken)) {
+      // TODO: Needs `getRedeemCollateralSteps` for more granular control
+      const positionManagerAddress = RaftConfig.networkConfig.wrappedCollateralTokenPositionManagers[collateralToken];
+      const positionManager = PositionManagerWrappedCollateralToken__factory.connect(positionManagerAddress, redeemer);
+      const rPermitSignature = await createPermitSignature(redeemer, debtAmount, positionManagerAddress, this.rToken);
+
+      return sendTransactionWithGasLimit(
+        positionManager.redeemCollateral,
+        [debtAmount.toBigInt(Decimal.PRECISION), maxFeePercentage.toBigInt(Decimal.PRECISION), rPermitSignature],
+        gasLimitMultiplier,
+      );
+    }
+
     const positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, redeemer);
 
     return sendTransactionWithGasLimit(
@@ -234,7 +275,7 @@ export class Protocol {
       throw new Error('Calculated base rate cannot be zero or less!');
     }
 
-    return Decimal.min(newBaseRate.add(redemptionSpreadDecimal).add(DEVIATION), Decimal.ONE);
+    return Decimal.min(newBaseRate.add(redemptionSpreadDecimal).add(ORACLE_DEVIATION[collateralToken]), Decimal.ONE);
   }
 
   /**
@@ -255,5 +296,46 @@ export class Protocol {
     this._openPositionCount = Number(response.openPositionCounter.count);
 
     return this._openPositionCount;
+  }
+
+  /**
+   * Return the maximum amount of collateral that one can deposit into the protocol.
+   * @param collateralToken The collateral token to check.
+   * @returns The maximum amount of collateral that can be deposited or null if there is no limit.
+   */
+  public async getPositionCollateralCap(collateralToken: CollateralToken): Promise<Decimal | null> {
+    const contract = this.getWrappedCappedCollateralTokenContract(collateralToken);
+
+    if (!contract) {
+      return null;
+    }
+
+    return new Decimal(await contract.maxBalance(), Decimal.PRECISION);
+  }
+
+  /**
+   * Return the maximum amount of collateral that the protocol can have for a given collateral token.
+   * @param collateralToken The collateral token to check.
+   * @returns The maximum amount of collateral that the protocol can have or null if there is no limit.
+   */
+  public async getTotalCollateralCap(collateralToken: CollateralToken): Promise<Decimal | null> {
+    const contract = this.getWrappedCappedCollateralTokenContract(collateralToken);
+
+    if (!contract) {
+      return null;
+    }
+
+    return new Decimal(await contract.cap(), Decimal.PRECISION);
+  }
+
+  private getWrappedCappedCollateralTokenContract(collateralToken: CollateralToken): WrappedCollateralToken | null {
+    const isWrappableToken = isWrappableCappedCollateralToken(collateralToken);
+
+    if (!isWrappedCappedUnderlyingCollateralToken(collateralToken) && !isWrappableToken) {
+      return null;
+    }
+
+    const underlyingToken = isWrappableToken ? getWrappedCappedCollateralToken(collateralToken) : collateralToken;
+    return getTokenContract(underlyingToken, this.provider);
   }
 }

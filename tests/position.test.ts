@@ -551,22 +551,10 @@ describe('UserPosition', () => {
       const signer = {
         getAddress: () => Promise.resolve('0x123'),
       } as Signer;
-      const userPosition = new UserPosition(signer, Decimal.ZERO, Decimal.ZERO);
+      const userPosition = new UserPosition(signer, Decimal.ZERO, Decimal.ZERO, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ZERO, Decimal.ZERO);
 
       expect(() => steps.next()).rejects.toThrow('Collateral and debt change cannot be both zero');
-    });
-
-    it('should throw an error if collateral token is not the matching one for the underlying collateral token', async () => {
-      const signer = {
-        getAddress: () => Promise.resolve('0x123'),
-      } as Signer;
-      const userPosition = new UserPosition(signer, Decimal.ZERO, Decimal.ZERO, 'wstETH');
-      const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, {
-        collateralToken: 'R' as unknown as CollateralToken,
-      });
-
-      expect(() => steps.next()).rejects.toThrow('Unsupported collateral token');
     });
 
     it('should throw an error if collateral token permit signature is not passed', async () => {

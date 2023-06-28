@@ -1,3 +1,11 @@
 export { createEmptyPermitSignature, createPermitSignature } from './permit';
 export { sendTransactionWithGasLimit } from './transactions';
-export { getTokenContract } from './tokenContractFactory';
+export {
+  getTokenContract,
+  getWrappedCappedCollateralToken,
+  isCollateralToken,
+  isUnderlyingCollateralToken,
+  isRToken,
+  isWrappableCappedCollateralToken,
+  isWrappedCappedUnderlyingCollateralToken,
+} from './token';
