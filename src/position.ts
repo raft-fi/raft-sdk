@@ -274,16 +274,16 @@ class PositionWithRunner extends Position {
    * Creates a new representation of a position with attached address and given initial collateral and debt amounts.
    * @param userAddress The address of the owner of the position.
    * @param contractRunner The blockchain contract runner (either provider or signer).
+   * @param underlyingCollateralToken The underlying collateral token.
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
-   * @param underlyingCollateralToken The underlying collateral token.
    */
   public constructor(
     userAddress: string,
     contractRunner: ContractRunner,
+    underlyingCollateralToken: UnderlyingCollateralToken,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
-    underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH', // TODO: remove default value
   ) {
     super(collateral, debt);
 
@@ -405,18 +405,18 @@ export class PositionWithAddress extends PositionWithRunner {
    * Creates a new representation of a position with the attached address and given initial collateral and debt amounts.
    * @param userAddress The address of the owner of the position.
    * @param provider The blockchain provider.
+   * @param underlyingCollateralToken The underlying collateral token.
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
-   * @param underlyingCollateralToken The underlying collateral token.
    */
   public constructor(
     userAddress: string,
     provider: Provider,
+    underlyingCollateralToken: UnderlyingCollateralToken,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
-    underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH', // TODO: remove default value
   ) {
-    super(userAddress, provider, collateral, debt, underlyingCollateralToken);
+    super(userAddress, provider, underlyingCollateralToken, collateral, debt);
   }
 
   /**
@@ -477,7 +477,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       return null;
     }
 
-    const position = new UserPosition(user, Decimal.ZERO, Decimal.ZERO, underlyingCollateralToken);
+    const position = new UserPosition(user, underlyingCollateralToken);
     await position.fetch();
 
     return position;
@@ -486,17 +486,17 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
   /**
    * Creates a new representation of a position or a given user with given initial collateral and debt amounts.
    * @param user The signer of the position's owner.
+   * @param underlyingCollateralToken The underlying collateral token.
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
-   * @param underlyingCollateralToken The underlying collateral token. Defaults to wstETH.
    */
   public constructor(
     user: Signer,
+    underlyingCollateralToken: T,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
-    underlyingCollateralToken: T,
   ) {
-    super('', user, collateral, debt, underlyingCollateralToken);
+    super('', user, underlyingCollateralToken, collateral, debt);
 
     this.user = user;
     this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, user);
