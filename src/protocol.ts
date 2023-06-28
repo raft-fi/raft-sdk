@@ -13,6 +13,7 @@ import {
 import {
   CollateralToken,
   R_TOKEN,
+  Token,
   TransactionWithFeesOptions,
   UNDERLYING_COLLATERAL_TOKENS,
   UnderlyingCollateralToken,
@@ -208,6 +209,11 @@ export class Protocol {
     );
 
     return this._debtSupply;
+  }
+
+  public async fetchTokenTotalSupply(token: Exclude<Token, 'ETH'>): Promise<Decimal> {
+    const contract = getTokenContract(token, this.provider);
+    return new Decimal(await contract.totalSupply(), Decimal.PRECISION);
   }
 
   /**
