@@ -47,17 +47,10 @@ import {
 
 export type PositionTransactionType = 'OPEN' | 'ADJUST' | 'CLOSE' | 'LIQUIDATION';
 
-export type ManagePositionStepType =
-  | 'whitelist'
-  | {
-      name: 'approve';
-      token: Token;
-    }
-  | {
-      name: 'permit';
-      token: Token;
-    }
-  | 'manage';
+export interface ManagePositionStepType {
+  name: 'whitelist' | 'approve' | 'permit' | 'manage';
+  token?: Token;
+}
 
 interface PositionTransactionQuery {
   id: string;
@@ -82,8 +75,9 @@ interface ManagePositionStepsPrefetch {
   rTokenAllowance?: Decimal;
 }
 
-interface ManagePositionStep {
+export interface ManagePositionStep {
   type: ManagePositionStepType;
+  stepNumber: number;
   numberOfSteps: number;
   action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
 }
@@ -548,7 +542,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     for (let step = await steps.next(); !step.done; step = await steps.next(collateralPermitSignature)) {
       const { type: stepType, action } = step.value;
 
-      switch (stepType) {
+      switch (stepType.name) {
         case 'whitelist':
           onDelegateWhitelistingStart?.();
           break;
@@ -566,7 +560,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         await result.wait();
         collateralPermitSignature = undefined;
 
-        switch (stepType) {
+        switch (stepType.name) {
           case 'whitelist':
             onDelegateWhitelistingEnd?.();
             break;
@@ -680,10 +674,14 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     // step (`manage`)
     const numberOfSteps =
       Number(whitelistingStepNeeded) + Number(collateralApprovalStepNeeded) + Number(rTokenApprovalStepNeeded) + 1;
+    let stepCounter = 1;
 
     if (whitelistingStepNeeded) {
       yield {
-        type: 'whitelist',
+        type: {
+          name: 'whitelist',
+        },
+        stepNumber: stepCounter++,
         numberOfSteps,
         action: () => this.positionManager.whitelistDelegate(positionManagerAddress, true),
       };
@@ -702,6 +700,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             name: 'permit',
             token: collateralToken,
           },
+          stepNumber: stepCounter++,
           numberOfSteps,
           action: () =>
             createPermitSignature(this.user, collateralChange, positionManagerAddress, collateralTokenContract),
@@ -718,6 +717,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             name: 'approve',
             token: collateralToken,
           },
+          stepNumber: stepCounter++,
           numberOfSteps,
           action: () => collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue),
         };
@@ -731,6 +731,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             name: 'permit',
             token: R_TOKEN,
           },
+          stepNumber: stepCounter++,
           numberOfSteps,
           action: () => createPermitSignature(this.user, debtChange.abs(), positionManagerAddress, this.rToken),
         };
@@ -746,6 +747,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             name: 'approve',
             token: R_TOKEN,
           },
+          stepNumber: stepCounter++,
           numberOfSteps,
           action: () => this.rToken.approve(positionManagerAddress, absoluteDebtChangeValue),
         };
@@ -754,7 +756,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     if (isUnderlyingCollateralToken(collateralToken)) {
       yield {
-        type: 'manage',
+        type: {
+          name: 'manage',
+        },
+        stepNumber: stepCounter++,
         numberOfSteps,
         action: () =>
           sendTransactionWithGasLimit(
@@ -783,7 +788,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         : this.loadPositionManagerStETH().managePositionStETH;
 
       yield {
-        type: 'manage',
+        type: {
+          name: 'manage',
+        },
+        stepNumber: stepCounter++,
         numberOfSteps,
         action: () =>
           sendTransactionWithGasLimit(
@@ -807,7 +815,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       }
 
       yield {
-        type: 'manage',
+        type: {
+          name: 'manage',
+        },
+        stepNumber: stepCounter++,
         numberOfSteps,
         action: () =>
           sendTransactionWithGasLimit(
