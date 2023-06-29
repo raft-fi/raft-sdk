@@ -1,5 +1,5 @@
 import { ZeroAddress } from 'ethers';
-import { RaftConfig, Token } from '../../src';
+import { RaftConfig } from '../../src';
 import { goerliConfig } from '../../src/config/goerli';
 import { mainnetConfig } from '../../src/config/mainnet';
 
@@ -62,16 +62,10 @@ describe('RaftConfig', () => {
 
   it('should return position manager', () => {
     RaftConfig.setNetwork('mainnet');
-    expect(RaftConfig.getPositionManagerAddress('wstETH', 'ETH')).toEqual(
-      mainnetConfig.underlyingTokens.wstETH.supportedCollateralTokens.ETH?.positionManager,
-    );
     expect(RaftConfig.getPositionManagerAddress('wstETH', 'stETH')).toEqual(mainnetConfig.positionManagerStEth);
     expect(RaftConfig.getPositionManagerAddress('wstETH', 'wstETH')).toEqual(mainnetConfig.positionManager);
 
     RaftConfig.setNetwork('goerli');
-    expect(RaftConfig.getPositionManagerAddress('wstETH', 'ETH')).toEqual(
-      goerliConfig.underlyingTokens.wstETH.supportedCollateralTokens.ETH?.positionManager,
-    );
     expect(RaftConfig.getPositionManagerAddress('wstETH', 'stETH')).toEqual(goerliConfig.positionManagerStEth);
     expect(RaftConfig.getPositionManagerAddress('wstETH', 'wstETH')).toEqual(goerliConfig.positionManager);
   });

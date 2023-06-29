@@ -39,6 +39,7 @@ import {
   createEmptyPermitSignature,
   createPermitSignature,
   getWrappedCappedCollateralToken,
+  isEoaAddress,
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
   sendTransactionWithGasLimit,
@@ -46,17 +47,10 @@ import {
 
 export type PositionTransactionType = 'OPEN' | 'ADJUST' | 'CLOSE' | 'LIQUIDATION';
 
-export type ManagePositionStepType =
-  | 'whitelist'
-  | {
-      name: 'approve';
-      token: Token;
-    }
-  | {
-      name: 'permit';
-      token: Token;
-    }
-  | 'manage';
+export interface ManagePositionStepType {
+  name: 'whitelist' | 'approve' | 'permit' | 'manage';
+  token?: Token;
+}
 
 interface PositionTransactionQuery {
   id: string;
@@ -81,8 +75,9 @@ interface ManagePositionStepsPrefetch {
   rTokenAllowance?: Decimal;
 }
 
-interface ManagePositionStep {
+export interface ManagePositionStep {
   type: ManagePositionStepType;
+  stepNumber: number;
   numberOfSteps: number;
   action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
 }
@@ -262,6 +257,7 @@ export class Position {
 }
 
 class PositionWithRunner extends Position {
+  protected readonly contractRunner: ContractRunner;
   protected userAddress: string;
   protected readonly underlyingCollateralToken: UnderlyingCollateralToken;
 
@@ -271,28 +267,30 @@ class PositionWithRunner extends Position {
   /**
    * Creates a new representation of a position with attached address and given initial collateral and debt amounts.
    * @param userAddress The address of the owner of the position.
+   * @param contractRunner The blockchain contract runner (either provider or signer).
+   * @param underlyingCollateralToken The underlying collateral token.
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
-   * @param underlyingCollateralToken The underlying collateral token.
    */
   public constructor(
     userAddress: string,
-    runner: ContractRunner,
+    contractRunner: ContractRunner,
+    underlyingCollateralToken: UnderlyingCollateralToken,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
-    underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH', // TODO: remove default value
   ) {
     super(collateral, debt);
 
+    this.contractRunner = contractRunner;
     this.userAddress = userAddress;
     this.underlyingCollateralToken = underlyingCollateralToken;
     this.indexCollateralToken = ERC20Indexable__factory.connect(
       RaftConfig.networkConfig.raftCollateralTokens[underlyingCollateralToken],
-      runner,
+      contractRunner,
     );
     this.indexDebtToken = ERC20Indexable__factory.connect(
       RaftConfig.networkConfig.raftDebtTokens[underlyingCollateralToken],
-      runner,
+      contractRunner,
     );
   }
 
@@ -401,18 +399,18 @@ export class PositionWithAddress extends PositionWithRunner {
    * Creates a new representation of a position with the attached address and given initial collateral and debt amounts.
    * @param userAddress The address of the owner of the position.
    * @param provider The blockchain provider.
+   * @param underlyingCollateralToken The underlying collateral token.
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
-   * @param underlyingCollateralToken The underlying collateral token.
    */
   public constructor(
     userAddress: string,
     provider: Provider,
+    underlyingCollateralToken: UnderlyingCollateralToken,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
-    underlyingCollateralToken: UnderlyingCollateralToken = 'wstETH', // TODO: remove default value
   ) {
-    super(userAddress, provider, collateral, debt, underlyingCollateralToken);
+    super(userAddress, provider, underlyingCollateralToken, collateral, debt);
   }
 
   /**
@@ -473,7 +471,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       return null;
     }
 
-    const position = new UserPosition(user, Decimal.ZERO, Decimal.ZERO, underlyingCollateralToken);
+    const position = new UserPosition(user, underlyingCollateralToken);
     await position.fetch();
 
     return position;
@@ -482,17 +480,17 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
   /**
    * Creates a new representation of a position or a given user with given initial collateral and debt amounts.
    * @param user The signer of the position's owner.
+   * @param underlyingCollateralToken The underlying collateral token.
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
-   * @param underlyingCollateralToken The underlying collateral token. Defaults to wstETH.
    */
   public constructor(
     user: Signer,
+    underlyingCollateralToken: T,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
-    underlyingCollateralToken: T,
   ) {
-    super('', user, collateral, debt, underlyingCollateralToken);
+    super('', user, underlyingCollateralToken, collateral, debt);
 
     this.user = user;
     this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, user);
@@ -544,7 +542,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     for (let step = await steps.next(); !step.done; step = await steps.next(collateralPermitSignature)) {
       const { type: stepType, action } = step.value;
 
-      switch (stepType) {
+      switch (stepType.name) {
         case 'whitelist':
           onDelegateWhitelistingStart?.();
           break;
@@ -562,7 +560,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         await result.wait();
         collateralPermitSignature = undefined;
 
-        switch (stepType) {
+        switch (stepType.name) {
           case 'whitelist':
             onDelegateWhitelistingEnd?.();
             break;
@@ -612,7 +610,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       frontendTag,
       approvalType = 'permit',
     } = options;
-    let { collateralToken = this.underlyingCollateralToken } = options;
+    let { collateralToken = this.underlyingCollateralToken as T } = options;
 
     // check whether it's closing position (i.e. collateralChange is ZERO while debtChange is -ve MAX)
     if (collateralChange.isZero() && !debtChange.equals(DEBT_CHANGE_TO_CLOSE)) {
@@ -622,7 +620,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
       // It saves gas by not using the delegate contract if the collateral token is not the underlying collateral token.
       // It does it by skipping the delegate whitelisting (if it is not whitelisted) and approving the R token.
-      collateralToken = this.underlyingCollateralToken;
+      collateralToken = this.underlyingCollateralToken as T;
     }
 
     if (!SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING[this.underlyingCollateralToken].has(collateralToken)) {
@@ -676,10 +674,14 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     // step (`manage`)
     const numberOfSteps =
       Number(whitelistingStepNeeded) + Number(collateralApprovalStepNeeded) + Number(rTokenApprovalStepNeeded) + 1;
+    let stepCounter = 1;
 
     if (whitelistingStepNeeded) {
       yield {
-        type: 'whitelist',
+        type: {
+          name: 'whitelist',
+        },
+        stepNumber: stepCounter++,
         numberOfSteps,
         action: () => this.positionManager.whitelistDelegate(positionManagerAddress, true),
       };
@@ -688,14 +690,17 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     let collateralPermitSignature = createEmptyPermitSignature();
     let rPermitSignature = createEmptyPermitSignature();
 
+    const isEoaPositionOwner = await isEoaAddress(userAddress, this.contractRunner);
+
     if (collateralApprovalStepNeeded) {
       const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
-      if (tokenConfig.supportsPermit && approvalType === 'permit') {
+      if (tokenConfig.supportsPermit && approvalType === 'permit' && isEoaPositionOwner) {
         const signature = yield {
           type: {
             name: 'permit',
             token: collateralToken,
           },
+          stepNumber: stepCounter++,
           numberOfSteps,
           action: () =>
             createPermitSignature(this.user, collateralChange, positionManagerAddress, collateralTokenContract),
@@ -712,6 +717,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             name: 'approve',
             token: collateralToken,
           },
+          stepNumber: stepCounter++,
           numberOfSteps,
           action: () => collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue),
         };
@@ -719,12 +725,13 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
 
     if (rTokenApprovalStepNeeded) {
-      if (approvalType === 'permit') {
+      if (approvalType === 'permit' && isEoaPositionOwner) {
         const signature = yield {
           type: {
             name: 'permit',
             token: R_TOKEN,
           },
+          stepNumber: stepCounter++,
           numberOfSteps,
           action: () => createPermitSignature(this.user, debtChange.abs(), positionManagerAddress, this.rToken),
         };
@@ -740,6 +747,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             name: 'approve',
             token: R_TOKEN,
           },
+          stepNumber: stepCounter++,
           numberOfSteps,
           action: () => this.rToken.approve(positionManagerAddress, absoluteDebtChangeValue),
         };
@@ -748,7 +756,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     if (isUnderlyingCollateralToken(collateralToken)) {
       yield {
-        type: 'manage',
+        type: {
+          name: 'manage',
+        },
+        stepNumber: stepCounter++,
         numberOfSteps,
         action: () =>
           sendTransactionWithGasLimit(
@@ -777,7 +788,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         : this.loadPositionManagerStETH().managePositionStETH;
 
       yield {
-        type: 'manage',
+        type: {
+          name: 'manage',
+        },
+        stepNumber: stepCounter++,
         numberOfSteps,
         action: () =>
           sendTransactionWithGasLimit(
@@ -795,24 +809,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             this.user,
           ),
       };
-    } else if (collateralToken === 'ETH' && this.underlyingCollateralToken === 'wstETH') {
-      if (!isCollateralIncrease) {
-        throw new Error('ETH withdrawal from the position is not supported');
-      }
-
-      yield {
-        type: 'manage',
-        numberOfSteps,
-        action: () =>
-          sendTransactionWithGasLimit(
-            this.loadPositionManagerStETH().managePositionETH,
-            [absoluteDebtChangeValue, isDebtIncrease, maxFeePercentageValue, rPermitSignature],
-            gasLimitMultiplier,
-            frontendTag,
-            this.user,
-            absoluteCollateralChangeValue,
-          ),
-      };
     } else {
       throw new Error(
         `Underlying collateral token ${this.underlyingCollateralToken} does not support collateral token ${collateralToken}`,
@@ -826,7 +822,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * @returns True if the delegate is whitelisted or the collateral token is the position's underlying collateral token,
    * otherwise false.
    */
-  public async isDelegateWhitelisted(collateralToken: CollateralToken): Promise<boolean> {
+  public async isDelegateWhitelisted(collateralToken: T | SupportedCollateralTokens[T]): Promise<boolean> {
     if (!this.isUnderlyingCollateralToken(collateralToken)) {
       const positionManagerAddress = RaftConfig.getPositionManagerAddress(
         this.underlyingCollateralToken,
@@ -847,7 +843,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * @param collateralToken The collateral token for which the delegate should be whitelisted.
    * @returns Transaction response if the whitelisting is needed, otherwise null.
    */
-  public async whitelistDelegate(collateralToken: CollateralToken): Promise<ContractTransactionResponse | null> {
+  public async whitelistDelegate(
+    collateralToken: T | SupportedCollateralTokens[T],
+  ): Promise<ContractTransactionResponse | null> {
     if (!this.isUnderlyingCollateralToken(collateralToken)) {
       return await this.positionManager.whitelistDelegate(
         RaftConfig.getPositionManagerAddress(this.underlyingCollateralToken, collateralToken),
@@ -868,7 +866,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
   public async approveManageTransaction(
     collateralChange: Decimal,
     debtChange: Decimal,
-    collateralToken: CollateralToken,
+    collateralToken: SupportedCollateralTokens[T],
   ) {
     const absoluteCollateralChangeValue = collateralChange.abs().value;
     const absoluteDebtChangeValue = debtChange.abs().value;

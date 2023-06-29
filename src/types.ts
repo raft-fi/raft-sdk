@@ -17,7 +17,7 @@ export type WrappedCappedUnderlyingCollateralToken = (typeof WRAPPED_CAPPED_UNDE
 export type UnderlyingCollateralToken = (typeof UNDERLYING_COLLATERAL_TOKENS)[number];
 export type CollateralToken = (typeof COLLATERAL_TOKENS)[number];
 export type RToken = typeof R_TOKEN;
-export type Token = CollateralToken | RToken;
+export type Token = (typeof TOKENS)[number];
 
 /**
  * @param maxFeePercentage Maximum fee percentage to pay for transaction.
