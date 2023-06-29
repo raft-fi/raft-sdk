@@ -8,6 +8,8 @@ export {
   UserPosition,
   type ManagePositionCallbacks,
   type ManagePositionOptions,
+  type ManagePositionStep,
+  type ManagePositionStepType,
   type PositionTransaction,
   type PositionTransactionType,
 } from './position';

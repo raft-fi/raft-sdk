@@ -87,13 +87,17 @@ describe('UserPosition', () => {
         name: 'permit',
         token: 'wstETH',
       });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
       expect(signature).toEqual(EMPTY_SIGNATURE);
 
       const secondStep = await steps.next(signature as ERC20PermitSignatureStruct);
 
       expect(secondStep.done).toBe(false);
-      expect(secondStep.value?.type).toEqual('manage');
+      expect(secondStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(secondStep.value?.stepNumber).toEqual(2);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -123,12 +127,16 @@ describe('UserPosition', () => {
         name: 'approve',
         token: 'wstETH',
       });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const secondStep = await steps.next();
 
       expect(secondStep.done).toBe(false);
-      expect(secondStep.value?.type).toEqual('manage');
+      expect(secondStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(secondStep.value?.stepNumber);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -156,13 +164,17 @@ describe('UserPosition', () => {
         name: 'permit',
         token: 'wstETH',
       });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
       expect(signature).toEqual(EMPTY_SIGNATURE);
 
       const secondStep = await steps.next(signature as ERC20PermitSignatureStruct);
 
       expect(secondStep.done).toBe(false);
-      expect(secondStep.value?.type).toEqual('manage');
+      expect(secondStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(secondStep.value?.stepNumber);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -184,7 +196,10 @@ describe('UserPosition', () => {
       const firstStep = await steps.next();
 
       expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).toEqual('manage');
+      expect(firstStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -206,7 +221,10 @@ describe('UserPosition', () => {
       const firstStep = await steps.next();
 
       expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).toEqual('manage');
+      expect(firstStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -228,7 +246,10 @@ describe('UserPosition', () => {
       const firstStep = await steps.next();
 
       expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).toEqual('whitelist');
+      expect(firstStep.value?.type).toEqual({
+        name: 'whitelist',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const secondStep = await steps.next();
@@ -238,12 +259,16 @@ describe('UserPosition', () => {
         name: 'approve',
         token: 'stETH',
       });
+      expect(secondStep.value?.stepNumber);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const thirdStep = await steps.next();
 
       expect(thirdStep.done).toBe(false);
-      expect(thirdStep.value?.type).toEqual('manage');
+      expect(thirdStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(thirdStep.value?.stepNumber).toEqual(3);
       expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -266,7 +291,10 @@ describe('UserPosition', () => {
       const firstStep = await steps.next();
 
       expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).toEqual('whitelist');
+      expect(firstStep.value?.type).toEqual({
+        name: 'whitelist',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const secondStep = await steps.next();
@@ -276,6 +304,7 @@ describe('UserPosition', () => {
         name: 'approve',
         token: 'stETH',
       });
+      expect(secondStep.value?.stepNumber);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const thirdStep = await steps.next();
@@ -286,13 +315,17 @@ describe('UserPosition', () => {
         name: 'permit',
         token: 'R',
       });
+      expect(thirdStep.value?.stepNumber).toEqual(3);
       expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
       expect(signature).toEqual(EMPTY_SIGNATURE);
 
       const fourthStep = await steps.next(signature as ERC20PermitSignatureStruct);
 
       expect(fourthStep.done).toBe(false);
-      expect(fourthStep.value?.type).toEqual('manage');
+      expect(fourthStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(fourthStep.value?.stepNumber).toEqual(4);
       expect(fourthStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -314,13 +347,19 @@ describe('UserPosition', () => {
       const firstStep = await steps.next();
 
       expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).toEqual('whitelist');
+      expect(firstStep.value?.type).toEqual({
+        name: 'whitelist',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const secondStep = await steps.next();
 
       expect(secondStep.done).toBe(false);
-      expect(secondStep.value?.type).toEqual('manage');
+      expect(secondStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(secondStep.value?.stepNumber);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -343,7 +382,10 @@ describe('UserPosition', () => {
       const firstStep = await steps.next();
 
       expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).toEqual('whitelist');
+      expect(firstStep.value?.type).toEqual({
+        name: 'whitelist',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const secondStep = await steps.next();
@@ -354,13 +396,17 @@ describe('UserPosition', () => {
         name: 'permit',
         token: 'R',
       });
+      expect(secondStep.value?.stepNumber);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
       expect(signature).toEqual(EMPTY_SIGNATURE);
 
       const thirdStep = await steps.next(signature as ERC20PermitSignatureStruct);
 
       expect(thirdStep.done).toBe(false);
-      expect(thirdStep.value?.type).toEqual('manage');
+      expect(thirdStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(thirdStep.value?.stepNumber).toEqual(3);
       expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -382,13 +428,19 @@ describe('UserPosition', () => {
       const firstStep = await steps.next();
 
       expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).toEqual('whitelist');
+      expect(firstStep.value?.type).toEqual({
+        name: 'whitelist',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const secondStep = await steps.next();
 
       expect(secondStep.done).toBe(false);
-      expect(secondStep.value?.type).toEqual('manage');
+      expect(secondStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(secondStep.value?.stepNumber);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -411,7 +463,10 @@ describe('UserPosition', () => {
       const firstStep = await steps.next();
 
       expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).toEqual('whitelist');
+      expect(firstStep.value?.type).toEqual({
+        name: 'whitelist',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const secondStep = await steps.next();
@@ -422,13 +477,17 @@ describe('UserPosition', () => {
         name: 'permit',
         token: 'R',
       });
+      expect(secondStep.value?.stepNumber);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
       expect(signature).toEqual(EMPTY_SIGNATURE);
 
       const thirdStep = await steps.next(signature as ERC20PermitSignatureStruct);
 
       expect(thirdStep.done).toBe(false);
-      expect(thirdStep.value?.type).toEqual('manage');
+      expect(thirdStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(thirdStep.value?.stepNumber).toEqual(3);
       expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -454,7 +513,10 @@ describe('UserPosition', () => {
       const firstStep = await steps.next();
 
       expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).toEqual('whitelist');
+      expect(firstStep.value?.type).toEqual({
+        name: 'whitelist',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const secondStep = await steps.next();
@@ -464,12 +526,16 @@ describe('UserPosition', () => {
         name: 'approve',
         token: 'R',
       });
+      expect(secondStep.value?.stepNumber);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const thirdStep = await steps.next();
 
       expect(thirdStep.done).toBe(false);
-      expect(thirdStep.value?.type).toEqual('manage');
+      expect(thirdStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(thirdStep.value?.stepNumber).toEqual(3);
       expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -503,7 +569,9 @@ describe('UserPosition', () => {
       const firstStep = await steps.next();
 
       expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).not.toEqual('whitelist');
+      expect(firstStep.value?.type).not.toEqual({
+        name: 'whitelist',
+      });
     });
 
     it('should throw an error if collateral and debt changes are both zero', async () => {
