@@ -72,7 +72,9 @@ interface PositionTransactionsQuery {
 interface ManagePositionStepsPrefetch {
   isDelegateWhitelisted?: boolean;
   collateralTokenAllowance?: Decimal;
+  collateralPermitSignature?: ERC20PermitSignatureStruct;
   rTokenAllowance?: Decimal;
+  rPermitSignature?: ERC20PermitSignatureStruct;
 }
 
 export interface ManagePositionStep {
@@ -596,8 +598,11 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * it will be fetched automatically.
    * @param options.collateralTokenAllowance The collateral token allowance of the position owner for the position
    * manager. If not provided, it will be fetched automatically.
+   * @param options.collateralPermitSignature The collateral token permit signature. If not provided, it will be asked
+   * from the user.
    * @param options.rTokenAllowance The R token allowance of the position owner for the position manager. If not
    * provided, it will be fetched automatically.
+   * @param options.rPermitSignature The R token permit signature. If not provided, it will be asked from the user.
    */
   public async *getManageSteps(
     collateralChange: Decimal,
@@ -644,6 +649,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     );
     const userAddress = await this.getUserAddress();
 
+    const { collateralPermitSignature: cachedCollateralPermitSignature, rPermitSignature: cachedRPermitSignature } =
+      options;
     let { isDelegateWhitelisted, collateralTokenAllowance, rTokenAllowance } = options;
 
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
@@ -665,10 +672,20 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         : Decimal.MAX_DECIMAL;
     }
 
+    const isEoaPositionOwner = await isEoaAddress(userAddress, this.contractRunner);
+    const canUsePermit = isEoaPositionOwner && approvalType === 'permit';
+    const collateralTokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
+    const canCollateralTokenUsePermit = collateralTokenConfig.supportsPermit && canUsePermit;
+
     const whitelistingStepNeeded = whitelistingRequired && !isDelegateWhitelisted;
     const collateralApprovalStepNeeded =
-      collateralTokenAllowanceRequired && collateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO);
-    const rTokenApprovalStepNeeded = rTokenAllowanceRequired && debtChange.abs().gt(rTokenAllowance ?? Decimal.ZERO);
+      collateralTokenAllowanceRequired && // action needs collateral token allowance check
+      collateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO) && // current allowance is not enough
+      (!canCollateralTokenUsePermit || !cachedCollateralPermitSignature); // approval step or signing a permit is needed
+    const rTokenApprovalStepNeeded =
+      rTokenAllowanceRequired && // action needs R token allowance check
+      debtChange.abs().gt(rTokenAllowance ?? Decimal.ZERO) && // current allowance is not enough
+      (!canUsePermit || !cachedRPermitSignature); // approval step or signing a permit is needed
 
     // The number of steps is the number of optional steps that are required based on input values plus one required
     // step (`manage`)
@@ -690,21 +707,20 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     let collateralPermitSignature = createEmptyPermitSignature();
     let rPermitSignature = createEmptyPermitSignature();
 
-    const isEoaPositionOwner = await isEoaAddress(userAddress, this.contractRunner);
-
     if (collateralApprovalStepNeeded) {
-      const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
-      if (tokenConfig.supportsPermit && approvalType === 'permit' && isEoaPositionOwner) {
-        const signature = yield {
-          type: {
-            name: 'permit',
-            token: collateralToken,
-          },
-          stepNumber: stepCounter++,
-          numberOfSteps,
-          action: () =>
-            createPermitSignature(this.user, collateralChange, positionManagerAddress, collateralTokenContract),
-        };
+      if (canCollateralTokenUsePermit) {
+        const signature =
+          cachedCollateralPermitSignature ??
+          (yield {
+            type: {
+              name: 'permit',
+              token: collateralToken,
+            },
+            stepNumber: stepCounter++,
+            numberOfSteps,
+            action: () =>
+              createPermitSignature(this.user, collateralChange, positionManagerAddress, collateralTokenContract),
+          });
 
         if (!signature) {
           throw new Error(`${collateralToken} permit signature is required`);
@@ -725,16 +741,18 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
 
     if (rTokenApprovalStepNeeded) {
-      if (approvalType === 'permit' && isEoaPositionOwner) {
-        const signature = yield {
-          type: {
-            name: 'permit',
-            token: R_TOKEN,
-          },
-          stepNumber: stepCounter++,
-          numberOfSteps,
-          action: () => createPermitSignature(this.user, debtChange.abs(), positionManagerAddress, this.rToken),
-        };
+      if (canUsePermit) {
+        const signature =
+          cachedRPermitSignature ??
+          (yield {
+            type: {
+              name: 'permit',
+              token: R_TOKEN,
+            },
+            stepNumber: stepCounter++,
+            numberOfSteps,
+            action: () => createPermitSignature(this.user, debtChange.abs(), positionManagerAddress, this.rToken),
+          });
 
         if (!signature) {
           throw new Error('R permit signature is required');
