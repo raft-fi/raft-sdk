@@ -1,7 +1,7 @@
 import { ZeroAddress } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { NetworkConfig, TokenConfig, UnderlyingTokens } from './types';
-import { getWstEthToStEthRate } from './rates';
+import { getWstEthToStEthRate } from '../price';
 import { Token } from '../types';
 
 const POSITION_MANAGER_ADDRESS = '0xeaf8aad45d563f14d8b443277dd51c426ad8607f';

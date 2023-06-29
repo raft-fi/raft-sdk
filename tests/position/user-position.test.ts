@@ -1,15 +1,15 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Signer } from 'ethers';
-import { ERC20PermitSignatureStruct, UserPosition, getTokenAllowance } from '../src';
-import { createEmptyPermitSignature, createPermitSignature } from '../src/utils';
+import { ERC20PermitSignatureStruct, UserPosition, getTokenAllowance } from '../../src';
+import { createEmptyPermitSignature, createPermitSignature } from '../../src/utils';
 
-jest.mock('../src/allowance', () => ({
-  ...jest.requireActual('../src/allowance'),
+jest.mock('../../src/allowance', () => ({
+  ...jest.requireActual('../../src/allowance'),
   getTokenAllowance: jest.fn(),
 }));
 
-jest.mock('../src/utils/permit', () => ({
-  ...jest.requireActual('../src/utils/permit'),
+jest.mock('../../src/utils/permit', () => ({
+  ...jest.requireActual('../../src/utils/permit'),
   createPermitSignature: jest.fn(),
 }));
 
