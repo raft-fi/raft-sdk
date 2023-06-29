@@ -11,14 +11,9 @@ const POSITION_MANAGER_WRAPPED_RETH = '0x109a9dace6e89cc5ddffebe374e15f029f6b144
 const underlyingTokensConfig: UnderlyingTokens = {
   wstETH: {
     supportedCollateralTokens: {
-      ETH: {
-        positionManager: POSITION_MANAGER_STETH_ADDRESS,
-        underlyingCollateralRate: getWstEthToStEthRate,
-        underlyingTokenTicker: 'wstETH',
-      },
       stETH: {
         positionManager: POSITION_MANAGER_STETH_ADDRESS,
-        underlyingCollateralRate: getWstEthToStEthRate, // TODO - Use proper rate - do not assume that 1 stETH = 1 ETH
+        underlyingCollateralRate: getWstEthToStEthRate,
         underlyingTokenTicker: 'wstETH',
       },
       wstETH: {

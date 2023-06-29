@@ -5,7 +5,7 @@ import { Token, UnderlyingCollateralToken, WrappedCappedUnderlyingCollateralToke
 export type SupportedNetwork = 'goerli' | 'mainnet';
 
 export type SupportedCollateralTokens = {
-  wstETH: 'ETH' | 'stETH' | 'wstETH';
+  wstETH: 'stETH' | 'wstETH';
   wcrETH: 'rETH' | 'wcrETH';
 };
 

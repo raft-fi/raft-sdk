@@ -610,7 +610,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       frontendTag,
       approvalType = 'permit',
     } = options;
-    let { collateralToken = this.underlyingCollateralToken } = options;
+    let { collateralToken = this.underlyingCollateralToken as T } = options;
 
     // check whether it's closing position (i.e. collateralChange is ZERO while debtChange is -ve MAX)
     if (collateralChange.isZero() && !debtChange.equals(DEBT_CHANGE_TO_CLOSE)) {
@@ -620,7 +620,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
       // It saves gas by not using the delegate contract if the collateral token is not the underlying collateral token.
       // It does it by skipping the delegate whitelisting (if it is not whitelisted) and approving the R token.
-      collateralToken = this.underlyingCollateralToken;
+      collateralToken = this.underlyingCollateralToken as T;
     }
 
     if (!SUPPORTED_COLLATERAL_TOKENS_PER_UNDERLYING[this.underlyingCollateralToken].has(collateralToken)) {
@@ -809,27 +809,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             this.user,
           ),
       };
-    } else if (collateralToken === 'ETH' && this.underlyingCollateralToken === 'wstETH') {
-      if (!isCollateralIncrease) {
-        throw new Error('ETH withdrawal from the position is not supported');
-      }
-
-      yield {
-        type: {
-          name: 'manage',
-        },
-        stepNumber: stepCounter++,
-        numberOfSteps,
-        action: () =>
-          sendTransactionWithGasLimit(
-            this.loadPositionManagerStETH().managePositionETH,
-            [absoluteDebtChangeValue, isDebtIncrease, maxFeePercentageValue, rPermitSignature],
-            gasLimitMultiplier,
-            frontendTag,
-            this.user,
-            absoluteCollateralChangeValue,
-          ),
-      };
     } else {
       throw new Error(
         `Underlying collateral token ${this.underlyingCollateralToken} does not support collateral token ${collateralToken}`,
@@ -843,7 +822,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * @returns True if the delegate is whitelisted or the collateral token is the position's underlying collateral token,
    * otherwise false.
    */
-  public async isDelegateWhitelisted(collateralToken: CollateralToken): Promise<boolean> {
+  public async isDelegateWhitelisted(collateralToken: T | SupportedCollateralTokens[T]): Promise<boolean> {
     if (!this.isUnderlyingCollateralToken(collateralToken)) {
       const positionManagerAddress = RaftConfig.getPositionManagerAddress(
         this.underlyingCollateralToken,
@@ -864,7 +843,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * @param collateralToken The collateral token for which the delegate should be whitelisted.
    * @returns Transaction response if the whitelisting is needed, otherwise null.
    */
-  public async whitelistDelegate(collateralToken: CollateralToken): Promise<ContractTransactionResponse | null> {
+  public async whitelistDelegate(
+    collateralToken: T | SupportedCollateralTokens[T],
+  ): Promise<ContractTransactionResponse | null> {
     if (!this.isUnderlyingCollateralToken(collateralToken)) {
       return await this.positionManager.whitelistDelegate(
         RaftConfig.getPositionManagerAddress(this.underlyingCollateralToken, collateralToken),
@@ -885,7 +866,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
   public async approveManageTransaction(
     collateralChange: Decimal,
     debtChange: Decimal,
-    collateralToken: CollateralToken,
+    collateralToken: SupportedCollateralTokens[T],
   ) {
     const absoluteCollateralChangeValue = collateralChange.abs().value;
     const absoluteDebtChangeValue = debtChange.abs().value;
