@@ -18,7 +18,8 @@ export class PriceFeed {
     this.provider = provider;
   }
 
-  public async getPrice(token: Token): Promise<Decimal> {
+  // TODO: Remove ETH exclusion when we add WETH support
+  public async getPrice(token: Exclude<Token, 'ETH'>): Promise<Decimal> {
     const tokenConfig = RaftConfig.networkConfig.tokens[token];
 
     if (tokenConfig.hardcodedPrice) {
