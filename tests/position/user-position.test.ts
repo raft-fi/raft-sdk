@@ -1,15 +1,15 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Signer } from 'ethers';
-import { ERC20PermitSignatureStruct, UserPosition, getTokenAllowance } from '../src';
-import { createEmptyPermitSignature, createPermitSignature } from '../src/utils';
+import { ERC20PermitSignatureStruct, UserPosition, getTokenAllowance } from '../../src';
+import { createEmptyPermitSignature, createPermitSignature } from '../../src/utils';
 
-jest.mock('../src/allowance', () => ({
-  ...jest.requireActual('../src/allowance'),
+jest.mock('../../src/allowance', () => ({
+  ...jest.requireActual('../../src/allowance'),
   getTokenAllowance: jest.fn(),
 }));
 
-jest.mock('../src/utils/permit', () => ({
-  ...jest.requireActual('../src/utils/permit'),
+jest.mock('../../src/utils/permit', () => ({
+  ...jest.requireActual('../../src/utils/permit'),
   createPermitSignature: jest.fn(),
 }));
 
@@ -429,6 +429,73 @@ describe('UserPosition', () => {
       expect(firstStep.value?.type).not.toEqual({
         name: 'whitelist',
       });
+    });
+
+    it('should skip permit step if cached collateral token permit signature is passed', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
+      const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, {
+        collateralToken: 'wstETH',
+        collateralPermitSignature: EMPTY_SIGNATURE,
+      });
+
+      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+
+      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+
+      const numberOfSteps = 1;
+
+      const firstStep = await steps.next();
+
+      expect(firstStep.done).toBe(false);
+      expect(firstStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
+      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const termination = await steps.next();
+
+      expect(termination.done).toBe(true);
+    });
+
+    it('should skip permit step if cached R token permit signature is passed', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
+      const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), {
+        collateralToken: 'stETH',
+        rPermitSignature: EMPTY_SIGNATURE,
+      });
+
+      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+
+      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+
+      const numberOfSteps = 2;
+
+      const firstStep = await steps.next();
+
+      expect(firstStep.done).toBe(false);
+      expect(firstStep.value?.type).toEqual({
+        name: 'whitelist',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
+      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const secondStep = await steps.next();
+
+      expect(secondStep.done).toBe(false);
+      expect(secondStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(secondStep.value?.stepNumber).toEqual(2);
+      expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const termination = await steps.next();
+
+      expect(termination.done).toBe(true);
     });
 
     it('should throw an error if collateral and debt changes are both zero', async () => {
