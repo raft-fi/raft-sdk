@@ -4,7 +4,10 @@ import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import { ERC20Indexable__factory, ERC20PermitRToken, PositionManager, WrappedCollateralToken } from './typechain';
 import {
+  ApprovalCallbacks,
+  ApprovalOptions,
   CollateralToken,
+  RToken,
   R_TOKEN,
   Token,
   TransactionWithFeesOptions,
@@ -12,14 +15,30 @@ import {
   UnderlyingCollateralToken,
 } from './types';
 import {
+  createEmptyPermitSignature,
   createPermitSignature,
   getPositionManagerContract,
   getTokenContract,
   getWrappedCappedCollateralToken,
+  isEoaAddress,
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
   buildTransactionWithGasLimit,
 } from './utils';
+import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
+
+interface RedeemCollateralStepType {
+  name: 'permit' | 'approve' | 'redeem';
+  token?: RToken;
+}
+
+interface RedeemCollateralStep {
+  type: RedeemCollateralStepType;
+  stepNumber: number;
+  numberOfSteps: number;
+  action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
+  gasEstimate: Decimal;
+}
 
 interface OpenPositionsResponse {
   count: string;
@@ -88,42 +107,146 @@ export class Protocol {
    * @param debtAmount The amount of debt in R to burn.
    * @param redeemer The account to redeem collateral for.
    * @param options.maxFeePercentage The maximum fee percentage to pay for redemption.
-   * @returns The dispatched redemption transaction.
+   * @param options.gasLimitMultiplier The multiplier to apply to the estimated gas limit.
+   * @param options.approvalType The type of approval to use.
+   * @param options.onApprovalStart Callback to execute when approval starts.
+   * @param options.onApprovalEnd Callback to execute when approval ends.
    */
   public async redeemCollateral(
     collateralToken: UnderlyingCollateralToken,
     debtAmount: Decimal,
     redeemer: Signer,
-    options: TransactionWithFeesOptions = {},
-  ): Promise<TransactionResponse> {
-    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE } = options;
+    options: TransactionWithFeesOptions & ApprovalCallbacks & ApprovalOptions = {},
+  ): Promise<void> {
+    const { onApprovalStart, onApprovalEnd, ...redemptionOptions } = options;
+    const steps = this.getRedeemCollateralSteps(collateralToken, debtAmount, redeemer, redemptionOptions);
+    let collateralPermitSignature: ERC20PermitSignatureStruct | undefined;
+
+    for (let step = await steps.next(); !step.done; step = await steps.next(collateralPermitSignature)) {
+      const { type: stepType, action } = step.value;
+
+      if (stepType.name !== 'redeem') {
+        onApprovalStart?.();
+      }
+
+      const result = await action();
+
+      if (result instanceof TransactionResponse) {
+        await result.wait();
+        collateralPermitSignature = undefined;
+
+        if (stepType.name !== 'redeem') {
+          onApprovalEnd?.();
+        }
+      } else {
+        collateralPermitSignature = result;
+      }
+    }
+  }
+
+  /**
+   * Returns the steps for redeeming collateral from the protocol. The steps are not dispatched automatically and it is
+   * the caller's response to dispatch them. Each step contains the type of the step, the total number of steps, and the
+   * action to perform. The action is either a transaction to dispatch or a function that returns a permit signature for
+   * the R token.
+   * @notice Redemption of R at peg will result in significant financial loss.
+   * @param collateralToken The collateral token to redeem.
+   * @param debtAmount The amount of debt in R to burn.
+   * @param redeemer The account to redeem collateral for.
+   * @param options.maxFeePercentage The maximum fee percentage to pay for redemption.
+   * @param options.gasLimitMultiplier The multiplier to apply to the estimated gas limit.
+   * @param options.approvalType The type of approval to use.
+   * @returns The dispatched redemption transaction.
+   */
+  public async *getRedeemCollateralSteps(
+    collateralToken: UnderlyingCollateralToken,
+    debtAmount: Decimal,
+    redeemer: Signer,
+    options: TransactionWithFeesOptions & ApprovalOptions = {},
+  ): AsyncGenerator<RedeemCollateralStep, void, ERC20PermitSignatureStruct | undefined> {
+    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE, approvalType = 'permit' } = options;
+    const rToken = getTokenContract(R_TOKEN, redeemer);
+    let stepCounter = 1;
 
     if (isWrappedCappedUnderlyingCollateralToken(collateralToken)) {
-      // TODO: Needs `getRedeemCollateralSteps` for more granular control
       const positionManagerAddress = RaftConfig.networkConfig.wrappedCollateralTokenPositionManagers[collateralToken];
       const positionManager = getPositionManagerContract('wrapped', positionManagerAddress, redeemer);
-      const rPermitSignature = await createPermitSignature(redeemer, debtAmount, positionManagerAddress, this.rToken);
+      const numberOfSteps = 2;
+      const isEoaRedeemer = await isEoaAddress(await redeemer.getAddress(), redeemer);
+      let rPermitSignature = createEmptyPermitSignature();
 
-      const { sendTransaction } = await buildTransactionWithGasLimit(
+      if (approvalType === 'permit' && isEoaRedeemer) {
+        const signature = yield {
+          type: {
+            name: 'permit',
+            token: R_TOKEN,
+          },
+          stepNumber: stepCounter++,
+          numberOfSteps,
+          action: () => createPermitSignature(redeemer, debtAmount, positionManagerAddress, rToken),
+          gasEstimate: Decimal.ZERO,
+        };
+
+        if (!signature) {
+          throw new Error('R permit signature is required');
+        }
+
+        rPermitSignature = signature;
+      } else {
+        const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(rToken.approve, [
+          positionManagerAddress,
+          debtAmount.toBigInt(Decimal.PRECISION),
+        ]);
+
+        yield {
+          type: {
+            name: 'approve',
+            token: R_TOKEN,
+          },
+          stepNumber: stepCounter++,
+          numberOfSteps,
+          action: sendTransaction,
+          gasEstimate,
+        };
+      }
+
+      const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
         positionManager.redeemCollateral,
         [debtAmount.toBigInt(Decimal.PRECISION), maxFeePercentage.toBigInt(Decimal.PRECISION), rPermitSignature],
         gasLimitMultiplier,
       );
-      return sendTransaction();
+
+      yield {
+        type: {
+          name: 'redeem',
+        },
+        stepNumber: stepCounter++,
+        numberOfSteps,
+        action: sendTransaction,
+        gasEstimate,
+      };
+    } else {
+      const positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, redeemer);
+      const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
+        positionManager.redeemCollateral,
+        [
+          RaftConfig.getTokenAddress(collateralToken),
+          debtAmount.toBigInt(Decimal.PRECISION),
+          maxFeePercentage.toBigInt(Decimal.PRECISION),
+        ],
+        gasLimitMultiplier,
+      );
+
+      yield {
+        type: {
+          name: 'redeem',
+        },
+        stepNumber: stepCounter++,
+        numberOfSteps: 1,
+        action: sendTransaction,
+        gasEstimate,
+      };
     }
-
-    const positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, redeemer);
-
-    const { sendTransaction } = await buildTransactionWithGasLimit(
-      positionManager.redeemCollateral,
-      [
-        RaftConfig.getTokenAddress(collateralToken),
-        debtAmount.toBigInt(Decimal.PRECISION),
-        maxFeePercentage.toBigInt(Decimal.PRECISION),
-      ],
-      gasLimitMultiplier,
-    );
-    return sendTransaction();
   }
 
   /**
