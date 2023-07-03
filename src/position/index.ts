@@ -6,4 +6,7 @@ export {
   type ManagePositionOptions,
   type ManagePositionStep,
   type ManagePositionStepType,
+  type LeveragePositionOptions,
+  type LeveragePositionStep,
+  type LeveragePositionStepType,
 } from './user-position';

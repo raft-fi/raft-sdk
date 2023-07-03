@@ -23,6 +23,11 @@ export interface ManagePositionStepType {
   token?: Token;
 }
 
+export interface LeveragePositionStepType {
+  name: 'whitelist' | 'approve' | 'permit' | 'leverage';
+  token?: Token;
+}
+
 interface ManagePositionStepsPrefetch {
   isDelegateWhitelisted?: boolean;
   collateralTokenAllowance?: Decimal;
@@ -31,8 +36,21 @@ interface ManagePositionStepsPrefetch {
   rPermitSignature?: ERC20PermitSignatureStruct;
 }
 
+interface LeveragePositionStepsPrefetch {
+  isDelegateWhitelisted?: boolean;
+  collateralTokenAllowance?: Decimal;
+  collateralPermitSignature?: ERC20PermitSignatureStruct;
+}
+
 export interface ManagePositionStep {
   type: ManagePositionStepType;
+  stepNumber: number;
+  numberOfSteps: number;
+  action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
+}
+
+export interface LeveragePositionStep {
+  type: LeveragePositionStepType;
   stepNumber: number;
   numberOfSteps: number;
   action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
@@ -52,6 +70,19 @@ const DEBT_CHANGE_TO_CLOSE = Decimal.MAX_DECIMAL.mul(-1);
  * use `approve` since they don't support signing. Defaults to permit.
  */
 export interface ManagePositionOptions<C extends CollateralToken> extends TransactionWithFeesOptions {
+  collateralToken?: C;
+  frontendTag?: string;
+  approvalType?: 'permit' | 'approve';
+}
+
+/**
+ * Options for leveraging a position.
+ * @property collateralToken The collateral token to use for the operation.
+ * @property frontendTag The frontend operator tag for the transaction.
+ * @property approvalType The approval type for the collateral token or R token. Smart contract position owners have to
+ * use `approve` since they don't support signing. Defaults to permit.
+ */
+export interface LeveragePositionOptions<C extends CollateralToken> extends TransactionWithFeesOptions {
   collateralToken?: C;
   frontendTag?: string;
   approvalType?: 'permit' | 'approve';
@@ -467,6 +498,213 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             frontendTag,
             this.user,
           ),
+      };
+    } else {
+      throw new Error(
+        `Underlying collateral token ${this.underlyingCollateralToken} does not support collateral token ${collateralToken}`,
+      );
+    }
+  }
+
+  /**
+   * Returns the steps for managing the leverage position's collateral and leverage multiplier. The steps are not dispatched
+   * automatically and it is the caller's response to dispatch them. Each step contains the type of the step, the total
+   * number of steps, and the action to perform. The action is either a transaction to dispatch or a function that
+   * returns a permit signature for the collateral token.
+   * @param collateralChange The amount of change the collateral by. Positive values deposit collateral, negative values
+   * withdraw it.
+   * @param leverage The leverage multiplier for the position.
+   * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
+   * @param options.collateralToken The collateral token to use for the operation. Defaults to the position's underlying
+   * collateral token.
+   * @param options.gasLimitMultiplier The multiplier for the gas limit of the transaction. Defaults to 1.
+   * @param options.frontendTag The frontend operator tag for the transaction. Optional.
+   * @param options.approvalType The approval type for the collateral token or R token. Smart contract position owners
+   * have to use `approve` since they don't support signing. Defaults to permit.
+   * @param options.isDelegateWhitelisted Whether the delegate is whitelisted for the position owner. If not provided,
+   * it will be fetched automatically.
+   * @param options.collateralTokenAllowance The collateral token allowance of the position owner for the position
+   * manager. If not provided, it will be fetched automatically.
+   * @param options.collateralPermitSignature The collateral token permit signature. If not provided, it will be asked
+   * from the user.
+   */
+  public async *getLeverageSteps(
+    collateralChange: Decimal,
+    leverage: Decimal,
+    options: LeveragePositionOptions<SupportedCollateralTokens[T]> & LeveragePositionStepsPrefetch = {},
+  ): AsyncGenerator<LeveragePositionStep, void, ERC20PermitSignatureStruct | undefined> {
+    const {
+      maxFeePercentage = Decimal.ONE,
+      gasLimitMultiplier = Decimal.ONE,
+      frontendTag,
+      approvalType = 'permit',
+    } = options;
+    const { collateralToken = this.underlyingCollateralToken as T } = options;
+
+    const absoluteCollateralChangeValue = collateralChange.abs().value;
+    const isCollateralIncrease = collateralChange.gt(Decimal.ZERO);
+    const maxFeePercentageValue = maxFeePercentage.value;
+    const isUnderlyingToken = this.isUnderlyingCollateralToken(collateralToken);
+
+    const whitelistingRequired = !isUnderlyingToken;
+    const collateralTokenContract = getTokenContract(collateralToken, this.user);
+    const collateralTokenAllowanceRequired = collateralTokenContract !== null && isCollateralIncrease;
+    const positionManagerAddress = RaftConfig.getPositionManagerAddress(
+      this.underlyingCollateralToken,
+      collateralToken,
+    );
+    const userAddress = await this.getUserAddress();
+
+    const { collateralPermitSignature: cachedCollateralPermitSignature } = options;
+    let { isDelegateWhitelisted, collateralTokenAllowance } = options;
+
+    // In case the delegate whitelisting check is not passed externally, check the whitelist status
+    if (isDelegateWhitelisted === undefined) {
+      isDelegateWhitelisted = whitelistingRequired ? await this.isDelegateWhitelisted(collateralToken) : false;
+    }
+
+    // In case the collateral token allowance check is not passed externally, check the allowance
+    if (collateralTokenAllowance === undefined) {
+      collateralTokenAllowance = collateralTokenAllowanceRequired
+        ? await getTokenAllowance(collateralTokenContract, userAddress, positionManagerAddress)
+        : Decimal.MAX_DECIMAL;
+    }
+
+    const isEoaPositionOwner = await isEoaAddress(userAddress, this.contractRunner);
+    const canUsePermit = isEoaPositionOwner && approvalType === 'permit';
+    const collateralTokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
+    const canCollateralTokenUsePermit = collateralTokenConfig.supportsPermit && canUsePermit;
+
+    const whitelistingStepNeeded = whitelistingRequired && !isDelegateWhitelisted;
+    const collateralApprovalStepNeeded =
+      collateralTokenAllowanceRequired && // action needs collateral token allowance check
+      collateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO) && // current allowance is not enough
+      (!canCollateralTokenUsePermit || !cachedCollateralPermitSignature); // approval step or signing a permit is needed
+
+    // The number of steps is the number of optional steps that are required based on input values plus one required
+    // step (`leverage`)
+    const numberOfSteps = Number(whitelistingStepNeeded) + Number(collateralApprovalStepNeeded) + 1;
+    let stepCounter = 1;
+
+    if (whitelistingStepNeeded) {
+      yield {
+        type: {
+          name: 'whitelist',
+        },
+        stepNumber: stepCounter++,
+        numberOfSteps,
+        action: () => this.positionManager.whitelistDelegate(positionManagerAddress, true),
+      };
+    }
+
+    let collateralPermitSignature = createEmptyPermitSignature();
+
+    if (collateralApprovalStepNeeded) {
+      if (canCollateralTokenUsePermit) {
+        const signature =
+          cachedCollateralPermitSignature ??
+          (yield {
+            type: {
+              name: 'permit',
+              token: collateralToken,
+            },
+            stepNumber: stepCounter++,
+            numberOfSteps,
+            action: () =>
+              createPermitSignature(this.user, collateralChange, positionManagerAddress, collateralTokenContract),
+          });
+
+        if (!signature) {
+          throw new Error(`${collateralToken} permit signature is required`);
+        }
+
+        collateralPermitSignature = signature;
+      } else {
+        yield {
+          type: {
+            name: 'approve',
+            token: collateralToken,
+          },
+          stepNumber: stepCounter++,
+          numberOfSteps,
+          action: () => collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue),
+        };
+      }
+    }
+
+    if (isUnderlyingCollateralToken(collateralToken)) {
+      yield {
+        type: {
+          name: 'leverage',
+        },
+        stepNumber: stepCounter++,
+        numberOfSteps,
+        // TODO: implement the actual leverage function
+        action: async () => {
+          const dummyFunc = (
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _absoluteCollateralChangeValue: bigint,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _isCollateralIncrease: boolean,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _leverage: Decimal,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _collateralPermitSignature: ERC20PermitSignatureStruct,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _maxFeePercentageValue: bigint,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _gasLimitMultiplier: Decimal,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _frontendTag?: string,
+          ) => false;
+          dummyFunc(
+            absoluteCollateralChangeValue,
+            isCollateralIncrease,
+            leverage,
+            collateralPermitSignature,
+            maxFeePercentageValue,
+            gasLimitMultiplier,
+            frontendTag,
+          );
+          return {} as TransactionResponse;
+        },
+      };
+    } else if (
+      isWrappableCappedCollateralToken(collateralToken) ||
+      (collateralToken === 'stETH' && this.underlyingCollateralToken === 'wstETH')
+    ) {
+      yield {
+        type: {
+          name: 'leverage',
+        },
+        stepNumber: stepCounter++,
+        numberOfSteps,
+        // TODO: implement the actual leverage function
+        action: async () => {
+          const dummyFunc = (
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _absoluteCollateralChangeValue: bigint,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _isCollateralIncrease: boolean,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _leverage: Decimal,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _maxFeePercentageValue: bigint,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _gasLimitMultiplier: Decimal,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            _frontendTag?: string,
+          ) => false;
+          dummyFunc(
+            absoluteCollateralChangeValue,
+            isCollateralIncrease,
+            leverage,
+            maxFeePercentageValue,
+            gasLimitMultiplier,
+            frontendTag,
+          );
+          return {} as TransactionResponse;
+        },
       };
     } else {
       throw new Error(
