@@ -10,6 +10,9 @@ export {
   type ManagePositionOptions,
   type ManagePositionStep,
   type ManagePositionStepType,
+  type LeveragePositionOptions,
+  type LeveragePositionStep,
+  type LeveragePositionStepType,
   type PositionTransaction,
   type PositionTransactionType,
 } from './position';
