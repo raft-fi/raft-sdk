@@ -2,14 +2,7 @@ import { request, gql } from 'graphql-request';
 import { JsonRpcProvider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
-import {
-  ERC20Indexable__factory,
-  ERC20Permit,
-  PositionManager,
-  PositionManagerWrappedCollateralToken__factory,
-  PositionManager__factory,
-  WrappedCollateralToken,
-} from './typechain';
+import { ERC20Indexable__factory, ERC20Permit, PositionManager, WrappedCollateralToken } from './typechain';
 import {
   CollateralToken,
   R_TOKEN,
@@ -20,6 +13,7 @@ import {
 } from './types';
 import {
   createPermitSignature,
+  getPositionManagerContract,
   getTokenContract,
   getWrappedCappedCollateralToken,
   isWrappableCappedCollateralToken,
@@ -68,7 +62,7 @@ export class Protocol {
    */
   private constructor(provider: JsonRpcProvider) {
     this.provider = provider;
-    this.positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, this.provider);
+    this.positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, this.provider);
     this.rToken = getTokenContract(R_TOKEN, this.provider);
   }
 
@@ -105,7 +99,7 @@ export class Protocol {
     if (isWrappedCappedUnderlyingCollateralToken(collateralToken)) {
       // TODO: Needs `getRedeemCollateralSteps` for more granular control
       const positionManagerAddress = RaftConfig.networkConfig.wrappedCollateralTokenPositionManagers[collateralToken];
-      const positionManager = PositionManagerWrappedCollateralToken__factory.connect(positionManagerAddress, redeemer);
+      const positionManager = getPositionManagerContract('wrapped', positionManagerAddress, redeemer);
       const rPermitSignature = await createPermitSignature(redeemer, debtAmount, positionManagerAddress, this.rToken);
 
       return sendTransactionWithGasLimit(
@@ -115,7 +109,7 @@ export class Protocol {
       );
     }
 
-    const positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, redeemer);
+    const positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, redeemer);
 
     return sendTransactionWithGasLimit(
       positionManager.redeemCollateral,

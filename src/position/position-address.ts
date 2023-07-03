@@ -1,9 +1,9 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { ContractTransactionResponse, Provider, Signer } from 'ethers';
 import { RaftConfig } from '../config';
-import { PositionManager__factory } from '../typechain';
 import { UnderlyingCollateralToken } from '../types';
 import { PositionWithRunner } from './base';
+import { getPositionManagerContract } from '../utils';
 
 /**
  * A position with an attached address that is the position's owner address. This class is used for read-only
@@ -36,7 +36,7 @@ export class PositionWithAddress extends PositionWithRunner {
    * @returns The dispatched transaction of the liquidation.
    */
   public async liquidate(liquidator: Signer): Promise<ContractTransactionResponse> {
-    const positionManager = PositionManager__factory.connect(RaftConfig.networkConfig.positionManager, liquidator);
+    const positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, liquidator);
     return positionManager.liquidate(this.userAddress);
   }
 }

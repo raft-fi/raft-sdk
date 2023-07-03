@@ -3,6 +3,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Token, UnderlyingCollateralToken, WrappedCappedUnderlyingCollateralToken } from '../types';
 
 export type SupportedNetwork = 'goerli' | 'mainnet';
+export type PositionManagerType = 'base' | 'stETH' | 'wrapped';
 
 export type SupportedCollateralTokens = {
   wstETH: 'stETH' | 'wstETH';
