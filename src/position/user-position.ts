@@ -79,7 +79,7 @@ export interface ManagePositionOptions<C extends CollateralToken> extends Transa
  * Options for leveraging a position.
  * @property collateralToken The collateral token to use for the operation.
  * @property frontendTag The frontend operator tag for the transaction.
- * @property approvalType The approval type for the collateral token or R token. Smart contract position owners have to
+ * @property approvalType The approval type for the collateral token. Smart contract position owners have to
  * use `approve` since they don't support signing. Defaults to permit.
  */
 export interface LeveragePositionOptions<C extends CollateralToken> extends TransactionWithFeesOptions {
