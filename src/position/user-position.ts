@@ -42,6 +42,35 @@ interface LeveragePositionStepsPrefetch {
   collateralPermitSignature?: ERC20PermitSignatureStruct;
 }
 
+type WhitelistStep = {
+  type: {
+    name: 'whitelist';
+  };
+  stepNumber: number;
+  numberOfSteps: number;
+  action: () => Promise<TransactionResponse>;
+};
+
+type PermitStep = {
+  type: {
+    name: 'permit';
+    token: Token;
+  };
+  stepNumber: number;
+  numberOfSteps: number;
+  action: () => Promise<ERC20PermitSignatureStruct>;
+};
+
+type ApproveStep = {
+  type: {
+    name: 'approve';
+    token: Token;
+  };
+  stepNumber: number;
+  numberOfSteps: number;
+  action: () => Promise<TransactionResponse>;
+};
+
 export interface ManagePositionStep {
   type: ManagePositionStepType;
   stepNumber: number;
@@ -366,82 +395,36 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     let stepCounter = 1;
 
     if (whitelistingStepNeeded) {
-      yield {
-        type: {
-          name: 'whitelist',
-        },
-        stepNumber: stepCounter++,
-        numberOfSteps,
-        action: () => this.positionManager.whitelistDelegate(positionManagerAddress, true),
-      };
+      yield* this.getWhitelistStep(positionManagerAddress, () => stepCounter++, numberOfSteps);
     }
 
     let collateralPermitSignature = createEmptyPermitSignature();
     let rPermitSignature = createEmptyPermitSignature();
 
     if (collateralApprovalStepNeeded) {
-      if (canCollateralTokenUsePermit) {
-        const signature =
-          cachedCollateralPermitSignature ??
-          (yield {
-            type: {
-              name: 'permit',
-              token: collateralToken,
-            },
-            stepNumber: stepCounter++,
-            numberOfSteps,
-            action: () =>
-              createPermitSignature(this.user, collateralChange, positionManagerAddress, collateralTokenContract),
-          });
-
-        if (!signature) {
-          throw new Error(`${collateralToken} permit signature is required`);
-        }
-
-        collateralPermitSignature = signature;
-      } else {
-        yield {
-          type: {
-            name: 'approve',
-            token: collateralToken,
-          },
-          stepNumber: stepCounter++,
-          numberOfSteps,
-          action: () => collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue),
-        };
-      }
+      collateralPermitSignature = yield* this.getApproveOrPermitStep(
+        collateralToken,
+        collateralTokenContract,
+        collateralChange,
+        positionManagerAddress,
+        () => stepCounter++,
+        numberOfSteps,
+        canCollateralTokenUsePermit,
+        cachedCollateralPermitSignature,
+      );
     }
 
     if (rTokenApprovalStepNeeded) {
-      if (canUsePermit) {
-        const signature =
-          cachedRPermitSignature ??
-          (yield {
-            type: {
-              name: 'permit',
-              token: R_TOKEN,
-            },
-            stepNumber: stepCounter++,
-            numberOfSteps,
-            action: () => createPermitSignature(this.user, debtChange.abs(), positionManagerAddress, this.rToken),
-          });
-
-        if (!signature) {
-          throw new Error('R permit signature is required');
-        }
-
-        rPermitSignature = signature;
-      } else {
-        yield {
-          type: {
-            name: 'approve',
-            token: R_TOKEN,
-          },
-          stepNumber: stepCounter++,
-          numberOfSteps,
-          action: () => this.rToken.approve(positionManagerAddress, absoluteDebtChangeValue),
-        };
-      }
+      rPermitSignature = yield* this.getApproveOrPermitStep(
+        R_TOKEN,
+        this.rToken,
+        debtChange.abs(),
+        positionManagerAddress,
+        () => stepCounter++,
+        numberOfSteps,
+        canUsePermit,
+        cachedRPermitSignature,
+      );
     }
 
     if (isUnderlyingCollateralToken(collateralToken)) {
@@ -587,49 +570,22 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     let stepCounter = 1;
 
     if (whitelistingStepNeeded) {
-      yield {
-        type: {
-          name: 'whitelist',
-        },
-        stepNumber: stepCounter++,
-        numberOfSteps,
-        action: () => this.positionManager.whitelistDelegate(positionManagerAddress, true),
-      };
+      yield* this.getWhitelistStep(positionManagerAddress, () => stepCounter++, numberOfSteps);
     }
 
     let collateralPermitSignature = createEmptyPermitSignature();
 
     if (collateralApprovalStepNeeded) {
-      if (canCollateralTokenUsePermit) {
-        const signature =
-          cachedCollateralPermitSignature ??
-          (yield {
-            type: {
-              name: 'permit',
-              token: collateralToken,
-            },
-            stepNumber: stepCounter++,
-            numberOfSteps,
-            action: () =>
-              createPermitSignature(this.user, collateralChange, positionManagerAddress, collateralTokenContract),
-          });
-
-        if (!signature) {
-          throw new Error(`${collateralToken} permit signature is required`);
-        }
-
-        collateralPermitSignature = signature;
-      } else {
-        yield {
-          type: {
-            name: 'approve',
-            token: collateralToken,
-          },
-          stepNumber: stepCounter++,
-          numberOfSteps,
-          action: () => collateralTokenContract.approve(positionManagerAddress, absoluteCollateralChangeValue),
-        };
-      }
+      collateralPermitSignature = yield* this.getApproveOrPermitStep(
+        collateralToken,
+        collateralTokenContract,
+        collateralChange,
+        positionManagerAddress,
+        () => stepCounter++,
+        numberOfSteps,
+        canCollateralTokenUsePermit,
+        cachedCollateralPermitSignature,
+      );
     }
 
     if (isUnderlyingCollateralToken(collateralToken)) {
@@ -944,5 +900,103 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
 
     return this.userAddress;
+  }
+
+  private *getWhitelistStep(
+    delegatorAddress: string,
+    getStepNumber: () => number,
+    numberOfSteps: number,
+  ): Generator<WhitelistStep, void, unknown> {
+    yield {
+      type: {
+        name: 'whitelist',
+      },
+      stepNumber: getStepNumber(),
+      numberOfSteps,
+      action: () => this.positionManager.whitelistDelegate(delegatorAddress, true),
+    };
+  }
+
+  private *getSignTokenPermitStep(
+    token: Token,
+    tokenContract: ERC20Permit,
+    approveAmount: Decimal,
+    spenderAddress: string,
+    getStepNumber: () => number,
+    numberOfSteps: number,
+    cachedSignature?: ERC20PermitSignatureStruct,
+  ): Generator<PermitStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
+    const signature =
+      cachedSignature ??
+      (yield {
+        type: {
+          name: 'permit' as const,
+          token: token,
+        },
+        stepNumber: getStepNumber(),
+        numberOfSteps,
+        action: () => createPermitSignature(this.user, approveAmount, spenderAddress, tokenContract),
+      });
+
+    if (!signature) {
+      throw new Error(`${token} permit signature is required`);
+    }
+
+    return signature;
+  }
+
+  private *getApproveTokenStep(
+    token: Token,
+    tokenContract: ERC20 | ERC20Permit,
+    approveAmount: Decimal,
+    spenderAddress: string,
+    getStepNumber: () => number,
+    numberOfSteps: number,
+  ): Generator<ApproveStep, void, unknown> {
+    yield {
+      type: {
+        name: 'approve' as const,
+        token: token,
+      },
+      stepNumber: getStepNumber(),
+      numberOfSteps,
+      action: () => tokenContract.approve(spenderAddress, approveAmount.toBigInt(Decimal.PRECISION)),
+    };
+  }
+
+  private *getApproveOrPermitStep(
+    token: Token,
+    tokenContract: ERC20 | ERC20Permit,
+    approveAmount: Decimal,
+    spenderAddress: string,
+    getStepNumber: () => number,
+    numberOfSteps: number,
+    canUsePermit: boolean,
+    cachedPermitSignature?: ERC20PermitSignatureStruct,
+  ): Generator<PermitStep | ApproveStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
+    let permitSignature = createEmptyPermitSignature();
+
+    if (canUsePermit) {
+      permitSignature = yield* this.getSignTokenPermitStep(
+        token,
+        tokenContract,
+        approveAmount,
+        spenderAddress,
+        getStepNumber,
+        numberOfSteps,
+        cachedPermitSignature,
+      );
+    } else {
+      yield* this.getApproveTokenStep(
+        token,
+        tokenContract,
+        approveAmount,
+        spenderAddress,
+        getStepNumber,
+        numberOfSteps,
+      );
+    }
+
+    return permitSignature;
   }
 }
