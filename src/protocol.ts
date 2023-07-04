@@ -16,7 +16,6 @@ import {
 } from './types';
 import {
   createEmptyPermitSignature,
-  createPermitSignature,
   getPositionManagerContract,
   getTokenContract,
   getWrappedCappedCollateralToken,
@@ -26,6 +25,7 @@ import {
   buildTransactionWithGasLimit,
 } from './utils';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
+import { getPermitOrApproveTokenStep } from './position';
 
 interface RedeemCollateralStepType {
   name: 'permit' | 'approve' | 'redeem';
@@ -175,40 +175,16 @@ export class Protocol {
       const isEoaRedeemer = await isEoaAddress(await redeemer.getAddress(), redeemer);
       let rPermitSignature = createEmptyPermitSignature();
 
-      if (approvalType === 'permit' && isEoaRedeemer) {
-        const signature = yield {
-          type: {
-            name: 'permit',
-            token: R_TOKEN,
-          },
-          stepNumber: stepCounter++,
-          numberOfSteps,
-          action: () => createPermitSignature(redeemer, debtAmount, positionManagerAddress, rToken),
-          gasEstimate: Decimal.ZERO,
-        };
-
-        if (!signature) {
-          throw new Error('R permit signature is required');
-        }
-
-        rPermitSignature = signature;
-      } else {
-        const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(rToken.approve, [
-          positionManagerAddress,
-          debtAmount.toBigInt(Decimal.PRECISION),
-        ]);
-
-        yield {
-          type: {
-            name: 'approve',
-            token: R_TOKEN,
-          },
-          stepNumber: stepCounter++,
-          numberOfSteps,
-          action: sendTransaction,
-          gasEstimate,
-        };
-      }
+      rPermitSignature = yield* getPermitOrApproveTokenStep(
+        redeemer,
+        R_TOKEN,
+        rToken,
+        debtAmount,
+        positionManagerAddress,
+        () => stepCounter++,
+        numberOfSteps,
+        approvalType === 'permit' && isEoaRedeemer,
+      );
 
       const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
         positionManager.redeemCollateral,

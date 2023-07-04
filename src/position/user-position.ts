@@ -26,7 +26,6 @@ import {
 } from '../types';
 import {
   createEmptyPermitSignature,
-  createPermitSignature,
   getPositionManagerContract,
   getTokenContract,
   isEoaAddress,
@@ -37,6 +36,7 @@ import {
 import { PositionWithRunner } from './base';
 import { SWAP_ROUTER_MAX_SLIPPAGE } from '../constants';
 import { Protocol } from '../protocol';
+import { BaseStep, getPermitOrApproveTokenStep, getWhitelistStep } from './steps';
 
 export interface ManagePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'manage';
@@ -65,35 +65,6 @@ interface LeveragePositionStepsPrefetch {
   borrowRate?: Decimal;
   underlyingCollateralPrice?: Decimal;
 }
-
-type BaseStep = {
-  stepNumber: number;
-  numberOfSteps: number;
-  gasEstimate: Decimal;
-};
-
-type WhitelistStep = {
-  type: {
-    name: 'whitelist';
-  };
-  action: () => Promise<TransactionResponse>;
-} & BaseStep;
-
-type PermitStep = {
-  type: {
-    name: 'permit';
-    token: Token;
-  };
-  action: () => Promise<ERC20PermitSignatureStruct>;
-} & BaseStep;
-
-type ApproveStep = {
-  type: {
-    name: 'approve';
-    token: Token;
-  };
-  action: () => Promise<TransactionResponse>;
-} & BaseStep;
 
 export interface ManagePositionStep extends BaseStep {
   type: ManagePositionStepType;
@@ -417,14 +388,15 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     let stepCounter = 1;
 
     if (whitelistingStepNeeded) {
-      yield* this.getWhitelistStep(positionManagerAddress, () => stepCounter++, numberOfSteps);
+      yield* getWhitelistStep(this.positionManager, positionManagerAddress, () => stepCounter++, numberOfSteps);
     }
 
     let collateralPermitSignature = createEmptyPermitSignature();
     let rPermitSignature = createEmptyPermitSignature();
 
     if (collateralApprovalStepNeeded) {
-      collateralPermitSignature = yield* this.getApproveOrPermitStep(
+      collateralPermitSignature = yield* getPermitOrApproveTokenStep(
+        this.user,
         collateralToken,
         collateralTokenContract,
         collateralChange,
@@ -437,7 +409,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
 
     if (rTokenApprovalStepNeeded) {
-      rPermitSignature = yield* this.getApproveOrPermitStep(
+      rPermitSignature = yield* getPermitOrApproveTokenStep(
+        this.user,
         R_TOKEN,
         this.rToken,
         debtChange.abs(),
@@ -636,7 +609,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     let stepCounter = 1;
 
     if (whitelistingStepNeeded) {
-      yield* this.getWhitelistStep(
+      yield* getWhitelistStep(
+        this.positionManager,
         RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
         () => stepCounter++,
         numberOfSteps,
@@ -644,7 +618,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
 
     if (collateralApprovalStepNeeded) {
-      yield* this.getApproveOrPermitStep(
+      yield* getPermitOrApproveTokenStep(
+        this.user,
         collateralToken,
         collateralTokenContract,
         principalCollateralChange,
@@ -765,10 +740,14 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(underlyingCollateralPrice);
       }
 
+      const oneStepLeverageStETH = OneInchOneStepLeverageStETH__factory.connect(
+        RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
+        this.user,
+      );
       const method =
         collateralToken === 'wstETH'
-          ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
-          : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH; // used to stETH
+          ? oneStepLeverageStETH.manageLeveragedPosition // used for wstETH
+          : oneStepLeverageStETH.manageLeveragedPositionStETH; // used to stETH
       const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
         method,
         [
@@ -1059,123 +1038,5 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
 
     return this.userAddress;
-  }
-
-  private async *getWhitelistStep(
-    delegatorAddress: string,
-    getStepNumber: () => number,
-    numberOfSteps: number,
-  ): AsyncGenerator<WhitelistStep, void, unknown> {
-    const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
-      this.positionManager.whitelistDelegate,
-      [delegatorAddress, true],
-    );
-
-    yield {
-      type: {
-        name: 'whitelist',
-      },
-      stepNumber: getStepNumber(),
-      numberOfSteps,
-      action: sendTransaction,
-      gasEstimate,
-    };
-  }
-
-  private loadOneStepLeverageStETH(): OneInchOneStepLeverageStETH {
-    return OneInchOneStepLeverageStETH__factory.connect(
-      RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
-      this.user,
-    );
-  }
-
-  private *getSignTokenPermitStep(
-    token: Token,
-    tokenContract: ERC20Permit,
-    approveAmount: Decimal,
-    spenderAddress: string,
-    getStepNumber: () => number,
-    numberOfSteps: number,
-    cachedSignature?: ERC20PermitSignatureStruct,
-  ): Generator<PermitStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
-    const signature =
-      cachedSignature ??
-      (yield {
-        type: {
-          name: 'permit' as const,
-          token: token,
-        },
-        stepNumber: getStepNumber(),
-        numberOfSteps,
-        action: () => createPermitSignature(this.user, approveAmount, spenderAddress, tokenContract),
-        gasEstimate: Decimal.ZERO,
-      });
-
-    if (!signature) {
-      throw new Error(`${token} permit signature is required`);
-    }
-
-    return signature;
-  }
-
-  private async *getApproveTokenStep(
-    token: Token,
-    tokenContract: ERC20 | ERC20Permit,
-    approveAmount: Decimal,
-    spenderAddress: string,
-    getStepNumber: () => number,
-    numberOfSteps: number,
-  ): AsyncGenerator<ApproveStep, void, unknown> {
-    const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(tokenContract.approve, [
-      spenderAddress,
-      approveAmount.toBigInt(Decimal.PRECISION),
-    ]);
-
-    yield {
-      type: {
-        name: 'approve' as const,
-        token: token,
-      },
-      stepNumber: getStepNumber(),
-      numberOfSteps,
-      action: sendTransaction,
-      gasEstimate,
-    };
-  }
-
-  private async *getApproveOrPermitStep(
-    token: Token,
-    tokenContract: ERC20 | ERC20Permit,
-    approveAmount: Decimal,
-    spenderAddress: string,
-    getStepNumber: () => number,
-    numberOfSteps: number,
-    canUsePermit: boolean,
-    cachedPermitSignature?: ERC20PermitSignatureStruct,
-  ): AsyncGenerator<PermitStep | ApproveStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
-    let permitSignature = createEmptyPermitSignature();
-
-    if (canUsePermit) {
-      permitSignature = yield* this.getSignTokenPermitStep(
-        token,
-        tokenContract,
-        approveAmount,
-        spenderAddress,
-        getStepNumber,
-        numberOfSteps,
-        cachedPermitSignature,
-      );
-    } else {
-      yield* this.getApproveTokenStep(
-        token,
-        tokenContract,
-        approveAmount,
-        spenderAddress,
-        getStepNumber,
-        numberOfSteps,
-      );
-    }
-
-    return permitSignature;
   }
 }
