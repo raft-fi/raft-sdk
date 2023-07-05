@@ -93,6 +93,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
 export const goerliConfig: NetworkConfig = {
   positionManager: POSITION_MANAGER_ADDRESS,
   positionManagerStEth: POSITION_MANAGER_STETH_ADDRESS,
+  oneStepLeverageStEth: '', // Add address if we ever deploy one step leverage on goerli
   wrappedCollateralTokenPositionManagers: {
     wcrETH: POSITION_MANAGER_WRAPPED_RETH,
   },
@@ -110,5 +111,6 @@ export const goerliConfig: NetworkConfig = {
   },
   underlyingTokens: underlyingTokensConfig,
   tokens: tokensConfig,
+  daiAddress: '', // Add address if we ever deploy one step leverage on goerli
   testNetwork: true,
 };

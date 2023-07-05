@@ -1,9 +1,19 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { Signer, ContractTransactionResponse, TransactionResponse } from 'ethers';
+import { Signer, ContractTransactionResponse, TransactionResponse, ethers } from 'ethers';
 import { request, gql } from 'graphql-request';
+import axios from 'axios';
 import { getTokenAllowance } from '../allowance';
 import { RaftConfig, SupportedCollateralTokens } from '../config';
-import { ERC20, PositionManager, ERC20Permit, ERC20Permit__factory } from '../typechain';
+import { PriceFeed } from '../price';
+import {
+  ERC20,
+  PositionManager,
+  ERC20Permit,
+  ERC20Permit__factory,
+  OneStepLeverageStETH__factory,
+  OneStepLeverageStETH,
+} from '../typechain';
+import OneStepLeverageStETHABI from './../abi/OneStepLeverageStETH.json';
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
 import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
 import {
@@ -17,6 +27,7 @@ import {
   sendTransactionWithGasLimit,
 } from '../utils';
 import { PositionWithRunner } from './base';
+import { BALANCER_R_DAI_POOL_ID, DAI_TOKEN_ADDRESS } from '../constants';
 
 export interface ManagePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'manage';
@@ -356,7 +367,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
     if (isDelegateWhitelisted === undefined) {
-      isDelegateWhitelisted = whitelistingRequired ? await this.isDelegateWhitelisted(collateralToken) : false;
+      isDelegateWhitelisted = whitelistingRequired
+        ? await this.isDelegateWhitelisted(positionManagerAddress, userAddress)
+        : false;
     }
 
     // In case the collateral token allowance check is not passed externally, check the allowance
@@ -514,55 +527,39 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
   public async *getLeverageSteps(
     collateralChange: Decimal,
     leverage: Decimal,
+    slippage: Decimal,
     options: LeveragePositionOptions<SupportedCollateralTokens[T]> & LeveragePositionStepsPrefetch = {},
   ): AsyncGenerator<LeveragePositionStep, void, ERC20PermitSignatureStruct | undefined> {
-    const {
-      maxFeePercentage = Decimal.ONE,
-      gasLimitMultiplier = Decimal.ONE,
-      frontendTag,
-      approvalType = 'permit',
-    } = options;
+    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE, frontendTag } = options;
     const { collateralToken = this.underlyingCollateralToken as T } = options;
 
     const absoluteCollateralChangeValue = collateralChange.abs().value;
     const isCollateralIncrease = collateralChange.gt(Decimal.ZERO);
-    const maxFeePercentageValue = maxFeePercentage.value;
-    const isUnderlyingToken = this.isUnderlyingCollateralToken(collateralToken);
-
-    const whitelistingRequired = !isUnderlyingToken;
     const collateralTokenContract = getTokenContract(collateralToken, this.user);
     const collateralTokenAllowanceRequired = collateralTokenContract !== null && isCollateralIncrease;
-    const positionManagerAddress = RaftConfig.getPositionManagerAddress(
-      this.underlyingCollateralToken,
-      collateralToken,
-    );
     const userAddress = await this.getUserAddress();
 
-    const { collateralPermitSignature: cachedCollateralPermitSignature } = options;
     let { isDelegateWhitelisted, collateralTokenAllowance } = options;
 
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
     if (isDelegateWhitelisted === undefined) {
-      isDelegateWhitelisted = whitelistingRequired ? await this.isDelegateWhitelisted(collateralToken) : false;
+      isDelegateWhitelisted = await this.isDelegateWhitelisted(
+        RaftConfig.networkConfig.oneStepLeverageStEth,
+        userAddress,
+      );
     }
 
     // In case the collateral token allowance check is not passed externally, check the allowance
     if (collateralTokenAllowance === undefined) {
       collateralTokenAllowance = collateralTokenAllowanceRequired
-        ? await getTokenAllowance(collateralTokenContract, userAddress, positionManagerAddress)
+        ? await getTokenAllowance(collateralTokenContract, userAddress, RaftConfig.networkConfig.oneStepLeverageStEth)
         : Decimal.MAX_DECIMAL;
     }
 
-    const isEoaPositionOwner = await isEoaAddress(userAddress, this.contractRunner);
-    const canUsePermit = isEoaPositionOwner && approvalType === 'permit';
-    const collateralTokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
-    const canCollateralTokenUsePermit = collateralTokenConfig.supportsPermit && canUsePermit;
-
-    const whitelistingStepNeeded = whitelistingRequired && !isDelegateWhitelisted;
+    const whitelistingStepNeeded = !isDelegateWhitelisted;
     const collateralApprovalStepNeeded =
       collateralTokenAllowanceRequired && // action needs collateral token allowance check
-      collateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO) && // current allowance is not enough
-      (!canCollateralTokenUsePermit || !cachedCollateralPermitSignature); // approval step or signing a permit is needed
+      collateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO); // current allowance is not enough
 
     // The number of steps is the number of optional steps that are required based on input values plus one required
     // step (`leverage`)
@@ -570,25 +567,102 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     let stepCounter = 1;
 
     if (whitelistingStepNeeded) {
-      yield* this.getWhitelistStep(positionManagerAddress, () => stepCounter++, numberOfSteps);
+      yield* this.getWhitelistStep(RaftConfig.networkConfig.oneStepLeverageStEth, () => stepCounter++, numberOfSteps);
     }
 
-    let collateralPermitSignature = createEmptyPermitSignature();
-
     if (collateralApprovalStepNeeded) {
-      collateralPermitSignature = yield* this.getApproveOrPermitStep(
+      yield* this.getApproveOrPermitStep(
         collateralToken,
         collateralTokenContract,
         collateralChange,
-        positionManagerAddress,
+        RaftConfig.networkConfig.oneStepLeverageStEth,
         () => stepCounter++,
         numberOfSteps,
-        canCollateralTokenUsePermit,
-        cachedCollateralPermitSignature,
+        false, // One step leverage doesn't support permit
       );
     }
 
     if (isUnderlyingCollateralToken(collateralToken)) {
+      if (!this.user.provider) {
+        return;
+      }
+
+      const priceFeed = new PriceFeed(this.user.provider);
+      const price = await priceFeed.getPrice(collateralToken);
+
+      const targetDebt = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
+
+      const swaps = [
+        {
+          poolId: BALANCER_R_DAI_POOL_ID,
+          assetInIndex: 0, // Giving borrower R to get DAI
+          assetOutIndex: 1, // Getting DAI from borrowed R
+          amount: 0, // Amount set to 0 always, contract will inject correct value
+          userData: '0x00',
+        },
+      ];
+
+      const intermediaryToken = RaftConfig.networkConfig.daiAddress;
+
+      const assets = [RaftConfig.networkConfig.tokens['R'].address, intermediaryToken];
+
+      const deadline = Math.floor(Date.now() / 1000) + 30 * 60;
+
+      // TODO - Handle other swap types
+      const fromAmountOffset = 164;
+
+      // Amount of DAI to swap for wstETH (assuming DAI is worth $1)
+      const swapAmount = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
+
+      const swapCalldata = await axios.get('https://api-raft.1inch.io/v5.0/1/swap', {
+        params: {
+          fromTokenAddress: RaftConfig.networkConfig.daiAddress,
+          toTokenAddress: RaftConfig.networkConfig.tokens[collateralToken].address,
+          amount: swapAmount.toBigInt(),
+          fromAddress: '0xFcD45aE78244ca8d1C58EBD023a01e612229713B', // 1inch AMM contract TODO - Move to network config
+          slippage: 50,
+          disableEstimate: true,
+        },
+      });
+
+      // TODO - Calculate intermediary min return
+      const intermediaryMinReturn = 1;
+
+      const isOneInchFirst = false;
+
+      const abi = new ethers.Interface(OneStepLeverageStETHABI);
+
+      // TODO - Remove console logs once we finalize everything for OSL
+      console.log(`fromAmountOffset: ${fromAmountOffset}`);
+      console.log(`1InchData: ${swapCalldata.data.tx.data}`);
+      const oneInchData = abi.getAbiCoder().encode(['uint256', 'bytes'], [fromAmountOffset, swapCalldata.data.tx.data]);
+
+      console.log(`swaps: ${JSON.stringify(swaps)}`);
+      console.log(`assets: ${assets}`);
+      console.log(`deadline: ${deadline}`);
+      const balancerData = abi
+        .getAbiCoder()
+        .encode(
+          [
+            'tuple(bytes32 poolId, uint256 assetInIndex, uint256 assetOutIndex, uint256 amount, bytes userData)[]',
+            'address[]',
+            'uint256',
+          ],
+          [swaps, assets, deadline],
+        );
+
+      console.log(`intermediaryToken: ${intermediaryToken}`);
+      console.log(`intermediaryMinReturn: ${intermediaryMinReturn}`);
+      console.log(`isOneInchFirst: ${isOneInchFirst}`);
+      const ammData = abi
+        .getAbiCoder()
+        .encode(
+          ['address', 'uint256', 'bool', 'bytes', 'bytes'],
+          [intermediaryToken, intermediaryMinReturn, isOneInchFirst, oneInchData, balancerData],
+        );
+
+      const minReturn = collateralChange.abs().mul(leverage.sub(Decimal.ONE)).mul(Decimal.ONE.sub(slippage));
+
       yield {
         type: {
           name: 'leverage',
@@ -596,39 +670,28 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         stepNumber: stepCounter++,
         numberOfSteps,
         // TODO: implement the actual leverage function
-        action: async () => {
-          const dummyFunc = (
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            _absoluteCollateralChangeValue: bigint,
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            _isCollateralIncrease: boolean,
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            _leverage: Decimal,
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            _collateralPermitSignature: ERC20PermitSignatureStruct,
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            _maxFeePercentageValue: bigint,
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            _gasLimitMultiplier: Decimal,
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            _frontendTag?: string,
-          ) => false;
-          dummyFunc(
-            absoluteCollateralChangeValue,
-            isCollateralIncrease,
-            leverage,
-            collateralPermitSignature,
-            maxFeePercentageValue,
+        action: () =>
+          sendTransactionWithGasLimit(
+            this.loadOneStepLeverageStETH().manageLeveragedPosition,
+            [
+              targetDebt.toBigInt(),
+              true, // TODO - Calculate if debt is increasing of decreasing (not needed for opening position)
+              absoluteCollateralChangeValue,
+              isCollateralIncrease,
+              ammData,
+              minReturn.toBigInt(),
+              maxFeePercentage.toBigInt(),
+            ],
             gasLimitMultiplier,
             frontendTag,
-          );
-          return {} as TransactionResponse;
-        },
+            this.user,
+          ),
       };
     } else if (
       isWrappableCappedCollateralToken(collateralToken) ||
       (collateralToken === 'stETH' && this.underlyingCollateralToken === 'wstETH')
     ) {
+      // TODO - Add support for stETH and wrapped capped tokens
       yield {
         type: {
           name: 'leverage',
@@ -655,7 +718,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             absoluteCollateralChangeValue,
             isCollateralIncrease,
             leverage,
-            maxFeePercentageValue,
+            maxFeePercentage.toBigInt(),
             gasLimitMultiplier,
             frontendTag,
           );
@@ -675,18 +738,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * @returns True if the delegate is whitelisted or the collateral token is the position's underlying collateral token,
    * otherwise false.
    */
-  public async isDelegateWhitelisted(collateralToken: T | SupportedCollateralTokens[T]): Promise<boolean> {
-    if (!this.isUnderlyingCollateralToken(collateralToken)) {
-      const positionManagerAddress = RaftConfig.getPositionManagerAddress(
-        this.underlyingCollateralToken,
-        collateralToken,
-      );
-      const userAddress = await this.getUserAddress();
-
-      return await this.positionManager.isDelegateWhitelisted(userAddress, positionManagerAddress);
-    }
-
-    return true;
+  public async isDelegateWhitelisted(delegateAddress: string, userAddress: string): Promise<boolean> {
+    return await this.positionManager.isDelegateWhitelisted(userAddress, delegateAddress);
   }
 
   /**
@@ -915,6 +968,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       numberOfSteps,
       action: () => this.positionManager.whitelistDelegate(delegatorAddress, true),
     };
+  }
+
+  private loadOneStepLeverageStETH(): OneStepLeverageStETH {
+    return OneStepLeverageStETH__factory.connect(RaftConfig.networkConfig.oneStepLeverageStEth, this.user);
   }
 
   private *getSignTokenPermitStep(

@@ -36,6 +36,7 @@ export type TokenConfig = {
 export interface NetworkConfig {
   positionManager: string;
   positionManagerStEth: string;
+  oneStepLeverageStEth: string;
   wrappedCollateralTokenPositionManagers: Record<WrappedCappedUnderlyingCollateralToken, string>;
   raftCollateralTokens: Record<UnderlyingCollateralToken, string>;
   raftDebtTokens: Record<UnderlyingCollateralToken, string>;
@@ -43,4 +44,5 @@ export interface NetworkConfig {
   underlyingTokens: UnderlyingTokens;
   tokens: Record<Token, TokenConfig>;
   testNetwork: boolean;
+  daiAddress: string;
 }
