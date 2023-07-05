@@ -52,6 +52,8 @@ export interface PositionTransaction {
  * positions).
  */
 export class Position {
+  protected readonly underlyingCollateralToken: UnderlyingCollateralToken;
+
   private collateral: Decimal;
   private debt: Decimal;
 
@@ -60,10 +62,15 @@ export class Position {
    * @param collateral The collateral amount. Defaults to 0.
    * @param debt The debt amount. Defaults to 0.
    */
-  public constructor(collateral: Decimal = Decimal.ZERO, debt: Decimal = Decimal.ZERO) {
+  public constructor(
+    underlyingCollateralToken: UnderlyingCollateralToken,
+    collateral: Decimal = Decimal.ZERO,
+    debt: Decimal = Decimal.ZERO,
+  ) {
     this.checkNonNegativeAmount(collateral);
     this.checkNonNegativeAmount(debt);
 
+    this.underlyingCollateralToken = underlyingCollateralToken;
     this.collateral = collateral;
     this.debt = debt;
   }
@@ -121,7 +128,7 @@ export class Position {
    * @returns True if the collateral ratio is below the minimum collateral ratio.
    */
   public isCollateralRatioBelowMinimum(price: Decimal): boolean {
-    return this.getCollateralRatio(price).lt(MIN_COLLATERAL_RATIO);
+    return this.getCollateralRatio(price).lt(MIN_COLLATERAL_RATIO[this.underlyingCollateralToken]);
   }
 
   /**
@@ -129,7 +136,7 @@ export class Position {
    * @returns The liquidation price limit.
    */
   public getLiquidationPriceLimit(): Decimal {
-    return MIN_COLLATERAL_RATIO.mul(this.debt).div(this.collateral);
+    return MIN_COLLATERAL_RATIO[this.underlyingCollateralToken].mul(this.debt).div(this.collateral);
   }
 
   /**
@@ -139,11 +146,18 @@ export class Position {
    * @returns True if the position is valid, false otherwise.
    */
   public isValid(collateralPrice: Decimal): boolean {
-    if (!this.isOpened) {
+    if (!this.isOpened && this.isEmpty) {
       return true;
     }
 
-    return this.debt.gte(MIN_NET_DEBT) && this.getCollateralRatio(collateralPrice).gte(MIN_COLLATERAL_RATIO);
+    return (
+      this.isOpened &&
+      this.getCollateralRatio(collateralPrice).gte(MIN_COLLATERAL_RATIO[this.underlyingCollateralToken])
+    );
+  }
+
+  public get isEmpty(): boolean {
+    return this.collateral.equals(Decimal.ZERO) && this.debt.equals(Decimal.ZERO);
   }
 
   /**
@@ -151,7 +165,7 @@ export class Position {
    * @returns True if the position is opened, false otherwise.
    */
   public get isOpened(): boolean {
-    return this.collateral.gt(Decimal.ZERO) && this.debt.gt(Decimal.ZERO);
+    return this.collateral.gt(Decimal.ZERO) && this.debt.gte(MIN_NET_DEBT);
   }
 
   private checkNonNegativeAmount(amount: Decimal): void {
@@ -164,7 +178,6 @@ export class Position {
 export class PositionWithRunner extends Position {
   protected readonly contractRunner: ContractRunner;
   protected userAddress: string;
-  protected readonly underlyingCollateralToken: UnderlyingCollateralToken;
 
   private readonly indexCollateralToken: ERC20Indexable;
   private readonly indexDebtToken: ERC20Indexable;
@@ -184,11 +197,10 @@ export class PositionWithRunner extends Position {
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
   ) {
-    super(collateral, debt);
+    super(underlyingCollateralToken, collateral, debt);
 
     this.contractRunner = contractRunner;
     this.userAddress = userAddress;
-    this.underlyingCollateralToken = underlyingCollateralToken;
     this.indexCollateralToken = ERC20Indexable__factory.connect(
       RaftConfig.networkConfig.raftCollateralTokens[underlyingCollateralToken],
       contractRunner,
