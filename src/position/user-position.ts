@@ -10,10 +10,10 @@ import {
   PositionManager,
   ERC20Permit,
   ERC20Permit__factory,
-  OneStepLeverageStETH__factory,
-  OneStepLeverageStETH,
+  OneInchOneStepLeverageStETH__factory,
+  OneInchOneStepLeverageStETH,
 } from '../typechain';
-import OneInchOneStepLeverageStETH from './../abi/OneInchOneStepLeverageStETH.json';
+import OneInchOneStepLeverageStETHABI from './../abi/OneInchOneStepLeverageStETH.json';
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
 import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
 import {
@@ -649,7 +649,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
       const isOneInchFirst = false;
 
-      const abi = new ethers.Interface(OneInchOneStepLeverageStETH);
+      const abi = new ethers.Interface(OneInchOneStepLeverageStETHABI);
 
       // TODO - Remove console logs once we finalize everything for OSL
       console.log(`fromAmountOffset: ${fromAmountOffset}`);
@@ -991,8 +991,11 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     };
   }
 
-  private loadOneStepLeverageStETH(): OneStepLeverageStETH {
-    return OneStepLeverageStETH__factory.connect(RaftConfig.networkConfig.oneInchOneStepLeverageStEth, this.user);
+  private loadOneStepLeverageStETH(): OneInchOneStepLeverageStETH {
+    return OneInchOneStepLeverageStETH__factory.connect(
+      RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
+      this.user,
+    );
   }
 
   private *getSignTokenPermitStep(
