@@ -619,7 +619,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
           fromTokenAddress: RaftConfig.networkConfig.daiAddress,
           toTokenAddress: RaftConfig.networkConfig.tokens[collateralToken].address,
           amount: swapAmount.toBigInt(),
-          fromAddress: '0xFcD45aE78244ca8d1C58EBD023a01e612229713B', // 1inch AMM contract TODO - Move to network config
+          fromAddress: '0x88d8dadc04dd2c29e3de4a583483ac9b43ae8ed3', // 1inch AMM contract TODO - Move to network config
           slippage: 50,
           disableEstimate: true,
         },
