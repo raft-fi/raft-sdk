@@ -13,7 +13,7 @@ import {
   OneStepLeverageStETH__factory,
   OneStepLeverageStETH,
 } from '../typechain';
-import OneStepLeverageStETHABI from './../abi/OneStepLeverageStETH.json';
+import OneInchOneStepLeverageStETH from './../abi/OneInchOneStepLeverageStETH.json';
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
 import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
 import {
@@ -544,16 +544,22 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
     if (isDelegateWhitelisted === undefined) {
       isDelegateWhitelisted = await this.isDelegateWhitelisted(
-        RaftConfig.networkConfig.oneStepLeverageStEth,
+        RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
         userAddress,
       );
     }
 
     // In case the collateral token allowance check is not passed externally, check the allowance
     if (collateralTokenAllowance === undefined) {
-      collateralTokenAllowance = collateralTokenAllowanceRequired
-        ? await getTokenAllowance(collateralTokenContract, userAddress, RaftConfig.networkConfig.oneStepLeverageStEth)
-        : Decimal.MAX_DECIMAL;
+      if (collateralTokenAllowanceRequired) {
+        collateralTokenAllowance = await getTokenAllowance(
+          collateralTokenContract,
+          userAddress,
+          RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
+        );
+      } else {
+        collateralTokenAllowance = Decimal.MAX_DECIMAL;
+      }
     }
 
     const whitelistingStepNeeded = !isDelegateWhitelisted;
@@ -567,7 +573,11 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     let stepCounter = 1;
 
     if (whitelistingStepNeeded) {
-      yield* this.getWhitelistStep(RaftConfig.networkConfig.oneStepLeverageStEth, () => stepCounter++, numberOfSteps);
+      yield* this.getWhitelistStep(
+        RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
+        () => stepCounter++,
+        numberOfSteps,
+      );
     }
 
     if (collateralApprovalStepNeeded) {
@@ -575,7 +585,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         collateralToken,
         collateralTokenContract,
         collateralChange,
-        RaftConfig.networkConfig.oneStepLeverageStEth,
+        RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
         () => stepCounter++,
         numberOfSteps,
         false, // One step leverage doesn't support permit
@@ -590,7 +600,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       const priceFeed = new PriceFeed(this.user.provider);
       const price = await priceFeed.getPrice(collateralToken);
 
-      const targetDebt = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
+      const debtChange = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
 
       const swaps = [
         {
@@ -608,34 +618,45 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
       const deadline = Math.floor(Date.now() / 1000) + 30 * 60;
 
-      // TODO - Handle other swap types
-      const fromAmountOffset = 164;
-
       // Amount of DAI to swap for wstETH (assuming DAI is worth $1)
       const swapAmount = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
+      console.log(swapAmount.toString());
 
       const swapCalldata = await axios.get('https://api-raft.1inch.io/v5.0/1/swap', {
         params: {
-          fromTokenAddress: RaftConfig.networkConfig.daiAddress,
+          fromTokenAddress: RaftConfig.networkConfig.tokens['R'].address,
           toTokenAddress: RaftConfig.networkConfig.tokens[collateralToken].address,
-          amount: swapAmount.toBigInt(),
-          fromAddress: '0x88d8dadc04dd2c29e3de4a583483ac9b43ae8ed3', // 1inch AMM contract TODO - Move to network config
+          amount: absoluteCollateralChangeValue,
+          fromAddress: await this.getUserAddress(), // '0x88d8dadc04dd2c29e3de4a583483ac9b43ae8ed3', // 1inch AMM contract TODO - Move to network config
           slippage: 50,
           disableEstimate: true,
         },
       });
+
+      const functionSignatureToFromAmountOffset: { [key: string]: number } = {
+        '0x12aa3caf': 164, // swap
+        '0x0502b1c5': 36, // unoswap
+        '0x84bd6d29': 100, // clipperSwap
+        '0xe449022e': 4, // uniswapV3Swap
+      };
+
+      const swapFunctionSignature = swapCalldata.data.tx.data.substr(0, 10);
+
+      const fromAmountOffset = functionSignatureToFromAmountOffset[swapFunctionSignature];
 
       // TODO - Calculate intermediary min return
       const intermediaryMinReturn = 1;
 
       const isOneInchFirst = false;
 
-      const abi = new ethers.Interface(OneStepLeverageStETHABI);
+      const abi = new ethers.Interface(OneInchOneStepLeverageStETH);
 
       // TODO - Remove console logs once we finalize everything for OSL
       console.log(`fromAmountOffset: ${fromAmountOffset}`);
       console.log(`1InchData: ${swapCalldata.data.tx.data}`);
-      const oneInchData = abi.getAbiCoder().encode(['uint256', 'bytes'], [fromAmountOffset, swapCalldata.data.tx.data]);
+      const oneInchDataAmmData = abi
+        .getAbiCoder()
+        .encode(['uint256', 'bytes'], [fromAmountOffset, swapCalldata.data.tx.data]);
 
       console.log(`swaps: ${JSON.stringify(swaps)}`);
       console.log(`assets: ${assets}`);
@@ -658,7 +679,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         .getAbiCoder()
         .encode(
           ['address', 'uint256', 'bool', 'bytes', 'bytes'],
-          [intermediaryToken, intermediaryMinReturn, isOneInchFirst, oneInchData, balancerData],
+          [intermediaryToken, intermediaryMinReturn, isOneInchFirst, oneInchDataAmmData, balancerData],
         );
 
       const minReturn = collateralChange.abs().mul(leverage.sub(Decimal.ONE)).mul(Decimal.ONE.sub(slippage));
@@ -674,11 +695,11 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
           sendTransactionWithGasLimit(
             this.loadOneStepLeverageStETH().manageLeveragedPosition,
             [
-              targetDebt.toBigInt(),
+              debtChange.toBigInt(),
               true, // TODO - Calculate if debt is increasing of decreasing (not needed for opening position)
               absoluteCollateralChangeValue,
               isCollateralIncrease,
-              ammData,
+              oneInchDataAmmData,
               minReturn.toBigInt(),
               maxFeePercentage.toBigInt(),
             ],
@@ -971,7 +992,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
   }
 
   private loadOneStepLeverageStETH(): OneStepLeverageStETH {
-    return OneStepLeverageStETH__factory.connect(RaftConfig.networkConfig.oneStepLeverageStEth, this.user);
+    return OneStepLeverageStETH__factory.connect(RaftConfig.networkConfig.oneInchOneStepLeverageStEth, this.user);
   }
 
   private *getSignTokenPermitStep(
