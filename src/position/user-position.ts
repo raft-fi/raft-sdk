@@ -622,12 +622,12 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       const swapAmount = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
       console.log(swapAmount.toString());
 
-      const amountTOSwap = collateralChange.abs().mul(price).mul(leverage.sub(1));
+      const amountToSwap = collateralChange.abs().mul(price).mul(leverage.sub(1));
       const swapCalldata = await axios.get('https://api-raft.1inch.io/v5.0/1/swap', {
         params: {
           fromTokenAddress: RaftConfig.networkConfig.tokens['R'].address,
           toTokenAddress: RaftConfig.networkConfig.tokens[collateralToken].address,
-          amount: amountTOSwap.value,
+          amount: amountToSwap.value,
           fromAddress: '0x10fbb5a361aa1a35bf2d0a262e24125fd39d33d8', // 1inch AMM contract TODO - Move to network config
           slippage: slippage.mul(100).toTruncated(2),
           disableEstimate: true,
