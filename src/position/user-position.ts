@@ -627,7 +627,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
           fromTokenAddress: RaftConfig.networkConfig.tokens['R'].address,
           toTokenAddress: RaftConfig.networkConfig.tokens[collateralToken].address,
           amount: absoluteCollateralChangeValue,
-          fromAddress: await this.getUserAddress(), // '0x88d8dadc04dd2c29e3de4a583483ac9b43ae8ed3', // 1inch AMM contract TODO - Move to network config
+          fromAddress: '0x10fbb5a361aa1a35bf2d0a262e24125fd39d33d8', // 1inch AMM contract TODO - Move to network config
           slippage: 50,
           disableEstimate: true,
         },
