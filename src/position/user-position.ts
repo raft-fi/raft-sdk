@@ -533,8 +533,14 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE, frontendTag } = options;
     const { collateralToken = this.underlyingCollateralToken as T } = options;
 
+    // Make sure we have latest position balance data before proceeding
+    await this.fetch();
+
     const absoluteCollateralChangeValue = collateralChange.abs().value;
     const isCollateralIncrease = collateralChange.gt(Decimal.ZERO);
+    let debtChange = Decimal.ZERO;
+    let isDebtIncrease = true;
+    const isClosePosition = leverage.equals(1) && collateralChange.isZero();
     const collateralTokenContract = getTokenContract(collateralToken, this.user);
     const collateralTokenAllowanceRequired = collateralTokenContract !== null && isCollateralIncrease;
     const userAddress = await this.getUserAddress();
@@ -606,7 +612,13 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       const priceFeed = new PriceFeed(this.user.provider);
       const price = await priceFeed.getPrice(collateralToken);
 
-      const debtChange = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
+      // User is closing the position
+      if (isClosePosition) {
+        debtChange = Decimal.MAX_DECIMAL.mul(-1);
+      } else {
+        // TODO - This works only for open leverage position, needs to be updated for adjust
+        debtChange = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
+      }
 
       const swaps = [
         {
@@ -628,12 +640,15 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       const swapAmount = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
       console.log(swapAmount.toString());
 
+      const collateralAddress = RaftConfig.networkConfig.tokens[collateralToken].address;
+      const rAddress = RaftConfig.networkConfig.tokens['R'].address;
       const amountToSwap = collateralChange.abs().mul(price).mul(leverage.sub(1));
       const swapCalldata = await axios.get('https://api-raft.1inch.io/v5.0/1/swap', {
         params: {
-          fromTokenAddress: RaftConfig.networkConfig.tokens['R'].address,
-          toTokenAddress: RaftConfig.networkConfig.tokens[collateralToken].address,
-          amount: amountToSwap.value,
+          fromTokenAddress: isClosePosition ? collateralAddress : rAddress,
+          toTokenAddress: isClosePosition ? rAddress : collateralAddress,
+          // When closing the position, we do not need to set amount, contracts will calculate correct amount and inject it in ammData
+          amount: isClosePosition ? 1 : amountToSwap.value,
           fromAddress: '0x10fbb5a361aa1a35bf2d0a262e24125fd39d33d8', // 1inch AMM contract TODO - Move to network config
           slippage: slippage.mul(100).toTruncated(2),
           disableEstimate: true,
@@ -690,10 +705,22 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         );
 
       const swapToTokenAmount = new Decimal(
-        swapCalldata.data.toTokenAmount,
-        Decimal.PRECISION - swapCalldata.data.toToken.decimals,
+        BigInt(swapCalldata.data.toTokenAmount),
+        swapCalldata.data.toToken.decimals,
       );
+      console.log(`swapCalldata.data.toTokenAmount: ${swapCalldata.data.toTokenAmount}`);
+      console.log(`swapCalldata.data.toToken.decimals ${swapCalldata.data.toToken.decimals}`);
       const minReturn = swapToTokenAmount.mul(Decimal.ONE.sub(slippage));
+      console.log(`minReturn: ${minReturn.toString()}`);
+
+      // User is closing the position
+      if (isClosePosition) {
+        isDebtIncrease = false;
+      }
+
+      const debtAfterLeverage = this.getDebt();
+      // Adding buffer because R price is not exactly 1$
+      const collateralToSwap = debtAfterLeverage.mul(Decimal.ONE.add(0.001)).div(price);
 
       yield {
         type: {
@@ -706,12 +733,12 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
           sendTransactionWithGasLimit(
             this.loadOneStepLeverageStETH().manageLeveragedPosition,
             [
-              debtChange.toBigInt(),
-              true, // TODO - Calculate if debt is increasing of decreasing (not needed for opening position)
+              debtChange.abs().toBigInt(),
+              isDebtIncrease,
               absoluteCollateralChangeValue,
               isCollateralIncrease,
               oneInchDataAmmData,
-              minReturn.toBigInt(),
+              isClosePosition ? collateralToSwap.toBigInt() : minReturn.toBigInt(),
               maxFeePercentage.toBigInt(),
             ],
             gasLimitMultiplier,
