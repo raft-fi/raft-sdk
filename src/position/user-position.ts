@@ -541,6 +541,12 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     let { isDelegateWhitelisted, collateralTokenAllowance } = options;
 
+    // TODO: this slippage max cap should be per swap router. right now the cap is for 1inch only
+    const MAX_SLIPPAGE_CAP = 0.5;
+    if (slippage.gt(MAX_SLIPPAGE_CAP)) {
+      throw new Error(`Slippage (${slippage.toTruncated(4)}) should not be greater than ${MAX_SLIPPAGE_CAP}`);
+    }
+
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
     if (isDelegateWhitelisted === undefined) {
       isDelegateWhitelisted = await this.isDelegateWhitelisted(
@@ -622,13 +628,14 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       const swapAmount = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
       console.log(swapAmount.toString());
 
+      const amountToSwap = collateralChange.abs().mul(price).mul(leverage.sub(1));
       const swapCalldata = await axios.get('https://api-raft.1inch.io/v5.0/1/swap', {
         params: {
           fromTokenAddress: RaftConfig.networkConfig.tokens['R'].address,
           toTokenAddress: RaftConfig.networkConfig.tokens[collateralToken].address,
-          amount: absoluteCollateralChangeValue,
+          amount: amountToSwap.value,
           fromAddress: '0x10fbb5a361aa1a35bf2d0a262e24125fd39d33d8', // 1inch AMM contract TODO - Move to network config
-          slippage: 50,
+          slippage: slippage.mul(100).toTruncated(2),
           disableEstimate: true,
         },
       });
@@ -682,7 +689,11 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
           [intermediaryToken, intermediaryMinReturn, isOneInchFirst, oneInchDataAmmData, balancerData],
         );
 
-      const minReturn = collateralChange.abs().mul(leverage.sub(Decimal.ONE)).mul(Decimal.ONE.sub(slippage));
+      const swapToTokenAmount = new Decimal(
+        swapCalldata.data.toTokenAmount,
+        Decimal.PRECISION - swapCalldata.data.toToken.decimals,
+      );
+      const minReturn = swapToTokenAmount.mul(Decimal.ONE.sub(slippage));
 
       yield {
         type: {
