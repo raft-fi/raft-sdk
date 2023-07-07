@@ -541,6 +541,12 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     let { isDelegateWhitelisted, collateralTokenAllowance } = options;
 
+    // TODO: this slippage max cap should be per swap router. right now the cap is for 1inch only
+    const MAX_SLIPPAGE_CAP = 0.5;
+    if (slippage.gt(MAX_SLIPPAGE_CAP)) {
+      throw new Error(`Slippage (${slippage.toTruncated(4)}) should not be greater than ${MAX_SLIPPAGE_CAP}`);
+    }
+
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
     if (isDelegateWhitelisted === undefined) {
       isDelegateWhitelisted = await this.isDelegateWhitelisted(
