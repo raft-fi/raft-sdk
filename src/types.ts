@@ -27,3 +27,5 @@ export interface TransactionWithFeesOptions {
   maxFeePercentage?: Decimal;
   gasLimitMultiplier?: Decimal;
 }
+
+export type SwapRouter = '1inch';
