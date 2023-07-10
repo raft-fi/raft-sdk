@@ -56,6 +56,7 @@ export class Position {
 
   private collateral: Decimal;
   private debt: Decimal;
+  private principalCollateral?: Decimal | null;
 
   /**
    * Creates a new representation of a position.
@@ -107,6 +108,25 @@ export class Position {
    */
   public getDebt(): Decimal {
     return this.debt;
+  }
+
+  /**
+   * Sets the principal collateral amount of the leverage position.
+   * @param principalCollateral The principal collateral amount.
+   */
+  public setPrincipalCollateral(principalCollateral: Decimal | null): void {
+    if (principalCollateral) {
+      this.checkNonNegativeAmount(principalCollateral);
+    }
+    this.principalCollateral = principalCollateral;
+  }
+
+  /**
+   * Returns the principal collateral amount of the leverage position.
+   * @returns The principal collateral amount.
+   */
+  public getPrincipalCollateral(): Decimal | null {
+    return this.principalCollateral ?? null;
   }
 
   /**
