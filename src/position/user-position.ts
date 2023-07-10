@@ -99,6 +99,7 @@ export interface LeveragePositionStep {
 
 interface UserPositionResponse {
   underlyingCollateralToken: string | null;
+  principalCollateral: string | null;
 }
 
 const DEBT_CHANGE_TO_CLOSE = Decimal.MAX_DECIMAL.mul(-1);
@@ -166,6 +167,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       query getPosition($positionId: String!) {
         position(id: $positionId) {
           underlyingCollateralToken
+          principalCollateral
         }
       }
     `;
@@ -190,7 +192,12 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       return null;
     }
 
+    const principalCollateral = response.position?.principalCollateral
+      ? Decimal.parse(BigInt(response.position.principalCollateral), 0n, Decimal.PRECISION)
+      : null;
+
     const position = new UserPosition(user, underlyingCollateralToken);
+    position.setPrincipalCollateral(principalCollateral);
     await position.fetch();
 
     return position;
