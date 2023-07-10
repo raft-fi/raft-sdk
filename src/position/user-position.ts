@@ -27,7 +27,6 @@ import {
   sendTransactionWithGasLimit,
 } from '../utils';
 import { PositionWithRunner } from './base';
-import { BALANCER_R_DAI_POOL_ID } from '../constants';
 
 export interface ManagePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'manage';
@@ -624,7 +623,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       );
     }
 
-    if (isUnderlyingCollateralToken(collateralToken)) {
+    if (collateralToken === 'wstETH' || collateralToken === 'stETH') {
       if (!this.user.provider) {
         return;
       }
@@ -733,7 +732,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         // TODO: implement the actual leverage function
         action: () =>
           sendTransactionWithGasLimit(
-            this.loadOneStepLeverageStETH().manageLeveragedPosition,
+            collateralToken === 'wstETH'
+              ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
+              : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH, // used to stETH
             [
               debtChange.abs().toBigInt(),
               isDebtIncrease,
@@ -748,11 +749,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             this.user,
           ),
       };
-    } else if (
-      isWrappableCappedCollateralToken(collateralToken) ||
-      (collateralToken === 'stETH' && this.underlyingCollateralToken === 'wstETH')
-    ) {
-      // TODO - Add support for stETH and wrapped capped tokens
+    } else if (isWrappableCappedCollateralToken(collateralToken)) {
+      // TODO - Add support for rETH (wrapped capped tokens)
       yield {
         type: {
           name: 'leverage',
