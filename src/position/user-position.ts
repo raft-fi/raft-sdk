@@ -49,6 +49,7 @@ interface ManagePositionStepsPrefetch {
 
 interface LeveragePositionStepsPrefetch {
   isDelegateWhitelisted?: boolean;
+  currentDebt?: Decimal;
   collateralTokenAllowance?: Decimal;
   collateralPermitSignature?: ERC20PermitSignatureStruct;
 }
@@ -533,9 +534,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE, frontendTag } = options;
     const { collateralToken = this.underlyingCollateralToken as T } = options;
 
-    // Make sure we have latest position balance data before proceeding
-    await this.fetch();
-
     const absoluteCollateralChangeValue = collateralChange.abs().value;
     const isCollateralIncrease = collateralChange.gt(Decimal.ZERO);
     let debtChange = Decimal.ZERO;
@@ -545,12 +543,17 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     const collateralTokenAllowanceRequired = collateralTokenContract !== null && isCollateralIncrease;
     const userAddress = await this.getUserAddress();
 
-    let { isDelegateWhitelisted, collateralTokenAllowance } = options;
+    let { isDelegateWhitelisted, collateralTokenAllowance, currentDebt } = options;
 
     // TODO: this slippage max cap should be per swap router. right now the cap is for 1inch only
     const MAX_SLIPPAGE_CAP = 0.5;
     if (slippage.gt(MAX_SLIPPAGE_CAP)) {
       throw new Error(`Slippage (${slippage.toTruncated(4)}) should not be greater than ${MAX_SLIPPAGE_CAP}`);
+    }
+
+    if (!currentDebt) {
+      // Make sure we have latest debt balance data before proceeding
+      currentDebt = await this.fetchDebt();
     }
 
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
@@ -718,9 +721,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         isDebtIncrease = false;
       }
 
-      const debtAfterLeverage = this.getDebt();
       // Adding buffer because R price is not exactly 1$
-      const collateralToSwap = debtAfterLeverage.mul(Decimal.ONE.add(0.001)).div(price);
+      const collateralToSwap = currentDebt.mul(Decimal.ONE.add(0.001)).div(price);
 
       yield {
         type: {
