@@ -4,6 +4,7 @@ export { RaftConfig, type SupportedNetwork } from './config';
 export { MIN_COLLATERAL_RATIO } from './constants';
 export {
   Position,
+  PositionWithRunner,
   PositionWithAddress,
   UserPosition,
   type ManagePositionCallbacks,
@@ -32,5 +33,6 @@ export {
   type TransactionWithFeesOptions,
   type WrappableCappedCollateralToken,
   type WrappedCappedUnderlyingCollateralToken,
+  type SwapRouter,
 } from './types';
 export type { ERC20PermitSignatureStruct } from './typechain/PositionManager';

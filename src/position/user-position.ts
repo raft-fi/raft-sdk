@@ -1,7 +1,6 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Signer, ContractTransactionResponse, TransactionResponse, ethers } from 'ethers';
 import { request, gql } from 'graphql-request';
-import axios from 'axios';
 import { getTokenAllowance } from '../allowance';
 import { RaftConfig, SupportedCollateralTokens } from '../config';
 import { PriceFeed } from '../price';
@@ -15,7 +14,14 @@ import {
 } from '../typechain';
 import OneInchOneStepLeverageStETHABI from './../abi/OneInchOneStepLeverageStETH.json';
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
-import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
+import {
+  CollateralToken,
+  R_TOKEN,
+  SwapRouter,
+  Token,
+  TransactionWithFeesOptions,
+  UnderlyingCollateralToken,
+} from '../types';
 import {
   createEmptyPermitSignature,
   createPermitSignature,
@@ -27,6 +33,7 @@ import {
   sendTransactionWithGasLimit,
 } from '../utils';
 import { PositionWithRunner } from './base';
+import { SWAP_ROUTER_MAX_SLIPPAGE } from '../constants';
 
 export interface ManagePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'manage';
@@ -123,11 +130,13 @@ export interface ManagePositionOptions<C extends CollateralToken> extends Transa
  * @property frontendTag The frontend operator tag for the transaction.
  * @property approvalType The approval type for the collateral token. Smart contract position owners have to
  * use `approve` since they don't support signing. Defaults to permit.
+ * @property swapRouter Swap router that swap will use for the operation
  */
 export interface LeveragePositionOptions<C extends CollateralToken> extends TransactionWithFeesOptions {
   collateralToken?: C;
   frontendTag?: string;
   approvalType?: 'permit' | 'approve';
+  swapRouter?: SwapRouter;
 }
 
 /**
@@ -525,6 +534,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.approvalType The approval type for the collateral token or R token. Smart contract position owners
    * have to use `approve` since they don't support signing. Defaults to permit.
+   * @param swapRouter Swap router that swap will use for the operation
    * @param options.isDelegateWhitelisted Whether the delegate is whitelisted for the position owner. If not provided,
    * it will be fetched automatically.
    * @param options.collateralTokenAllowance The collateral token allowance of the position owner for the position
@@ -539,7 +549,12 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     slippage: Decimal,
     options: LeveragePositionOptions<SupportedCollateralTokens[T]> & LeveragePositionStepsPrefetch = {},
   ): AsyncGenerator<LeveragePositionStep, void, ERC20PermitSignatureStruct | undefined> {
-    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE, frontendTag } = options;
+    const {
+      maxFeePercentage = Decimal.ONE,
+      gasLimitMultiplier = Decimal.ONE,
+      frontendTag,
+      swapRouter = '1inch',
+    } = options;
     const { collateralToken = this.underlyingCollateralToken as T } = options;
 
     const absolutePrincipalCollateralChangeValue = principalCollateralChange.abs().value;
@@ -552,10 +567,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     let { isDelegateWhitelisted, collateralTokenAllowance, currentDebt, currentCollateral } = options;
 
-    // TODO: this slippage max cap should be per swap router. right now the cap is for 1inch only
-    const MAX_SLIPPAGE_CAP = 0.5;
-    if (slippage.gt(MAX_SLIPPAGE_CAP)) {
-      throw new Error(`Slippage (${slippage.toTruncated(4)}) should not be greater than ${MAX_SLIPPAGE_CAP}`);
+    if (slippage.gt(SWAP_ROUTER_MAX_SLIPPAGE[swapRouter])) {
+      throw new Error(
+        `Slippage (${slippage.toTruncated(4)}) should not be greater than ${SWAP_ROUTER_MAX_SLIPPAGE[swapRouter]}`,
+      );
     }
 
     if (!currentDebt) {
@@ -675,16 +690,12 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         }
       }
 
-      const swapCalldata = await axios.get('https://api-raft.1inch.io/v5.0/1/swap', {
-        params: {
-          fromTokenAddress: isDebtIncrease ? rAddress : collateralAddress,
-          toTokenAddress: isDebtIncrease ? collateralAddress : rAddress,
-          amount: amountToSwap.value,
-          fromAddress: '0x10fbb5a361aa1a35bf2d0a262e24125fd39d33d8', // 1inch AMM contract TODO - Move to network config
-          slippage: slippage.mul(100).toTruncated(2),
-          disableEstimate: true,
-        },
-      });
+      const swapCalldata = await this.getSwapCallDataFrom1inch(
+        isDebtIncrease ? rAddress : collateralAddress,
+        isDebtIncrease ? collateralAddress : rAddress,
+        amountToSwap,
+        slippage,
+      );
 
       const functionSignatureToFromAmountOffset: { [key: string]: number } = {
         '0x12aa3caf': 164, // swap
