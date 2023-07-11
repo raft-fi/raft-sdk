@@ -550,7 +550,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     options: LeveragePositionOptions<SupportedCollateralTokens[T]> & LeveragePositionStepsPrefetch = {},
   ): AsyncGenerator<LeveragePositionStep, void, ERC20PermitSignatureStruct | undefined> {
     if (!this.user.provider) {
-      return;
+      throw new Error('Provider not set, please set provider before calling this method');
     }
     console.log('\n=====\n');
     const {
