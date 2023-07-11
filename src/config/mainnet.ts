@@ -7,7 +7,7 @@ import { Token } from '../types';
 const POSITION_MANAGER_ADDRESS = '0x5f59b322eb3e16a0c78846195af1f588b77403fc';
 const POSITION_MANAGER_STETH_ADDRESS = '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6';
 const POSITION_MANAGER_RETH = '0x29f8abb4cab4bbb56f617d9a3c0f62d33758e74e';
-const ONE_INCH_ONE_STEP_LEVERAGE_STETH_ADDRESS = '0xe16a88cfd4fe3fd1f6ae7543829a0b881cb6afe2';
+const ONE_INCH_ONE_STEP_LEVERAGE_STETH_ADDRESS = '0xb2bf4de5a63b2225338cdfdbad045ea62f158b67';
 
 const underlyingTokensConfig: UnderlyingTokens = {
   wstETH: {
