@@ -627,7 +627,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     const whitelistingStepNeeded = !isDelegateWhitelisted;
     const collateralApprovalStepNeeded =
       collateralTokenAllowanceRequired && // action needs collateral token allowance check
-      actualPrincipalCollateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO); // current allowance is not enough
+      principalCollateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO); // current allowance is not enough
 
     // The number of steps is the number of optional steps that are required based on input values plus one required
     // step (`leverage`)
@@ -646,7 +646,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       yield* this.getApproveOrPermitStep(
         collateralToken,
         collateralTokenContract,
-        actualPrincipalCollateralChange,
+        principalCollateralChange,
         RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
         () => stepCounter++,
         numberOfSteps,
@@ -736,6 +736,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       );
       console.log(`swapCalldata.data.toTokenAmount: ${swapCalldata.data.toTokenAmount}`);
       console.log(`swapCalldata.data.toToken.decimals ${swapCalldata.data.toToken.decimals}`);
+      // TODO: slippage already apply on 1inch swap. should not needed here or else user will lose more
       const minReturn = swapToTokenAmount.mul(Decimal.ONE.sub(slippage));
       console.log(`minReturn: ${minReturn.toString()}`);
 
