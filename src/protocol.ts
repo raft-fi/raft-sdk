@@ -54,6 +54,7 @@ export class Protocol {
   };
   private _redemptionRate: Decimal | null = null;
   private _openPositionCount: number | null = null;
+  private _flashMintFee: Decimal | null = null;
 
   /**
    * Creates a new representation of a stats class. Stats is a singleton, so constructor is set to private.
@@ -155,6 +156,13 @@ export class Protocol {
    */
   get openPositionCount(): number | null {
     return this._openPositionCount;
+  }
+
+  /**
+   * Raft protocol current flash mint fee.
+   */
+  get flashMintFee(): Decimal | null {
+    return this._flashMintFee;
   }
 
   /**
@@ -296,6 +304,17 @@ export class Protocol {
     this._openPositionCount = Number(response.openPositionCounter.count);
 
     return this._openPositionCount;
+  }
+
+  /**
+   * Fetches flash mint fee for token R.
+   * @returns Fetched flash mint fee.
+   */
+  async fetchFlashMintFee(): Promise<Decimal> {
+    // TODO: we should fetch this value from contract instead of hardcode
+    this._flashMintFee = new Decimal(0.0001);
+
+    return this._flashMintFee;
   }
 
   /**

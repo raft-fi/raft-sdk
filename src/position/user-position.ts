@@ -730,14 +730,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         .getAbiCoder()
         .encode(['uint256', 'bytes'], [fromAmountOffset, swapCalldata.data.tx.data]);
 
-      const swapToTokenAmount = new Decimal(
-        BigInt(swapCalldata.data.toTokenAmount),
-        swapCalldata.data.toToken.decimals,
-      );
       console.log(`swapCalldata.data.toTokenAmount: ${swapCalldata.data.toTokenAmount}`);
       console.log(`swapCalldata.data.toToken.decimals ${swapCalldata.data.toToken.decimals}`);
-      // TODO: slippage already apply on 1inch swap. should not needed here or else user will lose more
-      const minReturn = swapToTokenAmount.mul(Decimal.ONE.sub(slippage));
+      const minReturn = new Decimal(BigInt(swapCalldata.data.toTokenAmount), swapCalldata.data.toToken.decimals);
       console.log(`minReturn: ${minReturn.toString()}`);
 
       let collateralToSwap: Decimal;
