@@ -20,6 +20,7 @@ import {
   isWrappedCappedUnderlyingCollateralToken,
   sendTransactionWithGasLimit,
 } from './utils';
+import { FLASH_MINT_FEE } from './constants';
 
 interface OpenPositionsResponse {
   count: string;
@@ -54,7 +55,7 @@ export class Protocol {
   };
   private _redemptionRate: Decimal | null = null;
   private _openPositionCount: number | null = null;
-  private _flashMintFee: Decimal | null = null;
+  private _flashMintFee: Decimal = FLASH_MINT_FEE;
 
   /**
    * Creates a new representation of a stats class. Stats is a singleton, so constructor is set to private.
@@ -311,9 +312,7 @@ export class Protocol {
    * @returns Fetched flash mint fee.
    */
   async fetchFlashMintFee(): Promise<Decimal> {
-    // TODO: we should fetch this value from contract instead of hardcode
-    this._flashMintFee = new Decimal(0.0001);
-
+    // TODO: we should fetch this value from R token contract
     return this._flashMintFee;
   }
 
