@@ -330,15 +330,12 @@ export class PositionWithRunner extends Position {
    * @returns The token price on the swap router.
    */
   public async getSwapPrice(
-    collateralChange: Decimal,
-    leverage: Decimal,
+    amountToSwap: Decimal,
     slippage: Decimal,
-    tokenPrice: Decimal,
     fromToken: Token,
     toToken: Token,
     swapRouter: SwapRouter,
   ): Promise<Decimal> {
-    const amountToSwap = collateralChange.abs().mul(tokenPrice).mul(leverage.sub(1));
     const fromTokenAddress = RaftConfig.networkConfig.tokens[fromToken].address;
     const toTokenAddress = RaftConfig.networkConfig.tokens[toToken].address;
 

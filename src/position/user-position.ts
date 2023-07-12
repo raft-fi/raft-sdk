@@ -552,7 +552,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     if (!this.user.provider) {
       throw new Error('Provider not set, please set provider before calling this method');
     }
-    console.log('\n=====\n');
     const {
       maxFeePercentage = Decimal.ONE,
       gasLimitMultiplier = Decimal.ONE,
@@ -578,13 +577,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     const collateralTokenAllowanceRequired = collateralTokenContract !== null && isPrincipalCollateralIncrease;
     const userAddress = await this.getUserAddress();
 
-    console.log(`underlyingCollateralToken: ${this.underlyingCollateralToken}`);
-    console.log(`collateralToken: ${collateralToken}`);
-    console.log(`underlyingRate: ${Decimal.ONE.div(underlyingRate)}`);
-    console.log(`isPrincipalCollateralIncrease: ${isPrincipalCollateralIncrease}`);
-
-    console.log(`absolutePrincipalCollateralChangeValue: ${actualPrincipalCollateralChange.abs().toString()}`);
-
     if (slippage.gt(SWAP_ROUTER_MAX_SLIPPAGE[swapRouter])) {
       throw new Error(
         `Slippage (${slippage.toTruncated(4)}) should not be greater than ${SWAP_ROUTER_MAX_SLIPPAGE[swapRouter]}`,
@@ -598,10 +590,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     if (!currentCollateral) {
       currentCollateral = await this.fetchCollateral();
     }
-
-    console.log(`currentCollateral: ${currentCollateral.toString()}`);
-    console.log(`currentPrincipalCollateral: ${currentPrincipalCollateral.toString()}`);
-    console.log(`currentDebt: ${currentDebt.toString()}`);
 
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
     if (isDelegateWhitelisted === undefined) {
@@ -674,10 +662,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
         debtChange = newTotalDebt.sub(currentDebt);
       }
-      console.log(`debtChange: ${debtChange.toString()}`);
 
       const isDebtIncrease = debtChange.gt(Decimal.ZERO);
-      console.log(`isDebtIncrease: ${isDebtIncrease}`);
 
       const underlyingCollateralTokenAddress = RaftConfig.getTokenAddress(this.underlyingCollateralToken);
       const rAddress = RaftConfig.networkConfig.tokens['R'].address;
@@ -723,17 +709,12 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
       const abi = new ethers.Interface(OneInchOneStepLeverageStETHABI);
 
-      // TODO - Remove console logs once we finalize everything for OSL
-      console.log(`fromAmountOffset: ${fromAmountOffset}`);
-      console.log(`1InchData: ${swapCalldata.data.tx.data}`);
       const oneInchDataAmmData = abi
         .getAbiCoder()
         .encode(['uint256', 'bytes'], [fromAmountOffset, swapCalldata.data.tx.data]);
 
-      console.log(`swapCalldata.data.toTokenAmount: ${swapCalldata.data.toTokenAmount}`);
-      console.log(`swapCalldata.data.toToken.decimals ${swapCalldata.data.toToken.decimals}`);
+      console.log('swapCalldata.data.toTokenAmount: ', swapCalldata.data);
       const minReturn = new Decimal(BigInt(swapCalldata.data.toTokenAmount), swapCalldata.data.toToken.decimals);
-      console.log(`minReturn: ${minReturn.toString()}`);
 
       let collateralToSwap: Decimal;
       if (isClosePosition) {
