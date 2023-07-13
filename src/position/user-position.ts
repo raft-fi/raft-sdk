@@ -61,6 +61,7 @@ interface LeveragePositionStepsPrefetch {
   collateralTokenAllowance?: Decimal;
   underlyingRate?: Decimal;
   borrowRate?: Decimal;
+  underlyingCollateralPrice?: Decimal;
 }
 
 type WhitelistStep = {
@@ -569,6 +570,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       currentCollateral,
       underlyingRate,
       borrowRate,
+      underlyingCollateralPrice,
     } = options;
 
     const priceFeed = new PriceFeed(this.user.provider);
@@ -665,7 +667,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     const rAddress = RaftConfig.networkConfig.tokens['R'].address;
 
     if (collateralToken === 'wstETH' || collateralToken === 'stETH') {
-      const price = await priceFeed.getPrice(this.underlyingCollateralToken);
+      if (!underlyingCollateralPrice) {
+        underlyingCollateralPrice = await priceFeed.getPrice(this.underlyingCollateralToken);
+      }
 
       const spotSwap = new Decimal(1000);
       const rateSwapCalldata = await this.getSwapCallDataFrom1inch(
@@ -687,13 +691,13 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       }
       // User is opening the position
       else if (currentCollateral.isZero() && currentDebt.isZero()) {
-        debtChange = price
+        debtChange = underlyingCollateralPrice
           .mul(actualPrincipalCollateralChange)
           .mul(leverage.sub(1))
           .div(
-            price
+            underlyingCollateralPrice
               .div(oneInchRate)
-              .sub(leverage.mul(price.div(oneInchRate)))
+              .sub(leverage.mul(underlyingCollateralPrice.div(oneInchRate)))
               .add(leverage.mul(Decimal.ONE.add(borrowRate))),
           );
       }
@@ -701,13 +705,13 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       else {
         const newFinalCollateral = currentPrincipalCollateral.add(actualPrincipalCollateralChange);
 
-        const newTotalDebt = price
+        const newTotalDebt = underlyingCollateralPrice
           .mul(newFinalCollateral)
           .mul(leverage.sub(1))
           .div(
-            price
+            underlyingCollateralPrice
               .div(oneInchRate)
-              .sub(leverage.mul(price.div(oneInchRate)))
+              .sub(leverage.mul(underlyingCollateralPrice.div(oneInchRate)))
               .add(leverage.mul(Decimal.ONE.add(borrowRate))),
           );
 
@@ -763,9 +767,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
       let collateralToSwap: Decimal;
       if (isClosePosition) {
-        collateralToSwap = currentDebt.mul(Decimal.ONE.add(0.001)).div(oneInchRate);
+        collateralToSwap = currentDebt.mul(Decimal.ONE.add(0.001)).div(underlyingCollateralPrice);
       } else {
-        collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(oneInchRate);
+        collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(underlyingCollateralPrice);
       }
 
       yield {
