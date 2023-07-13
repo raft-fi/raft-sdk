@@ -1,5 +1,5 @@
 import { request, gql } from 'graphql-request';
-import { JsonRpcProvider, Signer, TransactionResponse } from 'ethers';
+import { Provider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import { ERC20Indexable__factory, ERC20Permit, PositionManager, WrappedCollateralToken } from './typechain';
@@ -37,7 +37,7 @@ const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION);
 export class Protocol {
   private static instance: Protocol;
 
-  private provider: JsonRpcProvider;
+  private provider: Provider;
   private positionManager: PositionManager;
   private rToken: ERC20Permit;
 
@@ -62,7 +62,7 @@ export class Protocol {
    * Use Stats.getInstance() to get an instance of Stats.
    * @param provider: Provider to use for reading data from blockchain.
    */
-  private constructor(provider: JsonRpcProvider) {
+  private constructor(provider: Provider) {
     this.provider = provider;
     this.positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, this.provider);
     this.rToken = getTokenContract(R_TOKEN, this.provider);
@@ -73,7 +73,7 @@ export class Protocol {
    * @param provider Provider to use for reading data from blockchain.
    * @returns The singleton instance.
    */
-  public static getInstance(provider: JsonRpcProvider): Protocol {
+  public static getInstance(provider: Provider): Protocol {
     if (!Protocol.instance) {
       Protocol.instance = new Protocol(provider);
     }

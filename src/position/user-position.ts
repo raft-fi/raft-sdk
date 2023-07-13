@@ -34,6 +34,7 @@ import {
 } from '../utils';
 import { PositionWithRunner } from './base';
 import { SWAP_ROUTER_MAX_SLIPPAGE } from '../constants';
+import { Protocol } from '../protocol';
 
 export interface ManagePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'manage';
@@ -59,6 +60,7 @@ interface LeveragePositionStepsPrefetch {
   currentCollateral?: Decimal;
   collateralTokenAllowance?: Decimal;
   underlyingRate?: Decimal;
+  borrowRate?: Decimal;
 }
 
 type WhitelistStep = {
@@ -560,7 +562,14 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     } = options;
     const { collateralToken = this.underlyingCollateralToken as T } = options;
 
-    let { isDelegateWhitelisted, collateralTokenAllowance, currentDebt, currentCollateral, underlyingRate } = options;
+    let {
+      isDelegateWhitelisted,
+      collateralTokenAllowance,
+      currentDebt,
+      currentCollateral,
+      underlyingRate,
+      borrowRate,
+    } = options;
 
     const priceFeed = new PriceFeed(this.user.provider);
     if (!underlyingRate) {
@@ -589,6 +598,16 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
     if (!currentCollateral) {
       currentCollateral = await this.fetchCollateral();
+    }
+    if (!borrowRate) {
+      const stats = Protocol.getInstance(this.user.provider);
+
+      const rates = await stats.fetchBorrowingRate();
+      borrowRate = rates[this.underlyingCollateralToken] || undefined;
+    }
+
+    if (!borrowRate) {
+      throw new Error('Failed to fetch borrowing rate!');
     }
 
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
@@ -642,8 +661,25 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       );
     }
 
+    const underlyingCollateralTokenAddress = RaftConfig.getTokenAddress(this.underlyingCollateralToken);
+    const rAddress = RaftConfig.networkConfig.tokens['R'].address;
+
     if (collateralToken === 'wstETH' || collateralToken === 'stETH') {
       const price = await priceFeed.getPrice(this.underlyingCollateralToken);
+
+      const spotSwap = new Decimal(1000);
+      const rateSwapCalldata = await this.getSwapCallDataFrom1inch(
+        rAddress,
+        underlyingCollateralTokenAddress,
+        spotSwap,
+        slippage,
+      );
+
+      const amountOut = new Decimal(
+        BigInt(rateSwapCalldata.data.toTokenAmount),
+        rateSwapCalldata.data.toToken.decimals,
+      );
+      const oneInchRate = spotSwap.div(amountOut);
 
       // User is closing the position
       if (isClosePosition) {
@@ -651,22 +687,34 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       }
       // User is opening the position
       else if (currentCollateral.isZero() && currentDebt.isZero()) {
-        debtChange = actualPrincipalCollateralChange.mul(price).mul(leverage.sub(Decimal.ONE));
+        debtChange = price
+          .mul(actualPrincipalCollateralChange)
+          .mul(leverage.sub(1))
+          .div(
+            price
+              .div(oneInchRate)
+              .sub(leverage.mul(price.div(oneInchRate)))
+              .add(leverage.mul(Decimal.ONE.add(borrowRate))),
+          );
       }
       // User is adjusting the position
       else {
-        const newTotalDebt = currentPrincipalCollateral
-          .add(actualPrincipalCollateralChange)
-          .mul(price)
-          .mul(leverage.sub(Decimal.ONE));
+        const newFinalCollateral = currentPrincipalCollateral.add(actualPrincipalCollateralChange);
+
+        const newTotalDebt = price
+          .mul(newFinalCollateral)
+          .mul(leverage.sub(1))
+          .div(
+            price
+              .div(oneInchRate)
+              .sub(leverage.mul(price.div(oneInchRate)))
+              .add(leverage.mul(Decimal.ONE.add(borrowRate))),
+          );
 
         debtChange = newTotalDebt.sub(currentDebt);
       }
 
       const isDebtIncrease = debtChange.gt(Decimal.ZERO);
-
-      const underlyingCollateralTokenAddress = RaftConfig.getTokenAddress(this.underlyingCollateralToken);
-      const rAddress = RaftConfig.networkConfig.tokens['R'].address;
 
       let amountToSwap: Decimal;
       // User is closing the position
@@ -676,14 +724,14 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       }
       // User is opening the position
       else if (currentCollateral.isZero() && currentDebt.isZero()) {
-        amountToSwap = actualPrincipalCollateralChange.mul(price).mul(leverage.sub(1));
+        amountToSwap = debtChange;
       }
       // User is adjusting the position
       else {
         if (isDebtIncrease) {
           amountToSwap = debtChange.abs();
         } else {
-          amountToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(price);
+          amountToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(oneInchRate);
         }
       }
 
@@ -693,8 +741,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         amountToSwap,
         slippage,
       );
-
-      console.log(`oneInch amountToSwap: ${amountToSwap.toString()}`);
 
       const functionSignatureToFromAmountOffset: { [key: string]: number } = {
         '0x12aa3caf': 164, // swap
@@ -713,17 +759,14 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         .getAbiCoder()
         .encode(['uint256', 'bytes'], [fromAmountOffset, swapCalldata.data.tx.data]);
 
-      console.log('swapCalldata.data.toTokenAmount: ', swapCalldata.data);
       const minReturn = new Decimal(BigInt(swapCalldata.data.toTokenAmount), swapCalldata.data.toToken.decimals);
 
       let collateralToSwap: Decimal;
       if (isClosePosition) {
-        collateralToSwap = currentDebt.mul(Decimal.ONE.add(0.001)).div(price);
+        collateralToSwap = currentDebt.mul(Decimal.ONE.add(0.001)).div(oneInchRate);
       } else {
-        collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(price);
+        collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(oneInchRate);
       }
-
-      console.log(`collateralToSwap: ${collateralToSwap.toString()}`);
 
       yield {
         type: {
