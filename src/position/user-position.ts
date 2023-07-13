@@ -687,28 +687,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       }
       // User is opening the position
       else if (currentCollateral.isZero() && currentDebt.isZero()) {
-        debtChange = actualPrincipalCollateralChange.mul(oneInchRate).mul(leverage.sub(Decimal.ONE));
-      }
-      // User is adjusting the position
-      else {
-        const newTotalDebt = currentPrincipalCollateral
-          .add(actualPrincipalCollateralChange)
-          .mul(oneInchRate)
-          .mul(leverage.sub(Decimal.ONE));
-
-        debtChange = newTotalDebt.sub(currentDebt);
-      }
-
-      const isDebtIncrease = debtChange.gt(Decimal.ZERO);
-
-      if (isDebtIncrease) {
-        // Apply borrowing fee to target debt
-        debtChange = debtChange.div(Decimal.ONE.add(borrowRate));
-
-        // debtToAdd = / (  + EFFECTIVE_LEVERAGE * (1 + BORROWING_FEE))
-
-        // debtToAdd = CHAINLINK_RATE * INIT_COLLATERAL * (EFFECTIVE_LEVERAGE - 1) / (CHAINLINK_RATE / 1INCH_RATE - EFFECTIVE_LEVERAGE * CHAINLINK_RATE / 1INCH_RATE + EFFECTIVE_LEVERAGE * (1 + BORROWING_FEE))
-
         debtChange = price
           .mul(actualPrincipalCollateralChange)
           .mul(leverage.sub(1))
@@ -719,6 +697,24 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
               .add(leverage.mul(Decimal.ONE.add(borrowRate))),
           );
       }
+      // User is adjusting the position
+      else {
+        const newFinalCollateral = currentPrincipalCollateral.add(actualPrincipalCollateralChange);
+
+        const newTotalDebt = price
+          .mul(newFinalCollateral)
+          .mul(leverage.sub(1))
+          .div(
+            price
+              .div(oneInchRate)
+              .sub(leverage.mul(price.div(oneInchRate)))
+              .add(leverage.mul(Decimal.ONE.add(borrowRate))),
+          );
+
+        debtChange = newTotalDebt.sub(currentDebt);
+      }
+
+      const isDebtIncrease = debtChange.gt(Decimal.ZERO);
 
       let amountToSwap: Decimal;
       // User is closing the position
@@ -771,29 +767,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       } else {
         collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(oneInchRate);
       }
-
-      console.log('=======================');
-      console.log(`oneInchRate: ${oneInchRate.toString()}`);
-      console.log(`chainlinkRate: ${price.toString()}`);
-      console.log(`currentCollateral: ${currentCollateral.toString()}`);
-      console.log(`currentPrincipalCollateral: ${currentPrincipalCollateral.toString()}`);
-      console.log(`currentDebt: ${currentDebt.toString()}`);
-      console.log(`underlyingCollateralToken: ${this.underlyingCollateralToken}`);
-      console.log(`collateralToken: ${collateralToken}`);
-      console.log(`underlyingRate: ${Decimal.ONE.div(underlyingRate)}`);
-      console.log(`debtChange: ${debtChange.toString()}`);
-      console.log(`isDebtIncrease: ${isDebtIncrease}`);
-      console.log(`actualPrincipalCollateralChange: ${actualPrincipalCollateralChange.abs().toString()}`);
-      console.log(`isPrincipalCollateralIncrease: ${isPrincipalCollateralIncrease}`);
-      console.log(`minReturn: ${minReturn.toString()}`);
-      console.log(`fromAmountOffset: ${fromAmountOffset}`);
-      console.log('=======================');
-
-      const finalCollateral = minReturn.add(actualPrincipalCollateralChange);
-
-      const effectiveLeverage = finalCollateral.mul(oneInchRate).div(finalCollateral.mul(oneInchRate).sub(debtChange));
-
-      console.log(effectiveLeverage.toString());
 
       yield {
         type: {
