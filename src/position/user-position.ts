@@ -667,8 +667,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     if (collateralToken === 'wstETH' || collateralToken === 'stETH') {
       const price = await priceFeed.getPrice(this.underlyingCollateralToken);
 
-      console.log(`price: ${price.toString()}`);
-
       const spotSwap = new Decimal(1000);
       const rateSwapCalldata = await this.getSwapCallDataFrom1inch(
         rAddress,
@@ -683,21 +681,19 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       );
       const oneInchRate = spotSwap.div(amountOut);
 
-      console.log(`oneInchRate: ${oneInchRate.toString()}`);
-
       // User is closing the position
       if (isClosePosition) {
         debtChange = Decimal.MAX_DECIMAL.mul(-1);
       }
       // User is opening the position
       else if (currentCollateral.isZero() && currentDebt.isZero()) {
-        debtChange = actualPrincipalCollateralChange.mul(price).mul(leverage.sub(Decimal.ONE));
+        debtChange = actualPrincipalCollateralChange.mul(oneInchRate).mul(leverage.sub(Decimal.ONE));
       }
       // User is adjusting the position
       else {
         const newTotalDebt = currentPrincipalCollateral
           .add(actualPrincipalCollateralChange)
-          .mul(price)
+          .mul(oneInchRate)
           .mul(leverage.sub(Decimal.ONE));
 
         debtChange = newTotalDebt.sub(currentDebt);
@@ -708,6 +704,20 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       if (isDebtIncrease) {
         // Apply borrowing fee to target debt
         debtChange = debtChange.div(Decimal.ONE.add(borrowRate));
+
+        // debtToAdd = / (  + EFFECTIVE_LEVERAGE * (1 + BORROWING_FEE))
+
+        // debtToAdd = CHAINLINK_RATE * INIT_COLLATERAL * (EFFECTIVE_LEVERAGE - 1) / (CHAINLINK_RATE / 1INCH_RATE - EFFECTIVE_LEVERAGE * CHAINLINK_RATE / 1INCH_RATE + EFFECTIVE_LEVERAGE * (1 + BORROWING_FEE))
+
+        debtChange = price
+          .mul(actualPrincipalCollateralChange)
+          .mul(leverage.sub(1))
+          .div(
+            price
+              .div(oneInchRate)
+              .sub(leverage.mul(price.div(oneInchRate)))
+              .add(leverage.mul(Decimal.ONE.add(borrowRate))),
+          );
       }
 
       let amountToSwap: Decimal;
@@ -718,14 +728,14 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       }
       // User is opening the position
       else if (currentCollateral.isZero() && currentDebt.isZero()) {
-        amountToSwap = actualPrincipalCollateralChange.mul(price).mul(leverage.sub(1));
+        amountToSwap = debtChange;
       }
       // User is adjusting the position
       else {
         if (isDebtIncrease) {
           amountToSwap = debtChange.abs();
         } else {
-          amountToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(price);
+          amountToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(oneInchRate);
         }
       }
 
@@ -757,30 +767,31 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
       let collateralToSwap: Decimal;
       if (isClosePosition) {
-        collateralToSwap = currentDebt.mul(Decimal.ONE.add(0.001)).div(price);
+        collateralToSwap = currentDebt.mul(Decimal.ONE.add(0.001)).div(oneInchRate);
       } else {
-        collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(price);
+        collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(oneInchRate);
       }
 
-      console.log(`underlyingCollateralToken: ${this.underlyingCollateralToken}`);
-      console.log(`collateralToken: ${collateralToken}`);
-      console.log(`underlyingRate: ${Decimal.ONE.div(underlyingRate)}`);
-      console.log(`isPrincipalCollateralIncrease: ${isPrincipalCollateralIncrease}`);
-      console.log(`absolutePrincipalCollateralChangeValue: ${actualPrincipalCollateralChange.abs().toString()}`);
+      console.log('=======================');
+      console.log(`oneInchRate: ${oneInchRate.toString()}`);
+      console.log(`chainlinkRate: ${price.toString()}`);
       console.log(`currentCollateral: ${currentCollateral.toString()}`);
       console.log(`currentPrincipalCollateral: ${currentPrincipalCollateral.toString()}`);
       console.log(`currentDebt: ${currentDebt.toString()}`);
+      console.log(`underlyingCollateralToken: ${this.underlyingCollateralToken}`);
+      console.log(`collateralToken: ${collateralToken}`);
+      console.log(`underlyingRate: ${Decimal.ONE.div(underlyingRate)}`);
       console.log(`debtChange: ${debtChange.toString()}`);
       console.log(`isDebtIncrease: ${isDebtIncrease}`);
-      console.log(`fromAmountOffset: ${fromAmountOffset}`);
-      console.log(`1InchData: ${swapCalldata.data.tx.data}`);
-      console.log(`swapCalldata.data.toTokenAmount: ${swapCalldata.data.toTokenAmount}`);
-      console.log(`swapCalldata.data.toToken.decimals ${swapCalldata.data.toToken.decimals}`);
+      console.log(`actualPrincipalCollateralChange: ${actualPrincipalCollateralChange.abs().toString()}`);
+      console.log(`isPrincipalCollateralIncrease: ${isPrincipalCollateralIncrease}`);
       console.log(`minReturn: ${minReturn.toString()}`);
+      console.log(`fromAmountOffset: ${fromAmountOffset}`);
+      console.log('=======================');
 
       const finalCollateral = minReturn.add(actualPrincipalCollateralChange);
 
-      const effectiveLeverage = finalCollateral.mul(price).div(finalCollateral.mul(price).sub(debtChange));
+      const effectiveLeverage = finalCollateral.mul(oneInchRate).div(finalCollateral.mul(oneInchRate).sub(debtChange));
 
       console.log(effectiveLeverage.toString());
 
@@ -802,7 +813,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
               principalCollateralChange.abs().toBigInt(),
               isPrincipalCollateralIncrease,
               oneInchDataAmmData,
-              isDebtIncrease ? new Decimal(1).toBigInt() : collateralToSwap.toBigInt(),
+              isDebtIncrease ? minReturn.toBigInt() : collateralToSwap.toBigInt(),
               maxFeePercentage.toBigInt(),
             ],
             gasLimitMultiplier,
