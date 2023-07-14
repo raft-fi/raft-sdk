@@ -763,7 +763,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         .getAbiCoder()
         .encode(['uint256', 'bytes'], [fromAmountOffset, swapCalldata.data.tx.data]);
 
-      const minReturn = new Decimal(BigInt(swapCalldata.data.toTokenAmount), swapCalldata.data.toToken.decimals);
+      const oneInchAmountOut = new Decimal(BigInt(swapCalldata.data.toTokenAmount), swapCalldata.data.toToken.decimals);
+      const minReturn = oneInchAmountOut.mul(Decimal.ONE.sub(slippage));
 
       let collateralToSwap: Decimal;
       if (isClosePosition) {
