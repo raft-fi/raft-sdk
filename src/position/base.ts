@@ -57,7 +57,7 @@ export class Position {
 
   private collateral: Decimal;
   private debt: Decimal;
-  private principalCollateral?: Decimal | null;
+  private isLeveraged?: boolean;
 
   /**
    * Creates a new representation of a position.
@@ -112,22 +112,19 @@ export class Position {
   }
 
   /**
-   * Sets the principal collateral amount of the leverage position.
-   * @param principalCollateral The principal collateral amount.
+   * Sets the flag to indicate whether this is a leverage position.
+   * @param isLeveraged The flag to indicate whether this is a leverage position.
    */
-  public setPrincipalCollateral(principalCollateral: Decimal | null): void {
-    if (principalCollateral) {
-      this.checkNonNegativeAmount(principalCollateral);
-    }
-    this.principalCollateral = principalCollateral;
+  public setIsLeveraged(isLeveraged: boolean): void {
+    this.isLeveraged = isLeveraged;
   }
 
   /**
-   * Returns the principal collateral amount of the leverage position.
-   * @returns The principal collateral amount.
+   * Returns the flag to indicate whether this is a leverage position.
+   * @returns The flag to indicate whether this is a leverage position.
    */
-  public getPrincipalCollateral(): Decimal | null {
-    return this.principalCollateral ?? null;
+  public getIsLeveraged(): boolean {
+    return this.isLeveraged ?? false;
   }
 
   /**
