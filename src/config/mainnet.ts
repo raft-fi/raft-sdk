@@ -7,6 +7,7 @@ import { Token } from '../types';
 const POSITION_MANAGER_ADDRESS = '0x5f59b322eb3e16a0c78846195af1f588b77403fc';
 const POSITION_MANAGER_STETH_ADDRESS = '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6';
 const POSITION_MANAGER_RETH = '0x29f8abb4cab4bbb56f617d9a3c0f62d33758e74e';
+const ONE_INCH_ONE_STEP_LEVERAGE_STETH_ADDRESS = '0xB2Bf4De5a63B2225338CdFdBAd045EA62f158b67';
 
 const underlyingTokensConfig: UnderlyingTokens = {
   wstETH: {
@@ -93,6 +94,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
 export const mainnetConfig: NetworkConfig = {
   positionManager: POSITION_MANAGER_ADDRESS,
   positionManagerStEth: POSITION_MANAGER_STETH_ADDRESS,
+  oneInchOneStepLeverageStEth: ONE_INCH_ONE_STEP_LEVERAGE_STETH_ADDRESS,
   wrappedCollateralTokenPositionManagers: {
     wcrETH: POSITION_MANAGER_RETH,
   },
@@ -110,5 +112,6 @@ export const mainnetConfig: NetworkConfig = {
   },
   underlyingTokens: underlyingTokensConfig,
   tokens: tokensConfig,
+  daiAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   testNetwork: false,
 };
