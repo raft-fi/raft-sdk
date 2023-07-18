@@ -26,6 +26,7 @@ export {
 } from './savings';
 export { PriceFeed } from './price';
 export { Protocol } from './protocol';
+export { RaftToken } from './token';
 export {
   COLLATERAL_TOKENS,
   R_TOKEN,
