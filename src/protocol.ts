@@ -1,5 +1,5 @@
 import { request, gql } from 'graphql-request';
-import { JsonRpcProvider, Signer, TransactionResponse } from 'ethers';
+import { Provider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import { ERC20Indexable__factory, ERC20Permit, PositionManager, WrappedCollateralToken } from './typechain';
@@ -20,6 +20,7 @@ import {
   isWrappedCappedUnderlyingCollateralToken,
   sendTransactionWithGasLimit,
 } from './utils';
+import { FLASH_MINT_FEE } from './constants';
 
 interface OpenPositionsResponse {
   count: string;
@@ -36,7 +37,7 @@ const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION);
 export class Protocol {
   private static instance: Protocol;
 
-  private provider: JsonRpcProvider;
+  private provider: Provider;
   private positionManager: PositionManager;
   private rToken: ERC20Permit;
 
@@ -54,13 +55,14 @@ export class Protocol {
   };
   private _redemptionRate: Decimal | null = null;
   private _openPositionCount: number | null = null;
+  private _flashMintFee: Decimal = FLASH_MINT_FEE;
 
   /**
    * Creates a new representation of a stats class. Stats is a singleton, so constructor is set to private.
    * Use Stats.getInstance() to get an instance of Stats.
    * @param provider: Provider to use for reading data from blockchain.
    */
-  private constructor(provider: JsonRpcProvider) {
+  private constructor(provider: Provider) {
     this.provider = provider;
     this.positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, this.provider);
     this.rToken = getTokenContract(R_TOKEN, this.provider);
@@ -71,7 +73,7 @@ export class Protocol {
    * @param provider Provider to use for reading data from blockchain.
    * @returns The singleton instance.
    */
-  public static getInstance(provider: JsonRpcProvider): Protocol {
+  public static getInstance(provider: Provider): Protocol {
     if (!Protocol.instance) {
       Protocol.instance = new Protocol(provider);
     }
@@ -155,6 +157,13 @@ export class Protocol {
    */
   get openPositionCount(): number | null {
     return this._openPositionCount;
+  }
+
+  /**
+   * Raft protocol current flash mint fee.
+   */
+  get flashMintFee(): Decimal | null {
+    return this._flashMintFee;
   }
 
   /**
@@ -296,6 +305,15 @@ export class Protocol {
     this._openPositionCount = Number(response.openPositionCounter.count);
 
     return this._openPositionCount;
+  }
+
+  /**
+   * Fetches flash mint fee for token R.
+   * @returns Fetched flash mint fee.
+   */
+  async fetchFlashMintFee(): Promise<Decimal> {
+    // TODO: we should fetch this value from R token contract
+    return this._flashMintFee;
   }
 
   /**

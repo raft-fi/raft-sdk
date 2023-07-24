@@ -1,10 +1,11 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { MIN_COLLATERAL_RATIO, MIN_NET_DEBT } from '../constants';
 import { ContractRunner } from 'ethers';
-import { CollateralToken, UnderlyingCollateralToken } from '../types';
+import { CollateralToken, SwapRouter, Token, UnderlyingCollateralToken } from '../types';
 import { ERC20Indexable, ERC20Indexable__factory } from '../typechain';
 import { RaftConfig } from '../config';
 import request, { gql } from 'graphql-request';
+import axios, { AxiosResponse } from 'axios';
 
 export type PositionTransactionType = 'OPEN' | 'ADJUST' | 'CLOSE' | 'LIQUIDATION';
 
@@ -56,6 +57,7 @@ export class Position {
 
   private collateral: Decimal;
   private debt: Decimal;
+  private isLeveraged?: boolean;
 
   /**
    * Creates a new representation of a position.
@@ -107,6 +109,22 @@ export class Position {
    */
   public getDebt(): Decimal {
     return this.debt;
+  }
+
+  /**
+   * Sets the flag to indicate whether this is a leverage position.
+   * @param isLeveraged The flag to indicate whether this is a leverage position.
+   */
+  public setIsLeveraged(isLeveraged: boolean): void {
+    this.isLeveraged = isLeveraged;
+  }
+
+  /**
+   * Returns the flag to indicate whether this is a leverage position.
+   * @returns The flag to indicate whether this is a leverage position.
+   */
+  public getIsLeveraged(): boolean {
+    return this.isLeveraged ?? false;
   }
 
   /**
@@ -302,5 +320,60 @@ export class PositionWithRunner extends Position {
     this.setDebt(new Decimal(debt, Decimal.PRECISION));
 
     return this.getDebt();
+  }
+
+  /**
+   * Returns the token price on the swap router
+   * @returns The token price on the swap router.
+   */
+  public async getSwapPrice(
+    amountToSwap: Decimal,
+    slippage: Decimal,
+    fromToken: Token,
+    toToken: Token,
+    swapRouter: SwapRouter,
+  ): Promise<Decimal> {
+    const fromTokenAddress = RaftConfig.networkConfig.tokens[fromToken].address;
+    const toTokenAddress = RaftConfig.networkConfig.tokens[toToken].address;
+
+    switch (swapRouter) {
+      case '1inch': {
+        const swapCalldata = await this.getSwapCallDataFrom1inch(
+          fromTokenAddress,
+          toTokenAddress,
+          amountToSwap,
+          slippage,
+        );
+        const fromTokenAmount = new Decimal(
+          BigInt(swapCalldata.data.fromTokenAmount),
+          swapCalldata.data.fromToken.decimals,
+        );
+        const toTokenAmount = new Decimal(BigInt(swapCalldata.data.toTokenAmount), swapCalldata.data.toToken.decimals);
+
+        return toTokenAmount.div(fromTokenAmount);
+      }
+      default:
+        throw new Error('Swap router not supported!');
+    }
+  }
+
+  protected async getSwapCallDataFrom1inch(
+    fromTokenAddress: string,
+    toTokenAddress: string,
+    amount: Decimal,
+    slippage: Decimal,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): Promise<AxiosResponse<any, any>> {
+    const swapCalldata = await axios.get('https://api-raft.1inch.io/v5.0/1/swap', {
+      params: {
+        fromTokenAddress,
+        toTokenAddress,
+        amount: amount.value,
+        fromAddress: '0x10fbb5a361aa1a35bf2d0a262e24125fd39d33d8', // 1inch AMM contract TODO - Move to network config
+        slippage: slippage.mul(100).toTruncated(2),
+        disableEstimate: true,
+      },
+    });
+    return swapCalldata;
   }
 }

@@ -1,7 +1,6 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Signer, ContractTransactionResponse, TransactionResponse, ethers } from 'ethers';
 import { request, gql } from 'graphql-request';
-import axios from 'axios';
 import { getTokenAllowance } from '../allowance';
 import { RaftConfig, SupportedCollateralTokens } from '../config';
 import { PriceFeed } from '../price';
@@ -15,7 +14,14 @@ import {
 } from '../typechain';
 import OneInchOneStepLeverageStETHABI from './../abi/OneInchOneStepLeverageStETH.json';
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
-import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
+import {
+  CollateralToken,
+  R_TOKEN,
+  SwapRouter,
+  Token,
+  TransactionWithFeesOptions,
+  UnderlyingCollateralToken,
+} from '../types';
 import {
   createEmptyPermitSignature,
   createPermitSignature,
@@ -27,7 +33,8 @@ import {
   sendTransactionWithGasLimit,
 } from '../utils';
 import { PositionWithRunner } from './base';
-import { BALANCER_R_DAI_POOL_ID, DAI_TOKEN_ADDRESS } from '../constants';
+import { SWAP_ROUTER_MAX_SLIPPAGE } from '../constants';
+import { Protocol } from '../protocol';
 
 export interface ManagePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'manage';
@@ -49,8 +56,12 @@ interface ManagePositionStepsPrefetch {
 
 interface LeveragePositionStepsPrefetch {
   isDelegateWhitelisted?: boolean;
+  currentDebt?: Decimal;
+  currentCollateral?: Decimal;
   collateralTokenAllowance?: Decimal;
-  collateralPermitSignature?: ERC20PermitSignatureStruct;
+  underlyingRate?: Decimal;
+  borrowRate?: Decimal;
+  underlyingCollateralPrice?: Decimal;
 }
 
 type WhitelistStep = {
@@ -98,6 +109,7 @@ export interface LeveragePositionStep {
 
 interface UserPositionResponse {
   underlyingCollateralToken: string | null;
+  isLeveraged: boolean | null;
 }
 
 const DEBT_CHANGE_TO_CLOSE = Decimal.MAX_DECIMAL.mul(-1);
@@ -121,11 +133,13 @@ export interface ManagePositionOptions<C extends CollateralToken> extends Transa
  * @property frontendTag The frontend operator tag for the transaction.
  * @property approvalType The approval type for the collateral token. Smart contract position owners have to
  * use `approve` since they don't support signing. Defaults to permit.
+ * @property swapRouter Swap router that swap will use for the operation
  */
 export interface LeveragePositionOptions<C extends CollateralToken> extends TransactionWithFeesOptions {
   collateralToken?: C;
   frontendTag?: string;
   approvalType?: 'permit' | 'approve';
+  swapRouter?: SwapRouter;
 }
 
 /**
@@ -165,6 +179,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       query getPosition($positionId: String!) {
         position(id: $positionId) {
           underlyingCollateralToken
+          isLeveraged
         }
       }
     `;
@@ -189,7 +204,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       return null;
     }
 
+    const isLeveraged = response.position?.isLeveraged ?? false;
+
     const position = new UserPosition(user, underlyingCollateralToken);
+    position.setIsLeveraged(isLeveraged);
     await position.fetch();
 
     return position;
@@ -507,7 +525,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * automatically and it is the caller's response to dispatch them. Each step contains the type of the step, the total
    * number of steps, and the action to perform. The action is either a transaction to dispatch or a function that
    * returns a permit signature for the collateral token.
-   * @param collateralChange The amount of change the collateral by. Positive values deposit collateral, negative values
+   * @param actualPrincipalCollateralChange The amount of change the collateral by. Positive values deposit collateral, negative values
    * withdraw it.
    * @param leverage The leverage multiplier for the position.
    * @param options.maxFeePercentage The maximum fee percentage to pay for the operation. Defaults to 1 (100%).
@@ -517,6 +535,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * @param options.frontendTag The frontend operator tag for the transaction. Optional.
    * @param options.approvalType The approval type for the collateral token or R token. Smart contract position owners
    * have to use `approve` since they don't support signing. Defaults to permit.
+   * @param swapRouter Swap router that swap will use for the operation
    * @param options.isDelegateWhitelisted Whether the delegate is whitelisted for the position owner. If not provided,
    * it will be fetched automatically.
    * @param options.collateralTokenAllowance The collateral token allowance of the position owner for the position
@@ -525,21 +544,71 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * from the user.
    */
   public async *getLeverageSteps(
-    collateralChange: Decimal,
+    currentPrincipalCollateral: Decimal,
+    principalCollateralChange: Decimal,
     leverage: Decimal,
     slippage: Decimal,
     options: LeveragePositionOptions<SupportedCollateralTokens[T]> & LeveragePositionStepsPrefetch = {},
   ): AsyncGenerator<LeveragePositionStep, void, ERC20PermitSignatureStruct | undefined> {
-    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE, frontendTag } = options;
+    if (!this.user.provider) {
+      throw new Error('Provider not set, please set provider before calling this method');
+    }
+    const {
+      maxFeePercentage = Decimal.ONE,
+      gasLimitMultiplier = Decimal.ONE,
+      frontendTag,
+      swapRouter = '1inch',
+    } = options;
     const { collateralToken = this.underlyingCollateralToken as T } = options;
 
-    const absoluteCollateralChangeValue = collateralChange.abs().value;
-    const isCollateralIncrease = collateralChange.gt(Decimal.ZERO);
+    let {
+      isDelegateWhitelisted,
+      collateralTokenAllowance,
+      currentDebt,
+      currentCollateral,
+      underlyingRate,
+      borrowRate,
+      underlyingCollateralPrice,
+    } = options;
+
+    const priceFeed = new PriceFeed(this.user.provider);
+    if (!underlyingRate) {
+      underlyingRate = await priceFeed.getUnderlyingCollateralRate(this.underlyingCollateralToken, collateralToken);
+    }
+
+    const actualPrincipalCollateralChange = principalCollateralChange.mul(Decimal.ONE.div(underlyingRate));
+
+    const absolutePrincipalCollateralChangeValue = actualPrincipalCollateralChange.abs().value;
+    const isPrincipalCollateralIncrease = actualPrincipalCollateralChange.gt(Decimal.ZERO);
+    let debtChange = Decimal.ZERO;
+    const isClosePosition = leverage.equals(1) && actualPrincipalCollateralChange.isZero();
     const collateralTokenContract = getTokenContract(collateralToken, this.user);
-    const collateralTokenAllowanceRequired = collateralTokenContract !== null && isCollateralIncrease;
+    const collateralTokenAllowanceRequired = collateralTokenContract !== null && isPrincipalCollateralIncrease;
     const userAddress = await this.getUserAddress();
 
-    let { isDelegateWhitelisted, collateralTokenAllowance } = options;
+    if (slippage.gt(SWAP_ROUTER_MAX_SLIPPAGE[swapRouter])) {
+      throw new Error(
+        `Slippage (${slippage.toTruncated(4)}) should not be greater than ${SWAP_ROUTER_MAX_SLIPPAGE[swapRouter]}`,
+      );
+    }
+
+    if (!currentDebt) {
+      // Make sure we have latest debt balance data before proceeding
+      currentDebt = await this.fetchDebt();
+    }
+    if (!currentCollateral) {
+      currentCollateral = await this.fetchCollateral();
+    }
+    if (!borrowRate) {
+      const stats = Protocol.getInstance(this.user.provider);
+
+      const rates = await stats.fetchBorrowingRate();
+      borrowRate = rates[this.underlyingCollateralToken] || undefined;
+    }
+
+    if (!borrowRate) {
+      throw new Error('Failed to fetch borrowing rate!');
+    }
 
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
     if (isDelegateWhitelisted === undefined) {
@@ -565,7 +634,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     const whitelistingStepNeeded = !isDelegateWhitelisted;
     const collateralApprovalStepNeeded =
       collateralTokenAllowanceRequired && // action needs collateral token allowance check
-      collateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO); // current allowance is not enough
+      principalCollateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO); // current allowance is not enough
 
     // The number of steps is the number of optional steps that are required based on input values plus one required
     // step (`leverage`)
@@ -584,7 +653,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       yield* this.getApproveOrPermitStep(
         collateralToken,
         collateralTokenContract,
-        collateralChange,
+        principalCollateralChange,
         RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
         () => stepCounter++,
         numberOfSteps,
@@ -592,46 +661,88 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       );
     }
 
-    if (isUnderlyingCollateralToken(collateralToken)) {
-      if (!this.user.provider) {
-        return;
+    const underlyingCollateralTokenAddress = RaftConfig.getTokenAddress(this.underlyingCollateralToken);
+    const rAddress = RaftConfig.networkConfig.tokens['R'].address;
+
+    if (collateralToken === 'wstETH' || collateralToken === 'stETH') {
+      if (!underlyingCollateralPrice) {
+        underlyingCollateralPrice = await priceFeed.getPrice(this.underlyingCollateralToken);
       }
 
-      const priceFeed = new PriceFeed(this.user.provider);
-      const price = await priceFeed.getPrice(collateralToken);
+      const spotSwap = new Decimal(1000);
+      const rateSwapCalldata = await this.getSwapCallDataFrom1inch(
+        rAddress,
+        underlyingCollateralTokenAddress,
+        spotSwap,
+        slippage,
+      );
 
-      const debtChange = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
+      const amountOut = new Decimal(
+        BigInt(rateSwapCalldata.data.toTokenAmount),
+        rateSwapCalldata.data.toToken.decimals,
+      );
+      const oneInchRate = spotSwap.div(amountOut);
 
-      const swaps = [
-        {
-          poolId: BALANCER_R_DAI_POOL_ID,
-          assetInIndex: 0, // Giving borrower R to get DAI
-          assetOutIndex: 1, // Getting DAI from borrowed R
-          amount: 0, // Amount set to 0 always, contract will inject correct value
-          userData: '0x00',
-        },
-      ];
+      // User is closing the position
+      if (isClosePosition) {
+        debtChange = Decimal.MAX_DECIMAL.mul(-1);
+      }
+      // User is opening the position
+      else if (currentCollateral.isZero() && currentDebt.isZero()) {
+        debtChange = underlyingCollateralPrice
+          .mul(actualPrincipalCollateralChange)
+          .mul(leverage.sub(1))
+          .div(
+            underlyingCollateralPrice
+              .div(oneInchRate)
+              .sub(leverage.mul(underlyingCollateralPrice.div(oneInchRate)))
+              .add(leverage.mul(Decimal.ONE.add(borrowRate))),
+          );
+      }
+      // User is adjusting the position
+      else {
+        const newFinalCollateral = currentPrincipalCollateral.add(actualPrincipalCollateralChange);
 
-      const intermediaryToken = RaftConfig.networkConfig.daiAddress;
+        const newTotalDebt = underlyingCollateralPrice
+          .mul(newFinalCollateral)
+          .mul(leverage.sub(1))
+          .div(
+            underlyingCollateralPrice
+              .div(oneInchRate)
+              .sub(leverage.mul(underlyingCollateralPrice.div(oneInchRate)))
+              .add(leverage.mul(Decimal.ONE.add(borrowRate))),
+          );
 
-      const assets = [RaftConfig.networkConfig.tokens['R'].address, intermediaryToken];
+        debtChange = newTotalDebt.sub(currentDebt);
+      }
 
-      const deadline = Math.floor(Date.now() / 1000) + 30 * 60;
+      const isDebtIncrease = debtChange.gt(Decimal.ZERO);
 
-      // Amount of DAI to swap for wstETH (assuming DAI is worth $1)
-      const swapAmount = collateralChange.abs().mul(price).mul(leverage.sub(Decimal.ONE));
-      console.log(swapAmount.toString());
+      let amountToSwap: Decimal;
+      // User is closing the position
+      if (isClosePosition) {
+        // When closing the position, we do not need to set swap amount, contracts will calculate correct amount and inject it in ammData
+        amountToSwap = Decimal.ONE;
+      }
+      // User is opening the position
+      else if (currentCollateral.isZero() && currentDebt.isZero()) {
+        amountToSwap = debtChange;
+      }
+      // User is adjusting the position
+      else {
+        if (isDebtIncrease) {
+          amountToSwap = debtChange.abs();
+        } else {
+          amountToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(oneInchRate);
+        }
+      }
 
-      const swapCalldata = await axios.get('https://api-raft.1inch.io/v5.0/1/swap', {
-        params: {
-          fromTokenAddress: RaftConfig.networkConfig.tokens['R'].address,
-          toTokenAddress: RaftConfig.networkConfig.tokens[collateralToken].address,
-          amount: absoluteCollateralChangeValue,
-          fromAddress: await this.getUserAddress(), // '0x88d8dadc04dd2c29e3de4a583483ac9b43ae8ed3', // 1inch AMM contract TODO - Move to network config
-          slippage: 50,
-          disableEstimate: true,
-        },
-      });
+      const swapCalldata = await this.getSwapCallDataFrom1inch(
+        isDebtIncrease ? rAddress : underlyingCollateralTokenAddress,
+        isDebtIncrease ? underlyingCollateralTokenAddress : rAddress,
+        amountToSwap,
+        slippage,
+      );
 
       const functionSignatureToFromAmountOffset: { [key: string]: number } = {
         '0x12aa3caf': 164, // swap
@@ -644,45 +755,21 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
       const fromAmountOffset = functionSignatureToFromAmountOffset[swapFunctionSignature];
 
-      // TODO - Calculate intermediary min return
-      const intermediaryMinReturn = 1;
-
-      const isOneInchFirst = false;
-
       const abi = new ethers.Interface(OneInchOneStepLeverageStETHABI);
 
-      // TODO - Remove console logs once we finalize everything for OSL
-      console.log(`fromAmountOffset: ${fromAmountOffset}`);
-      console.log(`1InchData: ${swapCalldata.data.tx.data}`);
       const oneInchDataAmmData = abi
         .getAbiCoder()
         .encode(['uint256', 'bytes'], [fromAmountOffset, swapCalldata.data.tx.data]);
 
-      console.log(`swaps: ${JSON.stringify(swaps)}`);
-      console.log(`assets: ${assets}`);
-      console.log(`deadline: ${deadline}`);
-      const balancerData = abi
-        .getAbiCoder()
-        .encode(
-          [
-            'tuple(bytes32 poolId, uint256 assetInIndex, uint256 assetOutIndex, uint256 amount, bytes userData)[]',
-            'address[]',
-            'uint256',
-          ],
-          [swaps, assets, deadline],
-        );
+      const oneInchAmountOut = new Decimal(BigInt(swapCalldata.data.toTokenAmount), swapCalldata.data.toToken.decimals);
+      const minReturn = oneInchAmountOut.mul(Decimal.ONE.sub(slippage));
 
-      console.log(`intermediaryToken: ${intermediaryToken}`);
-      console.log(`intermediaryMinReturn: ${intermediaryMinReturn}`);
-      console.log(`isOneInchFirst: ${isOneInchFirst}`);
-      const ammData = abi
-        .getAbiCoder()
-        .encode(
-          ['address', 'uint256', 'bool', 'bytes', 'bytes'],
-          [intermediaryToken, intermediaryMinReturn, isOneInchFirst, oneInchDataAmmData, balancerData],
-        );
-
-      const minReturn = collateralChange.abs().mul(leverage.sub(Decimal.ONE)).mul(Decimal.ONE.sub(slippage));
+      let collateralToSwap: Decimal;
+      if (isClosePosition) {
+        collateralToSwap = currentDebt.mul(Decimal.ONE.add(0.001)).div(underlyingCollateralPrice);
+      } else {
+        collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(underlyingCollateralPrice);
+      }
 
       yield {
         type: {
@@ -693,14 +780,16 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         // TODO: implement the actual leverage function
         action: () =>
           sendTransactionWithGasLimit(
-            this.loadOneStepLeverageStETH().manageLeveragedPosition,
+            collateralToken === 'wstETH'
+              ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
+              : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH, // used to stETH
             [
-              debtChange.toBigInt(),
-              true, // TODO - Calculate if debt is increasing of decreasing (not needed for opening position)
-              absoluteCollateralChangeValue,
-              isCollateralIncrease,
+              debtChange.abs().toBigInt(),
+              isDebtIncrease,
+              principalCollateralChange.abs().toBigInt(),
+              isPrincipalCollateralIncrease,
               oneInchDataAmmData,
-              minReturn.toBigInt(),
+              isDebtIncrease ? minReturn.toBigInt() : collateralToSwap.toBigInt(),
               maxFeePercentage.toBigInt(),
             ],
             gasLimitMultiplier,
@@ -708,11 +797,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             this.user,
           ),
       };
-    } else if (
-      isWrappableCappedCollateralToken(collateralToken) ||
-      (collateralToken === 'stETH' && this.underlyingCollateralToken === 'wstETH')
-    ) {
-      // TODO - Add support for stETH and wrapped capped tokens
+    } else if (isWrappableCappedCollateralToken(collateralToken)) {
+      // TODO - Add support for rETH (wrapped capped tokens)
       yield {
         type: {
           name: 'leverage',
@@ -736,8 +822,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             _frontendTag?: string,
           ) => false;
           dummyFunc(
-            absoluteCollateralChangeValue,
-            isCollateralIncrease,
+            absolutePrincipalCollateralChangeValue,
+            isPrincipalCollateralIncrease,
             leverage,
             maxFeePercentage.toBigInt(),
             gasLimitMultiplier,
