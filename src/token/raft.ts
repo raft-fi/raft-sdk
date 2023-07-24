@@ -20,12 +20,12 @@ export class RaftToken {
   }
 
   public async isEligibleToClaim(): Promise<boolean> {
-    // TODO: dummy implementation
+    // TODO: from RAFT airdrop contract, provide either address or merkle proof
     return true;
   }
 
   public async hasAlreadyClaimed(): Promise<boolean> {
-    // TODO: dummy implementation
+    // TODO: from RAFT airdrop contract, provide either address or merkle proof
     return false;
   }
 
@@ -38,8 +38,8 @@ export class RaftToken {
   }
 
   public async getClaimableAmount(): Promise<Decimal> {
-    // TODO: dummy implementation
-    return Decimal.ZERO;
+    // TODO: from IPFS, provide merkle proof to get this number
+    return new Decimal(123456);
   }
 
   /**
@@ -92,18 +92,18 @@ export class RaftToken {
   }
 
   public async claim(): Promise<void> {
-    // TODO: dummy implementation
-    return;
+    return this.claimAndStake(Decimal.ZERO);
   }
 
   public async stake(period: Decimal): Promise<void> {
-    // TODO: dummy implementation
+    // TODO: directly interact with balancer v2 pool?
+    // https://github.com/balancer/balancer-v2-monorepo/blob/master/pkg/liquidity-mining/contracts/VotingEscrow.vy
     period;
     return;
   }
 
   public async claimAndStake(period: Decimal): Promise<void> {
-    // TODO: dummy implementation
+    // TODO: from helper contract, to interact to claim and stake in 1 txn
     period;
     return;
   }
