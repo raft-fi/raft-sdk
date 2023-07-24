@@ -1,4 +1,4 @@
-import { AddressLike, JsonRpcProvider } from 'ethers';
+import { AddressLike, Provider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { Token } from './types';
 import { ERC20, ERC20Permit } from './typechain';
@@ -30,7 +30,7 @@ export class Allowance {
   private allowance: Decimal | null = null;
   private owner: AddressLike;
   private spender: AddressLike;
-  private provider: JsonRpcProvider;
+  private provider: Provider;
   private tokenContract: ERC20Permit | ERC20 | null;
 
   /**
@@ -40,12 +40,11 @@ export class Allowance {
    * @param spender Address to which allowance belongs.
    * @param provider: Provider to use for data fetching.
    */
-  public constructor(token: Token, owner: AddressLike, spender: AddressLike, provider: JsonRpcProvider) {
+  public constructor(token: Token, owner: AddressLike, spender: AddressLike, provider: Provider) {
     this.token = token;
     this.owner = owner;
     this.spender = spender;
     this.provider = provider;
-
     this.tokenContract = getTokenContract(this.token, this.provider);
   }
 
