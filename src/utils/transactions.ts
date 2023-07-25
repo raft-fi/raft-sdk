@@ -2,6 +2,12 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Overrides, StateMutability, TypedContractMethod } from '../typechain/common';
 import { Signer, TransactionResponse, hexlify } from 'ethers';
 
+interface BuiltTransactionData {
+  sendTransaction: () => Promise<TransactionResponse>;
+  gasEstimate: Decimal;
+  gasLimit: Decimal;
+}
+
 /**
  * Sends a transaction with a gas limit that is a multiple of the estimated gas cost.
  * @param method The contract's method to call.
@@ -12,7 +18,7 @@ import { Signer, TransactionResponse, hexlify } from 'ethers';
  * @param gasLimitMultiplier The multiplier to apply to estimated gas cost.
  * @returns Transaction response.
  */
-export async function sendTransactionWithGasLimit<
+export async function buildTransactionWithGasLimit<
   A extends Array<unknown>,
   R,
   S extends Exclude<StateMutability, 'view'>,
@@ -23,18 +29,26 @@ export async function sendTransactionWithGasLimit<
   tag?: string,
   signer?: Signer,
   value?: bigint,
-): Promise<TransactionResponse> {
-  const gasEstimate = await method.estimateGas(...args, { value } as Overrides<S>);
-  const gasLimit = new Decimal(gasEstimate, Decimal.PRECISION).mul(gasLimitMultiplier).toBigInt();
-  const overrides = { value, gasLimit } as Overrides<S>;
+): Promise<BuiltTransactionData> {
+  const gasEstimate = new Decimal(await method.estimateGas(...args, { value } as Overrides<S>), Decimal.PRECISION);
+  const gasLimit = gasEstimate.mul(gasLimitMultiplier);
+  const overrides = { value, gasLimit: gasLimit.toBigInt() } as Overrides<S>;
 
   if (!signer || !tag) {
-    return await method(...args, overrides);
+    return {
+      sendTransaction: () => method(...args, overrides),
+      gasEstimate,
+      gasLimit,
+    };
   }
 
   const hexTag = tag ? hexlify(Uint8Array.from(tag.split('').map(letter => letter.charCodeAt(0)))) : undefined;
   const transactionRequest = await method.populateTransaction(...args, overrides);
   transactionRequest.data = `${transactionRequest.data}${hexTag?.slice(2) ?? ''}`;
 
-  return signer.sendTransaction(transactionRequest);
+  return {
+    sendTransaction: () => signer.sendTransaction(transactionRequest),
+    gasEstimate,
+    gasLimit,
+  };
 }

@@ -30,7 +30,7 @@ import {
   isEoaAddress,
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
-  sendTransactionWithGasLimit,
+  buildTransactionWithGasLimit,
 } from '../utils';
 import { PositionWithRunner } from './base';
 import { SWAP_ROUTER_MAX_SLIPPAGE } from '../constants';
@@ -64,46 +64,42 @@ interface LeveragePositionStepsPrefetch {
   underlyingCollateralPrice?: Decimal;
 }
 
+type BaseStep = {
+  stepNumber: number;
+  numberOfSteps: number;
+  gasEstimate: Decimal;
+};
+
 type WhitelistStep = {
   type: {
     name: 'whitelist';
   };
-  stepNumber: number;
-  numberOfSteps: number;
   action: () => Promise<TransactionResponse>;
-};
+} & BaseStep;
 
 type PermitStep = {
   type: {
     name: 'permit';
     token: Token;
   };
-  stepNumber: number;
-  numberOfSteps: number;
   action: () => Promise<ERC20PermitSignatureStruct>;
-};
+} & BaseStep;
 
 type ApproveStep = {
   type: {
     name: 'approve';
     token: Token;
   };
-  stepNumber: number;
-  numberOfSteps: number;
   action: () => Promise<TransactionResponse>;
-};
+} & BaseStep;
 
-export interface ManagePositionStep {
+export interface ManagePositionStep extends BaseStep {
   type: ManagePositionStepType;
-  stepNumber: number;
-  numberOfSteps: number;
   action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
 }
 
-export interface LeveragePositionStep {
+export interface LeveragePositionStep extends BaseStep {
   type: LeveragePositionStepType;
-  stepNumber: number;
-  numberOfSteps: number;
   action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
 }
 
@@ -459,29 +455,31 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
 
     if (isUnderlyingCollateralToken(collateralToken)) {
+      const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
+        this.positionManager.managePosition,
+        [
+          RaftConfig.getTokenAddress(collateralToken),
+          userAddress,
+          absoluteCollateralChangeValue,
+          isCollateralIncrease,
+          absoluteDebtChangeValue,
+          isDebtIncrease,
+          maxFeePercentageValue,
+          collateralPermitSignature,
+        ],
+        gasLimitMultiplier,
+        frontendTag,
+        this.user,
+      );
+
       yield {
         type: {
           name: 'manage',
         },
         stepNumber: stepCounter++,
         numberOfSteps,
-        action: () =>
-          sendTransactionWithGasLimit(
-            this.positionManager.managePosition,
-            [
-              RaftConfig.getTokenAddress(collateralToken),
-              userAddress,
-              absoluteCollateralChangeValue,
-              isCollateralIncrease,
-              absoluteDebtChangeValue,
-              isDebtIncrease,
-              maxFeePercentageValue,
-              collateralPermitSignature,
-            ],
-            gasLimitMultiplier,
-            frontendTag,
-            this.user,
-          ),
+        action: sendTransaction,
+        gasEstimate,
       };
     } else if (
       isWrappableCappedCollateralToken(collateralToken) ||
@@ -490,6 +488,20 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       const method = isWrappableCappedCollateralToken(collateralToken)
         ? getPositionManagerContract('wrapped', positionManagerAddress, this.user).managePosition
         : getPositionManagerContract('stETH', positionManagerAddress, this.user).managePositionStETH;
+      const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
+        method,
+        [
+          absoluteCollateralChangeValue,
+          isCollateralIncrease,
+          absoluteDebtChangeValue,
+          isDebtIncrease,
+          maxFeePercentageValue,
+          rPermitSignature,
+        ],
+        gasLimitMultiplier,
+        frontendTag,
+        this.user,
+      );
 
       yield {
         type: {
@@ -497,21 +509,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         },
         stepNumber: stepCounter++,
         numberOfSteps,
-        action: () =>
-          sendTransactionWithGasLimit(
-            method,
-            [
-              absoluteCollateralChangeValue,
-              isCollateralIncrease,
-              absoluteDebtChangeValue,
-              isDebtIncrease,
-              maxFeePercentageValue,
-              rPermitSignature,
-            ],
-            gasLimitMultiplier,
-            frontendTag,
-            this.user,
-          ),
+        action: sendTransaction,
+        gasEstimate,
       };
     } else {
       throw new Error(
@@ -771,31 +770,35 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(underlyingCollateralPrice);
       }
 
+      const method =
+        collateralToken === 'wstETH'
+          ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
+          : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH; // used to stETH
+      const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
+        method,
+        [
+          debtChange.abs().toBigInt(),
+          isDebtIncrease,
+          principalCollateralChange.abs().toBigInt(),
+          isPrincipalCollateralIncrease,
+          oneInchDataAmmData,
+          isDebtIncrease ? minReturn.toBigInt() : collateralToSwap.toBigInt(),
+          maxFeePercentage.toBigInt(),
+        ],
+        gasLimitMultiplier,
+        frontendTag,
+        this.user,
+      );
+
       yield {
         type: {
           name: 'leverage',
         },
         stepNumber: stepCounter++,
         numberOfSteps,
-        // TODO: implement the actual leverage function
-        action: () =>
-          sendTransactionWithGasLimit(
-            collateralToken === 'wstETH'
-              ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
-              : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH, // used to stETH
-            [
-              debtChange.abs().toBigInt(),
-              isDebtIncrease,
-              principalCollateralChange.abs().toBigInt(),
-              isPrincipalCollateralIncrease,
-              oneInchDataAmmData,
-              isDebtIncrease ? minReturn.toBigInt() : collateralToSwap.toBigInt(),
-              maxFeePercentage.toBigInt(),
-            ],
-            gasLimitMultiplier,
-            frontendTag,
-            this.user,
-          ),
+        // TODO: implement the actual leverage function and gas estimate
+        action: sendTransaction,
+        gasEstimate,
       };
     } else if (isWrappableCappedCollateralToken(collateralToken)) {
       // TODO - Add support for rETH (wrapped capped tokens)
@@ -831,6 +834,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
           );
           return {} as TransactionResponse;
         },
+        gasEstimate: Decimal.ZERO,
       };
     } else {
       throw new Error(
@@ -1062,18 +1066,24 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     return this.userAddress;
   }
 
-  private *getWhitelistStep(
+  private async *getWhitelistStep(
     delegatorAddress: string,
     getStepNumber: () => number,
     numberOfSteps: number,
-  ): Generator<WhitelistStep, void, unknown> {
+  ): AsyncGenerator<WhitelistStep, void, unknown> {
+    const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
+      this.positionManager.whitelistDelegate,
+      [delegatorAddress, true],
+    );
+
     yield {
       type: {
         name: 'whitelist',
       },
       stepNumber: getStepNumber(),
       numberOfSteps,
-      action: () => this.positionManager.whitelistDelegate(delegatorAddress, true),
+      action: sendTransaction,
+      gasEstimate,
     };
   }
 
@@ -1103,6 +1113,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         stepNumber: getStepNumber(),
         numberOfSteps,
         action: () => createPermitSignature(this.user, approveAmount, spenderAddress, tokenContract),
+        gasEstimate: Decimal.ZERO,
       });
 
     if (!signature) {
@@ -1112,14 +1123,19 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     return signature;
   }
 
-  private *getApproveTokenStep(
+  private async *getApproveTokenStep(
     token: Token,
     tokenContract: ERC20 | ERC20Permit,
     approveAmount: Decimal,
     spenderAddress: string,
     getStepNumber: () => number,
     numberOfSteps: number,
-  ): Generator<ApproveStep, void, unknown> {
+  ): AsyncGenerator<ApproveStep, void, unknown> {
+    const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(tokenContract.approve, [
+      spenderAddress,
+      approveAmount.toBigInt(Decimal.PRECISION),
+    ]);
+
     yield {
       type: {
         name: 'approve' as const,
@@ -1127,11 +1143,12 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       },
       stepNumber: getStepNumber(),
       numberOfSteps,
-      action: () => tokenContract.approve(spenderAddress, approveAmount.toBigInt(Decimal.PRECISION)),
+      action: sendTransaction,
+      gasEstimate,
     };
   }
 
-  private *getApproveOrPermitStep(
+  private async *getApproveOrPermitStep(
     token: Token,
     tokenContract: ERC20 | ERC20Permit,
     approveAmount: Decimal,
@@ -1140,7 +1157,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     numberOfSteps: number,
     canUsePermit: boolean,
     cachedPermitSignature?: ERC20PermitSignatureStruct,
-  ): Generator<PermitStep | ApproveStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
+  ): AsyncGenerator<PermitStep | ApproveStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
     let permitSignature = createEmptyPermitSignature();
 
     if (canUsePermit) {

@@ -18,7 +18,7 @@ import {
   getWrappedCappedCollateralToken,
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
-  sendTransactionWithGasLimit,
+  buildTransactionWithGasLimit,
 } from './utils';
 import { FLASH_MINT_FEE } from './constants';
 
@@ -104,16 +104,17 @@ export class Protocol {
       const positionManager = getPositionManagerContract('wrapped', positionManagerAddress, redeemer);
       const rPermitSignature = await createPermitSignature(redeemer, debtAmount, positionManagerAddress, this.rToken);
 
-      return sendTransactionWithGasLimit(
+      const { sendTransaction } = await buildTransactionWithGasLimit(
         positionManager.redeemCollateral,
         [debtAmount.toBigInt(Decimal.PRECISION), maxFeePercentage.toBigInt(Decimal.PRECISION), rPermitSignature],
         gasLimitMultiplier,
       );
+      return sendTransaction();
     }
 
     const positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, redeemer);
 
-    return sendTransactionWithGasLimit(
+    const { sendTransaction } = await buildTransactionWithGasLimit(
       positionManager.redeemCollateral,
       [
         RaftConfig.getTokenAddress(collateralToken),
@@ -122,6 +123,7 @@ export class Protocol {
       ],
       gasLimitMultiplier,
     );
+    return sendTransaction();
   }
 
   /**
