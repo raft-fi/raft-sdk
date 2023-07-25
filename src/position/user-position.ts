@@ -602,6 +602,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       }
 
       const collateralDecimals = RaftConfig.networkConfig.tokens[collateralToken].decimals;
+      const method =
+        collateralToken === 'wstETH'
+          ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
+          : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH; // used to stETH
 
       yield {
         type: {
@@ -612,9 +616,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         // TODO: implement the actual leverage function
         action: () =>
           sendTransactionWithGasLimit(
-            collateralToken === 'wstETH'
-              ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
-              : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH, // used to stETH
+            method,
             [
               debtChange.abs().toBigInt(RAFT_DEBT_TOKEN_PRECISION),
               isDebtIncrease,

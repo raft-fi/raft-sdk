@@ -58,6 +58,7 @@ describe('UserPosition', () => {
       (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
         sendTransaction: jest.fn(),
         gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
       });
 
       const firstStep = await steps.next();
@@ -83,6 +84,11 @@ describe('UserPosition', () => {
       (getPositionManagerContract as jest.Mock).mockResolvedValue({
         managePosition: null,
       });
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
+      });
 
       const firstStep = await steps.next();
 
@@ -103,6 +109,11 @@ describe('UserPosition', () => {
       (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
       (getPositionManagerContract as jest.Mock).mockResolvedValue({
         managePosition: null,
+      });
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
       });
 
       const numberOfSteps = 2;
@@ -152,6 +163,7 @@ describe('UserPosition', () => {
       (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
         sendTransaction: jest.fn(),
         gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
       });
 
       const numberOfSteps = 2;
@@ -189,6 +201,11 @@ describe('UserPosition', () => {
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
       (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
+      });
 
       const numberOfSteps = 2;
 
@@ -229,6 +246,11 @@ describe('UserPosition', () => {
       (getPositionManagerContract as jest.Mock).mockResolvedValue({
         managePosition: null,
       });
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
+      });
 
       const numberOfSteps = 1;
 
@@ -254,6 +276,11 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
+      });
 
       const numberOfSteps = 1;
 
@@ -452,6 +479,7 @@ describe('UserPosition', () => {
       const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'WETH' });
 
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
       (getPositionManagerContract as jest.Mock).mockReturnValue({
         managePosition: null,
         whitelistDelegate: null,
@@ -459,6 +487,7 @@ describe('UserPosition', () => {
       (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
         sendTransaction: jest.fn(),
         gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
       });
 
       const numberOfSteps = 3;
@@ -573,6 +602,11 @@ describe('UserPosition', () => {
       (getPositionManagerContract as jest.Mock).mockResolvedValue({
         managePosition: null,
       });
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
+      });
 
       const firstStep = await steps.next();
 
@@ -596,6 +630,11 @@ describe('UserPosition', () => {
       (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
       (getPositionManagerContract as jest.Mock).mockResolvedValue({
         managePosition: null,
+      });
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
       });
 
       const numberOfSteps = 1;
@@ -633,6 +672,7 @@ describe('UserPosition', () => {
       (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
         sendTransaction: jest.fn(),
         gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
       });
 
       const numberOfSteps = 2;
@@ -698,6 +738,7 @@ describe('UserPosition', () => {
       (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
         sendTransaction: jest.fn(),
         gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
       });
 
       await steps.next();

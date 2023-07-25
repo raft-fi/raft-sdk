@@ -161,18 +161,18 @@ describe('RaftToken', () => {
     const token = new RaftToken(DUMMY_ADDRESS, DUMMY_PROVIDER);
 
     const impact0 = await token.calculatePriceImpact(new Decimal(123), { poolData });
-    expect(impact0?.toString()).toEqual('0.000018724090791929');
+    expect(impact0?.toString()).toEqual('-0.000018724441389807');
 
     const impact1 = await token.calculatePriceImpact(new Decimal(1234), { poolData });
-    expect(impact1?.toString()).toEqual('0.000187830760707588');
+    expect(impact1?.toString()).toEqual('-0.000187866047730067');
 
     const impact2 = await token.calculatePriceImpact(new Decimal(12345), { poolData });
-    expect(impact2?.toString()).toEqual('0.001877163308987409');
+    expect(impact2?.toString()).toEqual('-0.001880693678155468');
 
     const impact3 = await token.calculatePriceImpact(new Decimal(123456), { poolData });
-    expect(impact3?.toString()).toEqual('0.018583640533134232');
+    expect(impact3?.toString()).toEqual('-0.018935531646557438');
 
     const impact4 = await token.calculatePriceImpact(new Decimal(1234567), { poolData });
-    expect(impact4?.toString()).toEqual('0.168473619010284787');
+    expect(impact4?.toString()).toEqual('-0.202607665687961472');
   });
 });

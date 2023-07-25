@@ -28,13 +28,4 @@ describe('Allowance', () => {
     const result = await allowance.fetchAllowance();
     expect(result).toEqual(expectedAllowance);
   });
-
-  it('should return infinite allowance for ETH', async () => {
-    (getTokenContract as jest.Mock).mockReturnValue(null);
-
-    const allowance = new Allowance('ETH', '0x123', '0x456', mockProvider);
-    const result = await allowance.fetchAllowance();
-
-    expect(result).toEqual(Decimal.MAX_DECIMAL);
-  });
 });

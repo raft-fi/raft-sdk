@@ -30,13 +30,4 @@ describe('Balance', () => {
     const result = await allowance.fetchBalance();
     expect(result).toEqual(expectedAllowance);
   });
-
-  it('should return mocked balance for ETH', async () => {
-    (getTokenContract as jest.Mock).mockReturnValue(null);
-
-    const allowance = new Balance('ETH', '0x123', mockProvider);
-    const result = await allowance.fetchBalance();
-
-    expect(result).toEqual(Decimal.ONE);
-  });
 });

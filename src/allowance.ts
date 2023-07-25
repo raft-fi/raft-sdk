@@ -6,7 +6,7 @@ import { getTokenContract } from './utils';
 import { RaftConfig } from './config';
 
 /**
- * Fetches and returns token allowance. In case of `null` token contract, returns infinity (`Decimal.MAX_DECIMAL`).
+ * Fetches and returns token allowance.
  * @param tokenContract Token contract to check allowance for.
  * @param owner Wallet to check allowance for.
  * @param spender Address to which allowance belongs.
@@ -14,14 +14,12 @@ import { RaftConfig } from './config';
  */
 export async function getTokenAllowance(
   token: Token,
-  tokenContract: ERC20 | ERC20Permit | null,
+  tokenContract: ERC20 | ERC20Permit,
   owner: AddressLike,
   spender: AddressLike,
 ): Promise<Decimal> {
   const tokenConfig = RaftConfig.networkConfig.tokens[token];
-  return tokenContract !== null
-    ? new Decimal(await tokenContract.allowance(owner, spender), tokenConfig.decimals)
-    : Decimal.MAX_DECIMAL;
+  return new Decimal(await tokenContract.allowance(owner, spender), tokenConfig.decimals);
 }
 
 export class Allowance {
@@ -31,7 +29,7 @@ export class Allowance {
   private owner: AddressLike;
   private spender: AddressLike;
   private provider: Provider;
-  private tokenContract: ERC20Permit | ERC20 | null;
+  private tokenContract: ERC20Permit | ERC20;
 
   /**
    * Creates a new representation of an allowance.
