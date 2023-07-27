@@ -31,7 +31,7 @@ const ORACLE_DEVIATION: Record<UnderlyingCollateralToken, Decimal> = {
   wstETH: new Decimal(0.01), // 1%
   wcrETH: new Decimal(0.015), // 1.5%
 };
-const SECONDS_IN_MINUTE = 60;
+const SECONDS_IN_MINUTE = 60n;
 const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)
 
 export class Protocol {
@@ -263,22 +263,19 @@ export class Protocol {
     const redeemedFraction = collateralAmount.mul(collateralPrice).div(totalDebtSupply);
 
     const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
-    const [collateralInfo, lastBlock] = await Promise.all([
+    const [collateralInfo, latestBlock] = await Promise.all([
       this.positionManager.collateralInfo(collateralTokenAddress),
       this.provider.getBlock('latest'),
     ]);
-    if (!lastBlock) {
+    if (!latestBlock) {
       throw new Error('Failed to fetch latest block');
     }
 
-    const lastFeeOperationTime = new Decimal(collateralInfo.lastFeeOperationTime, 0);
     const baseRate = new Decimal(collateralInfo.baseRate, Decimal.PRECISION);
     const redemptionSpreadDecimal = new Decimal(collateralInfo.redemptionSpread, Decimal.PRECISION);
-    const latestBlockTimestampDecimal = new Decimal(lastBlock.timestamp);
-    const minutesPassed = latestBlockTimestampDecimal.sub(lastFeeOperationTime).div(SECONDS_IN_MINUTE);
+    const minutesPassed = (BigInt(latestBlock.timestamp) - collateralInfo.lastFeeOperationTime) / SECONDS_IN_MINUTE;
 
-    // Using floor here because fractional number cannot be converted to BigInt
-    const decayFactor = MINUTE_DECAY_FACTOR.pow(Math.floor(Number(minutesPassed.toString())));
+    const decayFactor = MINUTE_DECAY_FACTOR.pow(Number(minutesPassed));
     const decayedBaseRate = baseRate.mul(decayFactor);
 
     const newBaseRate = Decimal.min(decayedBaseRate.add(redeemedFraction.div(BETA)), Decimal.ONE);
