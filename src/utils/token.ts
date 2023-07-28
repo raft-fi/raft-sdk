@@ -3,6 +3,8 @@ import { RaftConfig } from '../config';
 import {
   ERC20,
   ERC20Permit,
+  ERC20PermitRToken,
+  ERC20PermitRToken__factory,
   ERC20Permit__factory,
   ERC20__factory,
   InterestRateDebtToken__factory,
@@ -41,7 +43,7 @@ type TokenContractTypes = {
   WBTC: ERC20;
   cbETH: ERC20;
   swETH: ERC20;
-  R: ERC20Permit;
+  R: ERC20PermitRToken;
 };
 
 export function isInterestRateVault(
@@ -78,11 +80,15 @@ export function getWrappedCappedCollateralToken<T extends WrappableCappedCollate
   return `wc${underlyingToken}`;
 }
 
-export function getTokenContract<T extends Token>(collateralToken: T, runner: ContractRunner): TokenContractTypes[T] {
-  const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
-  const tokenAddress = RaftConfig.getTokenAddress(collateralToken);
+export function getTokenContract<T extends Token>(token: T, runner: ContractRunner): TokenContractTypes[T] {
+  const tokenConfig = RaftConfig.networkConfig.tokens[token];
+  const tokenAddress = RaftConfig.getTokenAddress(token);
 
-  if (isWrappedCappedUnderlyingCollateralToken(collateralToken)) {
+  if (isRToken(token)) {
+    return ERC20PermitRToken__factory.connect(tokenAddress, runner) as TokenContractTypes[T];
+  }
+
+  if (isWrappedCappedUnderlyingCollateralToken(token)) {
     return WrappedCollateralToken__factory.connect(tokenAddress, runner) as TokenContractTypes[T];
   }
 

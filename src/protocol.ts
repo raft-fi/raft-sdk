@@ -7,7 +7,7 @@ import {
   ChaiToken__factory,
   ChainlinkDaiUsdAggregator__factory,
   ERC20Indexable__factory,
-  ERC20Permit,
+  ERC20PermitRToken,
   PositionManager,
   WrappedCollateralToken,
 } from './typechain';
@@ -34,7 +34,6 @@ import {
   CHAI_PRECISION,
   CHAI_RATE_PRECISION,
   CHAI_TOKEN_ADDRESS,
-  FLASH_MINT_FEE,
   INDEX_INCREASE_PRECISION,
   R_CHAI_PSM_ADDRESS,
   SECONDS_PER_YEAR,
@@ -48,13 +47,14 @@ interface PsmTvlData {
   usdValue: Decimal;
   daiLocked: Decimal;
 }
+const FLASH_MINT_FEE_PERCENTAGE_BASE = 10_000;
 
 export class Protocol {
   private static instance: Protocol;
 
   private provider: Provider;
   private positionManager: PositionManager;
-  private rToken: ERC20Permit;
+  private rToken: ERC20PermitRToken;
 
   private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
     'wstETH-v1': null,
@@ -95,8 +95,8 @@ export class Protocol {
     swETH: null,
   };
   private _openPositionCount: number | null = null;
-  private _flashMintFee: Decimal = FLASH_MINT_FEE;
   private _psmTvl: PsmTvlData | null = null;
+  private _flashMintFee: Decimal | null = null;
 
   /**
    * Creates a new representation of a stats class. Stats is a singleton, so constructor is set to private.
@@ -338,11 +338,11 @@ export class Protocol {
   }
 
   /**
-   * Fetches flash mint fee for token R.
+   * Fetches flash mint fee for the R token.
    * @returns Fetched flash mint fee.
    */
-  async fetchFlashMintFee(): Promise<Decimal> {
-    // TODO: we should fetch this value from R token contract
+  public async fetchFlashMintFee(): Promise<Decimal> {
+    this._flashMintFee = new Decimal(await this.rToken.flashMintFeePercentage(), 0).div(FLASH_MINT_FEE_PERCENTAGE_BASE);
     return this._flashMintFee;
   }
 
