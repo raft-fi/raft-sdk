@@ -55,7 +55,7 @@
   "dependencies": {
     "@balancer-labs/sor": "^4.1.1-beta.13",
     "@ethersproject/bignumber": "^5.7.0",
-    "@tempusfinance/decimal": "^0.0.12",
+    "@tempusfinance/decimal": "^0.1.0",
     "axios": "^1.4.0",
     "ethers": "^6.3.0",
     "graphql": "^16.6.0",
