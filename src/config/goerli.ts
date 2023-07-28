@@ -1,5 +1,5 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { NetworkConfig, RaftTokenConfig, TokenConfig, UnderlyingTokens } from './types';
+import { NetworkConfig, TokenConfig, UnderlyingTokens } from './types';
 import { getWstEthToStEthRate } from '../price';
 import { Token } from '../types';
 
@@ -200,12 +200,8 @@ export const goerliConfig: NetworkConfig = {
   daiAddress: '', // Add address if we ever deploy one step leverage on goerli
   testNetwork: true,
   rSavingsModule: '0xDeEae93bf4bdA40529Fe5769Dd817996e86eb4Dd',
-};
-
-export const goerliRaftTokenConfig: RaftTokenConfig = {
   // TODO: update this to veRAFT
   veRaftAddress: '0x33A99Dcc4C85C014cf12626959111D5898bbCAbF',
   // TODO: update this to RAFT/R pool
-  balancerPoolAddress: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00',
-  balancerPoolId: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00000200000000000000000060',
+  balancerWeightedPoolId: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00000200000000000000000060',
 };

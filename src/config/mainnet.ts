@@ -1,7 +1,7 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { NetworkConfig, RaftTokenConfig, TokenConfig, UnderlyingTokens } from './types';
-import { Token } from '../types';
+import { NetworkConfig, TokenConfig, UnderlyingTokens } from './types';
 import { getWstEthToStEthRate } from '../price';
+import { Token } from '../types';
 
 const POSITION_MANAGER_ADDRESS = '0x5f59b322eb3e16a0c78846195af1f588b77403fc';
 const POSITION_MANAGER_STETH_ADDRESS = '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6';
@@ -201,12 +201,8 @@ export const mainnetConfig: NetworkConfig = {
   daiAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   testNetwork: false,
   rSavingsModule: '0x2ba26bae6df1153e29813d7f926143f9c94402f3',
-};
-
-export const mainnetRaftTokenConfig: RaftTokenConfig = {
   // TODO: update this to veRAFT
   veRaftAddress: '0xC128a9954e6c874eA3d62ce62B468bA073093F25',
   // TODO: update this to RAFT/R pool
-  balancerPoolAddress: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56',
-  balancerPoolId: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014',
+  balancerWeightedPoolId: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014',
 };
