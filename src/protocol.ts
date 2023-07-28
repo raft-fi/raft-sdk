@@ -2,7 +2,7 @@ import { request, gql } from 'graphql-request';
 import { Provider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
-import { ERC20Indexable__factory, ERC20Permit, PositionManager, WrappedCollateralToken } from './typechain';
+import { ERC20Indexable__factory, ERC20PermitRToken, PositionManager, WrappedCollateralToken } from './typechain';
 import {
   CollateralToken,
   R_TOKEN,
@@ -20,12 +20,12 @@ import {
   isWrappedCappedUnderlyingCollateralToken,
   buildTransactionWithGasLimit,
 } from './utils';
-import { FLASH_MINT_FEE } from './constants';
 
 interface OpenPositionsResponse {
   count: string;
 }
 
+const FLASH_MINT_FEE_PERCENTAGE_BASE = 10_000;
 const BETA = new Decimal(2);
 const ORACLE_DEVIATION: Record<UnderlyingCollateralToken, Decimal> = {
   wstETH: new Decimal(0.01), // 1%
@@ -39,7 +39,7 @@ export class Protocol {
 
   private provider: Provider;
   private positionManager: PositionManager;
-  private rToken: ERC20Permit;
+  private rToken: ERC20PermitRToken;
 
   private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
     wstETH: null,
@@ -55,7 +55,7 @@ export class Protocol {
   };
   private _redemptionRate: Decimal | null = null;
   private _openPositionCount: number | null = null;
-  private _flashMintFee: Decimal = FLASH_MINT_FEE;
+  private _flashMintFee: Decimal | null = null;
 
   /**
    * Creates a new representation of a stats class. Stats is a singleton, so constructor is set to private.
@@ -307,11 +307,11 @@ export class Protocol {
   }
 
   /**
-   * Fetches flash mint fee for token R.
+   * Fetches flash mint fee for the R token.
    * @returns Fetched flash mint fee.
    */
-  async fetchFlashMintFee(): Promise<Decimal> {
-    // TODO: we should fetch this value from R token contract
+  public async fetchFlashMintFee(): Promise<Decimal> {
+    this._flashMintFee = new Decimal(await this.rToken.flashMintFeePercentage(), 0).div(FLASH_MINT_FEE_PERCENTAGE_BASE);
     return this._flashMintFee;
   }
 
