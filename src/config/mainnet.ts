@@ -1,6 +1,6 @@
 import { ZeroAddress } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { NetworkConfig, RaftTokenConfig, TokenConfig, UnderlyingTokens } from './types';
+import { NetworkConfig, TokenConfig, UnderlyingTokens } from './types';
 import { getWstEthToStEthRate } from '../price';
 import { Token } from '../types';
 
@@ -114,12 +114,8 @@ export const mainnetConfig: NetworkConfig = {
   tokens: tokensConfig,
   daiAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   testNetwork: false,
-};
-
-export const mainnetRaftTokenConfig: RaftTokenConfig = {
   // TODO: update this to veRAFT
   veRaftAddress: '0xC128a9954e6c874eA3d62ce62B468bA073093F25',
   // TODO: update this to RAFT/R pool
-  balancerPoolAddress: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56',
-  balancerPoolId: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014',
+  balancerWeightedPoolId: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014',
 };

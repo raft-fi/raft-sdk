@@ -125,7 +125,7 @@ describe('RaftToken', () => {
     ];
 
     for (const { stakeAmount, period, veRaftTotalSupply, annualGiveAway, expected } of tests) {
-      const result = await token.estimateStakeApr(stakeAmount, period, { veRaftTotalSupply, annualGiveAway });
+      const result = await token.estimateStakingApr(stakeAmount, period, { veRaftTotalSupply, annualGiveAway });
       expect(result.toString().substring(0, 6)).toBe(expected.toString().substring(0, 6));
     }
   });

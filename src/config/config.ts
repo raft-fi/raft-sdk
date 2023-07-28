@@ -1,16 +1,11 @@
 import { TOKENS, Token, UnderlyingCollateralToken } from '../types';
-import { goerliConfig, goerliRaftTokenConfig } from './goerli';
-import { mainnetConfig, mainnetRaftTokenConfig } from './mainnet';
-import { NetworkConfig, RaftTokenConfig, SupportedCollateralTokens, SupportedNetwork } from './types';
+import { goerliConfig } from './goerli';
+import { mainnetConfig } from './mainnet';
+import { NetworkConfig, SupportedCollateralTokens, SupportedNetwork } from './types';
 
 const networkConfig: Record<SupportedNetwork, NetworkConfig> = {
   mainnet: mainnetConfig,
   goerli: goerliConfig,
-};
-
-const raftTokenConfig: Record<SupportedNetwork, RaftTokenConfig> = {
-  mainnet: mainnetRaftTokenConfig,
-  goerli: goerliRaftTokenConfig,
 };
 
 const networkIds: Record<SupportedNetwork, number> = {
@@ -41,10 +36,6 @@ export class RaftConfig {
 
   static get networkConfig(): NetworkConfig {
     return networkConfig[this._network];
-  }
-
-  static get raftTokenConfig(): RaftTokenConfig {
-    return raftTokenConfig[this._network];
   }
 
   static get isTestNetwork(): boolean {

@@ -45,12 +45,8 @@ export interface NetworkConfig {
   tokens: Record<Token, TokenConfig>;
   testNetwork: boolean;
   daiAddress: string;
-}
-
-export interface RaftTokenConfig {
   // https://docs.balancer.fi/concepts/governance/veBAL/
   veRaftAddress: string;
-  // 80/20 balancer weighted pool
-  balancerPoolAddress: string;
-  balancerPoolId: string;
+  // 80/20 balancer weighted pool for RAFT/R
+  balancerWeightedPoolId: string;
 }

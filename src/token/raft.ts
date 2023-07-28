@@ -59,7 +59,7 @@ export class RaftToken {
    * @returns Total supply of veRAFT.
    */
   public async fetchVeRaftTotalSupply(): Promise<Decimal> {
-    const veRAFTAddress = RaftConfig.raftTokenConfig.veRaftAddress;
+    const veRAFTAddress = RaftConfig.networkConfig.veRaftAddress;
     const contract = ERC20__factory.connect(veRAFTAddress, this.provider);
     const totalSupply = await contract.totalSupply();
     return new Decimal(totalSupply, Decimal.PRECISION);
@@ -74,14 +74,14 @@ export class RaftToken {
   }
 
   /**
-   * Returns the estimated staked APR for the input.
-   * @param stakeAmount The staked amount of RAFT.
+   * Returns the estimated staking APR for the input.
+   * @param stakeAmount The stake amount of RAFT.
    * @param period The period, in year.
    * @param options.veRaftTotalSupply The total supply of veRAFT. If not provided, will query.
    * @param options.annualGiveAway The annual give away of RAFT. If not provided, will query.
-   * @returns The estimated staked APR.
+   * @returns The estimated staking APR.
    */
-  public async estimateStakeApr(
+  public async estimateStakingApr(
     stakeAmount: Decimal,
     period: number,
     options: EstimateAprOption = {},
@@ -127,7 +127,7 @@ export class RaftToken {
       }
     `;
 
-    const poolId = RaftConfig.raftTokenConfig.balancerPoolId;
+    const poolId = RaftConfig.networkConfig.balancerWeightedPoolId;
     const response = await request<PoolDataQuery>(RaftConfig.balancerSubgraphEndpoint, query, {
       poolId,
     });
@@ -137,7 +137,7 @@ export class RaftToken {
 
   /**
    * Returns the estimated price impact for the RAFT staking.
-   * @param stakeAmount The staked amount of RAFT.
+   * @param stakeAmount The stake amount of RAFT.
    * @param options.poolData The balancer pool data. If not provided, will query.
    * @returns The estimated price impact for the RAFT staking.
    */
