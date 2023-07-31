@@ -43,10 +43,7 @@ export class PriceFeed {
         if (collateralTokenConfig.underlyingCollateralRate instanceof Decimal) {
           underlyingToCollateralRate = collateralTokenConfig.underlyingCollateralRate;
         } else if (typeof collateralTokenConfig.underlyingCollateralRate === 'function') {
-          underlyingToCollateralRate = await collateralTokenConfig.underlyingCollateralRate(
-            RaftConfig.getTokenAddress(collateralTokenConfig.underlyingTokenTicker),
-            this.provider,
-          );
+          underlyingToCollateralRate = await collateralTokenConfig.underlyingCollateralRate(this.provider);
         }
 
         if (!underlyingToCollateralRate) {
@@ -82,10 +79,7 @@ export class PriceFeed {
       return Promise.resolve(collateralTokenConfig.underlyingCollateralRate);
     }
 
-    return collateralTokenConfig.underlyingCollateralRate(
-      RaftConfig.getTokenAddress(collateralTokenConfig.underlyingTokenTicker),
-      this.provider,
-    );
+    return collateralTokenConfig.underlyingCollateralRate(this.provider);
   }
 
   private async fetchPriceFromPriceFeed(token: UnderlyingCollateralToken): Promise<Decimal> {
