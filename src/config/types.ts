@@ -21,7 +21,7 @@ export type UnderlyingTokens = {
 export type CollateralTokenConfig = {
   positionManager: string;
   underlyingTokenTicker: UnderlyingCollateralToken;
-  underlyingCollateralRate: Decimal | ((address: string, provider: Provider) => Promise<Decimal>);
+  underlyingCollateralRate: Decimal | ((provider: Provider) => Promise<Decimal>);
 };
 
 export type TokenConfig = {

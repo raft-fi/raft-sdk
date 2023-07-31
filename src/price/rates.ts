@@ -1,9 +1,9 @@
 import { Provider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { WstETH__factory } from '../typechain';
+import { getTokenContract } from '../utils';
 
-export async function getWstEthToStEthRate(wstETHAddress: string, provider: Provider): Promise<Decimal> {
-  const contract = WstETH__factory.connect(wstETHAddress, provider);
+export async function getWstEthToStEthRate(provider: Provider): Promise<Decimal> {
+  const contract = getTokenContract('wstETH', provider);
   const wstEthPerStEth = await contract.stEthPerToken();
 
   return new Decimal(wstEthPerStEth, Decimal.PRECISION);
