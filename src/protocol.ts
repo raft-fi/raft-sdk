@@ -25,19 +25,16 @@ import {
   buildTransactionWithGasLimit,
 } from './utils';
 import { ERC20PermitSignatureStruct } from './typechain/PositionManager';
-import { getPermitOrApproveTokenStep } from './position';
+import { BaseStep, getPermitOrApproveTokenStep } from './position';
 
 interface RedeemCollateralStepType {
   name: 'permit' | 'approve' | 'redeem';
   token?: RToken;
 }
 
-interface RedeemCollateralStep {
+interface RedeemCollateralStep extends BaseStep {
   type: RedeemCollateralStepType;
-  stepNumber: number;
-  numberOfSteps: number;
   action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
-  gasEstimate: Decimal;
 }
 
 interface OpenPositionsResponse {

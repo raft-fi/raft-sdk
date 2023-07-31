@@ -1,6 +1,6 @@
 export { Position, PositionWithRunner, type PositionTransaction, type PositionTransactionType } from './base';
 export { PositionWithAddress } from './position-address';
-export { getPermitOrApproveTokenStep } from './steps';
+export { getPermitOrApproveTokenStep, type BaseStep } from './steps';
 export {
   UserPosition,
   type ManagePositionCallbacks,
