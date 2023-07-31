@@ -36,7 +36,7 @@ export class PriceFeed {
       return await this.fetchSubgraphPrice(ticker);
     } catch (e) {
       const fallbackPrice = await this.getPrice(fallbackToken);
-      const rate = await getFallbackRate(RaftConfig.getTokenAddress(fallbackToken), this.provider);
+      const rate = await getFallbackRate(this.provider);
       return fallbackPrice.mul(rate);
     }
   }
@@ -49,7 +49,7 @@ export class PriceFeed {
    * @returns Conversion rate from underlying collateral token to collateral token.
    */
   public async getUnderlyingCollateralRate<U extends UnderlyingCollateralToken>(
-    underlyingCollateral: U,
+    _underlyingCollateral: U,
     collateralToken: SupportedCollateralTokens[U],
   ): Promise<Decimal> {
     const { priceFeed } = RaftConfig.networkConfig.tokens[collateralToken];
@@ -58,7 +58,7 @@ export class PriceFeed {
       return Decimal.ONE;
     }
 
-    return priceFeed.getFallbackRate(RaftConfig.getTokenAddress(underlyingCollateral), this.provider);
+    return priceFeed.getFallbackRate(this.provider);
   }
 
   private async fetchPriceFromPriceFeed(token: UnderlyingCollateralToken): Promise<Decimal> {

@@ -2,7 +2,6 @@ import { ContractRunner } from 'ethers';
 import { RaftConfig } from '../config';
 import {
   ERC20,
-  ERC20Permit,
   ERC20PermitRToken,
   ERC20PermitRToken__factory,
   ERC20Permit__factory,
@@ -10,6 +9,8 @@ import {
   InterestRateDebtToken__factory,
   WrappedCollateralToken,
   WrappedCollateralToken__factory,
+  WstETH,
+  WstETH__factory,
 } from '../typechain';
 import {
   COLLATERAL_TOKENS,
@@ -34,8 +35,8 @@ const COLLATERAL_TOKEN_SET = new Set<string>(COLLATERAL_TOKENS);
 
 type TokenContractTypes = {
   stETH: ERC20;
-  wstETH: ERC20Permit;
-  'wstETH-v1': ERC20Permit;
+  wstETH: WstETH;
+  'wstETH-v1': WstETH;
   rETH: ERC20;
   'rETH-v1': ERC20;
   WETH: ERC20;
@@ -86,6 +87,10 @@ export function getTokenContract<T extends Token>(token: T, runner: ContractRunn
 
   if (isRToken(token)) {
     return ERC20PermitRToken__factory.connect(tokenAddress, runner) as TokenContractTypes[T];
+  }
+
+  if (token === 'wstETH' || token === 'wstETH-v1') {
+    return WstETH__factory.connect(tokenAddress, runner) as TokenContractTypes[T];
   }
 
   if (isWrappedCappedUnderlyingCollateralToken(token)) {

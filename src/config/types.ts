@@ -39,7 +39,7 @@ export type CollateralTokenConfig = {
 export interface SubgraphPriceFeed {
   ticker: SubgraphPriceFeedToken;
   fallbackToken: UnderlyingCollateralToken;
-  getFallbackRate: (address: string, runner: ContractRunner) => Promise<Decimal>;
+  getFallbackRate: (runner: ContractRunner) => Promise<Decimal>;
 }
 
 export type TokenConfig = {
