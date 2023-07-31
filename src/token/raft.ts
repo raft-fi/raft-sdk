@@ -4,13 +4,13 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Provider } from 'ethers';
 import request, { gql } from 'graphql-request';
 import { RaftConfig } from '../config';
-import { ERC20__factory } from '../typechain';
+import { VotingEscrow, VotingEscrow__factory } from '../typechain';
 
 // annual give away = 10% of 1B evenly over 3 years
 const ANNUAL_GIVE_AWAY = new Decimal(1000000000).mul(0.1).div(3);
 
 type EstimateAprOption = {
-  veRaftTotalSupply?: Decimal;
+  veRaftAvgTotalSupply?: Decimal;
   annualGiveAway?: Decimal;
 };
 
@@ -22,13 +22,22 @@ type PoolDataQuery = {
   pool: SubgraphPoolBase | null;
 };
 
+type VeRaftBalancePoint = {
+  bias: bigint;
+  slope: bigint;
+  ts: bigint;
+  blk: bigint;
+};
+
 export class RaftToken {
   private provider: Provider;
   private walletAddress: string;
+  private veContract: VotingEscrow;
 
   public constructor(walletAddress: string, provider: Provider) {
     this.walletAddress = walletAddress;
     this.provider = provider;
+    this.veContract = VotingEscrow__factory.connect(RaftConfig.networkConfig.veRaftAddress, provider);
   }
 
   public async isEligibleToClaim(): Promise<boolean> {
@@ -54,14 +63,23 @@ export class RaftToken {
     return new Decimal(123456);
   }
 
+  private getVeRaftBalance(point: VeRaftBalancePoint, supplyAtTimestamp: number): bigint {
+    return point.bias + point.slope * (BigInt(supplyAtTimestamp) - point.ts);
+  }
+
   /**
-   * Returns the total supply of veRAFT.
+   * Returns the avg total supply of veRAFT.
+   * @param period The period, in year.
    * @returns Total supply of veRAFT.
    */
-  public async fetchVeRaftTotalSupply(): Promise<Decimal> {
-    const veRAFTAddress = RaftConfig.networkConfig.veRaftAddress;
-    const contract = ERC20__factory.connect(veRAFTAddress, this.provider);
-    const totalSupply = await contract.totalSupply();
+  public async fetchVeRaftAvgTotalSupply(period: number): Promise<Decimal> {
+    const stakePeriodInSecond = period * 365 * 24 * 60 * 60;
+    const currentTimeInSecond = Math.floor(Date.now() / 1000);
+
+    const epoch = await this.veContract.epoch();
+    const lastPoint = (await this.veContract.point_history(epoch)) as VeRaftBalancePoint;
+
+    const totalSupply = this.getVeRaftBalance(lastPoint, currentTimeInSecond + stakePeriodInSecond / 2);
     return new Decimal(totalSupply, Decimal.PRECISION);
   }
 
@@ -77,7 +95,7 @@ export class RaftToken {
    * Returns the estimated staking APR for the input.
    * @param stakeAmount The stake amount of RAFT.
    * @param period The period, in year.
-   * @param options.veRaftTotalSupply The total supply of veRAFT. If not provided, will query.
+   * @param options.veRaftAvgTotalSupply The avg total supply of veRAFT. If not provided, will query.
    * @param options.annualGiveAway The annual give away of RAFT. If not provided, will query.
    * @returns The estimated staking APR.
    */
@@ -86,22 +104,22 @@ export class RaftToken {
     period: number,
     options: EstimateAprOption = {},
   ): Promise<Decimal> {
-    let { veRaftTotalSupply, annualGiveAway } = options;
+    let { veRaftAvgTotalSupply, annualGiveAway } = options;
 
-    if (!veRaftTotalSupply) {
-      veRaftTotalSupply = await this.fetchVeRaftTotalSupply();
+    if (!veRaftAvgTotalSupply) {
+      veRaftAvgTotalSupply = await this.fetchVeRaftAvgTotalSupply(period);
     }
 
     if (!annualGiveAway) {
       annualGiveAway = await this.getAnnualGiveAway();
     }
 
-    // veRAFT = staked RAFT * period
-    const newVeRaft = stakeAmount.mul(period);
-    const newTotalVeRaft = veRaftTotalSupply.add(newVeRaft);
+    // avg veRAFT = staked RAFT * period / 2
+    const newVeRaftAvgAmount = stakeAmount.mul(period).div(2);
+    const newVeRaftAvgTotalAmount = veRaftAvgTotalSupply.add(newVeRaftAvgAmount);
 
-    // estimated APR = new veRAFT / total veRAFT * annual give away / staked RAFT
-    return newVeRaft.div(newTotalVeRaft).mul(annualGiveAway).div(stakeAmount);
+    // estimated APR = new avg veRAFT / total avg veRAFT * annual give away / staked RAFT
+    return newVeRaftAvgAmount.div(newVeRaftAvgTotalAmount).mul(annualGiveAway).div(stakeAmount);
   }
 
   public async getBalancerPoolData(): Promise<SubgraphPoolBase | null> {
