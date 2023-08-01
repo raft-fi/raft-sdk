@@ -201,8 +201,8 @@ export const goerliConfig: NetworkConfig = {
   testNetwork: true,
   rSavingsModule: '0xDeEae93bf4bdA40529Fe5769Dd817996e86eb4Dd',
   // TODO: wait for deployment
-  raftAirdropAddress: '',
-  claimRaftStakeVeRaftAddress: '',
+  raftAirdropAddress: '0x0000000000000000000000000000000000000000',
+  claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
   // this is veBAL
   veRaftAddress: '0x33A99Dcc4C85C014cf12626959111D5898bbCAbF',
   // this is veBAL/WETH pool

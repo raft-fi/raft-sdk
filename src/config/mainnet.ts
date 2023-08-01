@@ -202,8 +202,8 @@ export const mainnetConfig: NetworkConfig = {
   testNetwork: false,
   rSavingsModule: '0x2ba26bae6df1153e29813d7f926143f9c94402f3',
   // TODO: wait for deployment
-  raftAirdropAddress: '',
-  claimRaftStakeVeRaftAddress: '',
+  raftAirdropAddress: '0x0000000000000000000000000000000000000000',
+  claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
   // TODO: update this to veRAFT
   veRaftAddress: '0xC128a9954e6c874eA3d62ce62B468bA073093F25',
   // TODO: update this to RAFT/R pool

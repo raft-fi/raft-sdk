@@ -61,7 +61,7 @@ export class RaftToken {
     this.claimAndStakeContract = new Contract(
       RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      {} as any,
+      [] as any,
       provider,
     );
   }
