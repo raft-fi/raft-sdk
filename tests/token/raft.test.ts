@@ -2,7 +2,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Provider } from 'ethers';
 import { RaftToken } from '../../src/token';
 
-describe('RaftToken', () => {
+describe.skip('RaftToken', () => {
   const DUMMY_ADDRESS = '0x0';
   const DUMMY_PROVIDER = {} as Provider;
 

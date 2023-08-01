@@ -64,6 +64,8 @@ export interface NetworkConfig {
   testNetwork: boolean;
   daiAddress: string;
   rSavingsModule: string;
+  raftAirdropAddress: string;
+  claimRaftStakeVeRaftAddress: string;
   // https://docs.balancer.fi/concepts/governance/veBAL/
   veRaftAddress: string;
   // 80/20 balancer weighted pool for RAFT/R

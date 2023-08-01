@@ -1,10 +1,13 @@
 import { SubgraphPoolBase, WeightedPool } from '@balancer-labs/sor';
 import { BigNumber } from '@ethersproject/bignumber';
 import { Decimal } from '@tempusfinance/decimal';
-import { Provider } from 'ethers';
+import { Contract, Provider, Signer, TransactionResponse } from 'ethers';
+import { StandardMerkleTree } from '@openzeppelin/merkle-tree';
 import request, { gql } from 'graphql-request';
 import { RaftConfig } from '../config';
-import { VotingEscrow, VotingEscrow__factory } from '../typechain';
+import { MerkleDistributor, MerkleDistributor__factory, VotingEscrow, VotingEscrow__factory } from '../typechain';
+import { buildTransactionWithGasLimit } from '../utils';
+import { TransactionWithFeesOptions } from '../types';
 
 // annual give away = 10% of 1B evenly over 3 years
 const ANNUAL_GIVE_AWAY = new Decimal(1000000000).mul(0.1).div(3);
@@ -14,7 +17,7 @@ type EstimateAprOption = {
   annualGiveAway?: Decimal;
 };
 
-type PriceImpactOption = {
+type PoolDataOption = {
   poolData?: SubgraphPoolBase | null;
 };
 
@@ -29,38 +32,81 @@ type VeRaftBalancePoint = {
   blk: bigint;
 };
 
+type WhitelistAddress = string;
+type WhitelistClaimAmount = string;
+type WhitelistItem = [WhitelistAddress, WhitelistClaimAmount];
+
 export class RaftToken {
   private provider: Provider;
   private walletAddress: string;
   private veContract: VotingEscrow;
+  private airdropContract: MerkleDistributor;
+  private claimAndStakeContract: Contract;
+  private merkleTree?: StandardMerkleTree<string[]>;
+  private merkleProof?: string[] | null;
+  private merkleTreeIndex?: number | null;
+  private claimableAmount: Decimal = Decimal.ZERO;
 
   public constructor(walletAddress: string, provider: Provider) {
-    this.walletAddress = walletAddress;
     this.provider = provider;
+    this.walletAddress = walletAddress;
     this.veContract = VotingEscrow__factory.connect(RaftConfig.networkConfig.veRaftAddress, provider);
+
+    // TODO: update ABI for RAFT airdrop contract
+    // https://github.com/raft-fi/raft-staking/blob/master/contracts/dependencies/IMerkleDistributor.sol
+    this.airdropContract = MerkleDistributor__factory.connect(RaftConfig.networkConfig.raftAirdropAddress, provider);
+
+    // TODO: set ClaimRaftAndStake contract
+    // https://github.com/raft-fi/raft-staking/blob/master/contracts/ClaimRaftAndStake.sol
+    this.claimAndStakeContract = new Contract(
+      RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
+      {} as any,
+      provider,
+    );
   }
 
-  public async isEligibleToClaim(): Promise<boolean> {
-    // TODO: from RAFT airdrop contract, provide either address or merkle proof
-    return true;
+  public setWhitelist(items: WhitelistItem[]): void {
+    if (!this.merkleTree) {
+      this.merkleTree = StandardMerkleTree.of(items, ['address', 'uint256']);
+
+      const index = items.findIndex(([address]) => address === this.walletAddress);
+      if (index >= 0) {
+        const found = items[index];
+        const [, amount] = found;
+
+        this.merkleTreeIndex = index;
+        this.merkleProof = this.merkleTree.getProof(index);
+        this.claimableAmount = new Decimal(BigInt(amount), Decimal.PRECISION);
+      } else {
+        this.merkleTreeIndex = null;
+        this.merkleProof = null;
+        this.claimableAmount = Decimal.ZERO;
+      }
+    }
+  }
+
+  public isEligibleToClaim(): boolean {
+    return Boolean(this.merkleProof);
   }
 
   public async hasAlreadyClaimed(): Promise<boolean> {
-    // TODO: from RAFT airdrop contract, provide either address or merkle proof
+    if (this.merkleTreeIndex !== null && this.merkleTreeIndex !== undefined) {
+      const index = BigInt(this.merkleTreeIndex);
+      return this.airdropContract.isClaimed(index);
+    }
+
     return false;
   }
 
   public async canClaim(): Promise<boolean> {
-    const [isEligibleToClaim, hasAlreadyClaimed] = await Promise.all([
-      this.isEligibleToClaim(),
-      this.hasAlreadyClaimed(),
-    ]);
+    const isEligibleToClaim = this.isEligibleToClaim();
+    const hasAlreadyClaimed = await this.hasAlreadyClaimed();
+
     return isEligibleToClaim && !hasAlreadyClaimed;
   }
 
-  public async getClaimableAmount(): Promise<Decimal> {
-    // TODO: from IPFS, provide merkle proof to get this number
-    return new Decimal(123456);
+  public getClaimableAmount(): Decimal {
+    return this.claimableAmount;
   }
 
   private getVeRaftBalance(point: VeRaftBalancePoint, supplyAtTimestamp: number): bigint {
@@ -87,7 +133,7 @@ export class RaftToken {
    * Returns the number of annual give away of RAFT.
    * @returns The annual give away of RAFT.
    */
-  public async getAnnualGiveAway(): Promise<Decimal> {
+  public getAnnualGiveAway(): Decimal {
     return ANNUAL_GIVE_AWAY;
   }
 
@@ -111,7 +157,7 @@ export class RaftToken {
     }
 
     if (!annualGiveAway) {
-      annualGiveAway = await this.getAnnualGiveAway();
+      annualGiveAway = this.getAnnualGiveAway();
     }
 
     // avg veRAFT = staked RAFT * period / 2
@@ -159,7 +205,7 @@ export class RaftToken {
    * @param options.poolData The balancer pool data. If not provided, will query.
    * @returns The estimated price impact for the RAFT staking.
    */
-  public async calculatePriceImpact(stakeAmount: Decimal, options: PriceImpactOption = {}): Promise<Decimal | null> {
+  public async calculatePriceImpact(stakeAmount: Decimal, options: PoolDataOption = {}): Promise<Decimal | null> {
     let { poolData } = options;
 
     if (!poolData) {
@@ -193,20 +239,102 @@ export class RaftToken {
     return priceImpact;
   }
 
-  public async claim(): Promise<void> {
-    return this.claimAndStake(Decimal.ZERO);
+  private async calculateBptOutGivenExactRaftIn(
+    stakeAmount: Decimal,
+    options: PoolDataOption = {},
+  ): Promise<BigNumber | null> {
+    let { poolData } = options;
+
+    if (!poolData) {
+      poolData = await this.getBalancerPoolData();
+    }
+
+    if (!poolData) {
+      return null;
+    }
+
+    const pool = WeightedPool.fromPool(poolData);
+    const poolPairData = pool.parsePoolPairData(poolData.tokensList[0], poolData.tokensList[1]);
+    const tokenIn = BigNumber.from(stakeAmount.toString());
+
+    return pool._exactTokenInForTokenOut(poolPairData, tokenIn);
   }
 
-  public async stake(period: Decimal): Promise<void> {
+  public async claim(signer: Signer, options: TransactionWithFeesOptions = {}): Promise<TransactionResponse | null> {
+    if (this.merkleTreeIndex !== null && this.merkleTreeIndex !== undefined && this.merkleProof) {
+      const { gasLimitMultiplier = Decimal.ONE } = options;
+      const index = BigInt(this.merkleTreeIndex);
+      const amount = this.claimableAmount.value;
+
+      const { sendTransaction } = await buildTransactionWithGasLimit(
+        this.airdropContract.claim,
+        [index, this.walletAddress, amount, this.merkleProof],
+        gasLimitMultiplier,
+        undefined, // we dont have frontendTag for airdrop
+        signer,
+      );
+
+      return sendTransaction();
+    }
+
+    return null;
+  }
+
+  public async stake(_period: Decimal): Promise<TransactionResponse | null> {
     // TODO: directly interact with balancer v2 pool?
     // https://github.com/balancer/balancer-v2-monorepo/blob/master/pkg/liquidity-mining/contracts/VotingEscrow.vy
-    period;
-    return;
+    return null;
   }
 
-  public async claimAndStake(period: Decimal): Promise<void> {
-    // TODO: from helper contract, to interact to claim and stake in 1 txn
-    period;
-    return;
+  public async claimAndStake(
+    period: Decimal,
+    _signer: Signer,
+    options: TransactionWithFeesOptions = {},
+  ): Promise<TransactionResponse | null> {
+    if (this.merkleTreeIndex !== null && this.merkleTreeIndex !== undefined && this.merkleProof) {
+      const { gasLimitMultiplier = Decimal.ONE } = options;
+      const index = BigInt(this.merkleTreeIndex);
+      const amount = this.claimableAmount.value;
+      const minBptAmountOut = await this.calculateBptOutGivenExactRaftIn(this.claimableAmount.mul(period));
+
+      if (!minBptAmountOut) {
+        return null;
+      }
+
+      /*
+      let raftPermitSignature = createEmptyPermitSignature();
+      let balancerLPPermitSignature = createEmptyPermitSignature();
+      const isEoaPositionOwner = await isEoaAddress(this.walletAddress, this.provider);
+
+      if (isEoaPositionOwner) {
+        // implement approval
+      } else {
+        createPermitSignature(signer, approveAmount, this.claimAndStakeContract, tokenContract);
+      }
+      */
+      /*
+      https://github.com/raft-fi/raft-staking/blob/master/contracts/ClaimRaftAndStake.sol
+
+      const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
+        this.claimAndStakeContract.execute,
+        [
+          index,
+          this.walletAddress,
+          amount,
+          this.merkleProof,
+          minBptAmountOut.toBigInt(),
+          raftPermitSignature,
+          balancerLPPermitSignature,
+        ],
+        gasLimitMultiplier,
+        undefined, // we dont have frontendTag for claim and stake
+        signer,
+      );
+
+      return sendTransaction();
+      */
+    }
+
+    return null;
   }
 }
