@@ -18,7 +18,7 @@ export type SupportedCollateralTokens = {
 };
 
 export type UnderlyingCollateralTokenConfig<U extends UnderlyingCollateralToken> = {
-  supportedCollateralTokens: Record<SupportedCollateralTokens[U], CollateralTokenConfig>;
+  supportedCollateralTokens: Record<U | SupportedCollateralTokens[U], CollateralTokenConfig>;
 };
 
 export type UnderlyingTokens = {
