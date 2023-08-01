@@ -23,6 +23,7 @@
     }
   },
   "scripts": {
+    "anvil": "anvil --fork-url $ANVIL_FORK_URL --fork-block-number $ANVIL_BLOCK_NUMBER",
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",

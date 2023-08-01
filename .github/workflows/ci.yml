@@ -89,6 +89,9 @@ jobs:
   test:
     runs-on: 'ubuntu-latest'
     needs: ['lint', 'build']
+    env:
+      ANVIL_BLOCK_NUMBER: 17317900
+
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@v3'
@@ -115,6 +118,14 @@ jobs:
 
       - name: 'Install the Node.js dependencies'
         run: npm install
+
+      - name: 'Set up Foundry'
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: 'Launch Anvil'
+        run: npm run anvil &
+        env:
+          ANVIL_FORK_URL: ${{ secrets.ANVIL_FORK_URL }}
 
       - name: 'Run the tests'
         run: 'npm run test'
