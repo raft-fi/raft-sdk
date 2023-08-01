@@ -6,12 +6,7 @@ import { StandardMerkleTree } from '@openzeppelin/merkle-tree';
 import request, { gql } from 'graphql-request';
 import { RaftConfig } from '../config';
 import { MerkleDistributor, MerkleDistributor__factory, VotingEscrow, VotingEscrow__factory } from '../typechain';
-import {
-  buildTransactionWithGasLimit,
-  createEmptyPermitSignature,
-  createPermitSignature,
-  isEoaAddress,
-} from '../utils';
+import { buildTransactionWithGasLimit } from '../utils';
 import { TransactionWithFeesOptions } from '../types';
 
 // annual give away = 10% of 1B evenly over 3 years
@@ -65,6 +60,7 @@ export class RaftToken {
     // https://github.com/raft-fi/raft-staking/blob/master/contracts/ClaimRaftAndStake.sol
     this.claimAndStakeContract = new Contract(
       RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       {} as any,
       provider,
     );
@@ -275,7 +271,7 @@ export class RaftToken {
         this.airdropContract.claim,
         [index, this.walletAddress, amount, this.merkleProof],
         gasLimitMultiplier,
-        undefined, // we dont have frontendTag for airdrop
+        'raft',
         signer,
       );
 
@@ -288,6 +284,7 @@ export class RaftToken {
   public async stake(period: Decimal): Promise<TransactionResponse | null> {
     // TODO: directly interact with balancer v2 pool?
     // https://github.com/balancer/balancer-v2-monorepo/blob/master/pkg/liquidity-mining/contracts/VotingEscrow.vy
+    period;
     return null;
   }
 
@@ -306,6 +303,10 @@ export class RaftToken {
         return null;
       }
 
+      signer;
+      gasLimitMultiplier;
+      index;
+      amount;
       /*
       let raftPermitSignature = createEmptyPermitSignature();
       let balancerLPPermitSignature = createEmptyPermitSignature();

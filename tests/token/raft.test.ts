@@ -1,6 +1,5 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Provider } from 'ethers';
-import { StandardMerkleTree } from '@openzeppelin/merkle-tree';
 import { RaftToken } from '../../src/token';
 
 describe('RaftToken', () => {
