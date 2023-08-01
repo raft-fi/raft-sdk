@@ -64,9 +64,10 @@ export class RaftConfig {
 
   static getPositionManagerAddress<U extends UnderlyingCollateralToken>(
     underlyingCollateralToken: U,
-    collateralToken: SupportedCollateralTokens[U],
+    collateralToken?: U | SupportedCollateralTokens[U],
   ): string {
-    return this.networkConfig.underlyingTokens[underlyingCollateralToken].supportedCollateralTokens[collateralToken]
+    const usedCollateralToken = collateralToken ?? underlyingCollateralToken;
+    return this.networkConfig.underlyingTokens[underlyingCollateralToken].supportedCollateralTokens[usedCollateralToken]
       .positionManager;
   }
 }

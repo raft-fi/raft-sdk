@@ -42,9 +42,9 @@ export async function buildTransactionWithGasLimit<
     };
   }
 
-  const hexTag = tag ? hexlify(Uint8Array.from(tag.split('').map(letter => letter.charCodeAt(0)))) : undefined;
+  const hexTag = hexlify(Uint8Array.from(tag.split('').map(letter => letter.charCodeAt(0))));
   const transactionRequest = await method.populateTransaction(...args, overrides);
-  transactionRequest.data = `${transactionRequest.data}${hexTag?.slice(2) ?? ''}`;
+  transactionRequest.data = `${transactionRequest.data}${hexTag.slice(2)}`;
 
   return {
     sendTransaction: () => signer.sendTransaction(transactionRequest),
