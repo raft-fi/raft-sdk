@@ -115,8 +115,8 @@ export const mainnetConfig: NetworkConfig = {
   daiAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   testNetwork: false,
   // TODO: wait for deployment
-  raftAirdropAddress: '',
-  claimRaftStakeVeRaftAddress: '',
+  raftAirdropAddress: '0x0000000000000000000000000000000000000000',
+  claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
   // TODO: update this to veRAFT
   veRaftAddress: '0xC128a9954e6c874eA3d62ce62B468bA073093F25',
   // TODO: update this to RAFT/R pool

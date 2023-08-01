@@ -114,8 +114,8 @@ export const goerliConfig: NetworkConfig = {
   daiAddress: '', // Add address if we ever deploy one step leverage on goerli
   testNetwork: true,
   // TODO: wait for deployment
-  raftAirdropAddress: '',
-  claimRaftStakeVeRaftAddress: '',
+  raftAirdropAddress: '0x0000000000000000000000000000000000000000',
+  claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
   // this is veBAL
   veRaftAddress: '0x33A99Dcc4C85C014cf12626959111D5898bbCAbF',
   // this is veBAL/WETH pool
