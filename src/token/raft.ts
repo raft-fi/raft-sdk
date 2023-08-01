@@ -60,6 +60,7 @@ export class RaftToken {
     // https://github.com/raft-fi/raft-staking/blob/master/contracts/ClaimRaftAndStake.sol
     this.claimAndStakeContract = new Contract(
       RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       {} as any,
       provider,
     );
@@ -270,7 +271,7 @@ export class RaftToken {
         this.airdropContract.claim,
         [index, this.walletAddress, amount, this.merkleProof],
         gasLimitMultiplier,
-        undefined, // we dont have frontendTag for airdrop
+        'raft',
         signer,
       );
 
@@ -283,6 +284,7 @@ export class RaftToken {
   public async stake(_period: Decimal): Promise<TransactionResponse | null> {
     // TODO: directly interact with balancer v2 pool?
     // https://github.com/balancer/balancer-v2-monorepo/blob/master/pkg/liquidity-mining/contracts/VotingEscrow.vy
+    period;
     return null;
   }
 
@@ -301,6 +303,10 @@ export class RaftToken {
         return null;
       }
 
+      signer;
+      gasLimitMultiplier;
+      index;
+      amount;
       /*
       let raftPermitSignature = createEmptyPermitSignature();
       let balancerLPPermitSignature = createEmptyPermitSignature();
