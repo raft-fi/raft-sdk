@@ -159,7 +159,6 @@ export interface ManagePositionCallbacks {
  */
 export class UserPosition<T extends UnderlyingCollateralToken> extends PositionWithRunner {
   private user: Signer;
-  private collateralTokens = new Map<CollateralToken, ERC20>();
   private positionManager: PositionManager;
   private rToken: ERC20Permit;
 
