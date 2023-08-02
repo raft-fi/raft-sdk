@@ -149,12 +149,26 @@ const tokensConfig: Record<Token, TokenConfig> = {
     supportsPermit: false,
     priceFeed: 'swETH',
   },
+  RAFT: {
+    address: '0x0000000000000000000000000000000000000000', // TODO: update address
+    ticker: 'RAFT',
+    decimals: 18,
+    supportsPermit: true,
+    priceFeed: Decimal.ONE, // TODO: update price feed
+  },
   R: {
     address: '0x183015a9ba6ff60230fdeadc3f43b3d788b13e21',
     ticker: 'R',
     decimals: 18,
     supportsPermit: true,
     priceFeed: Decimal.ONE,
+  },
+  'B-80RAFT-20R': {
+    address: '0x0000000000000000000000000000000000000000', // TODO: update address
+    ticker: 'B-80RAFT-20R',
+    decimals: 18,
+    supportsPermit: true,
+    priceFeed: Decimal.ONE, // TODO: update price feed
   },
 };
 

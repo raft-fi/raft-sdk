@@ -2,6 +2,7 @@ import { ContractRunner } from 'ethers';
 import { RaftConfig } from '../config';
 import {
   ERC20,
+  ERC20Permit,
   ERC20PermitRToken,
   ERC20PermitRToken__factory,
   ERC20Permit__factory,
@@ -44,7 +45,9 @@ type TokenContractTypes = {
   WBTC: ERC20;
   cbETH: ERC20;
   swETH: ERC20;
+  RAFT: ERC20Permit;
   R: ERC20PermitRToken;
+  'B-80RAFT-20R': ERC20Permit;
 };
 
 export function isInterestRateVault(

@@ -17,8 +17,10 @@ export const COLLATERAL_TOKENS = [
   ...WRAPPABLE_CAPPED_COLLATERAL_TOKENS,
   ...UNDERLYING_COLLATERAL_TOKENS,
 ] as const;
+export const RAFT_TOKEN = 'RAFT';
 export const R_TOKEN = 'R';
-export const TOKENS = [...COLLATERAL_TOKENS, R_TOKEN] as const;
+export const LP_BALANCER_TOKEN = 'B-80RAFT-20R';
+export const TOKENS = [...COLLATERAL_TOKENS, RAFT_TOKEN, R_TOKEN, LP_BALANCER_TOKEN] as const;
 
 export const VAULT_VERSIONS = ['v1', 'v2'] as const;
 export const VAULTS_V1 = ['wstETH-v1', 'wcrETH-v1'] as const;
@@ -28,6 +30,7 @@ export type WrappableCappedCollateralToken = (typeof WRAPPABLE_CAPPED_COLLATERAL
 export type WrappedCappedUnderlyingCollateralToken = (typeof WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS)[number];
 export type UnderlyingCollateralToken = (typeof UNDERLYING_COLLATERAL_TOKENS)[number];
 export type CollateralToken = (typeof COLLATERAL_TOKENS)[number];
+export type RaftToken = typeof RAFT_TOKEN;
 export type RToken = typeof R_TOKEN;
 export type Token = (typeof TOKENS)[number];
 

@@ -23,3 +23,4 @@ export {
   isWrappedCappedUnderlyingCollateralToken,
   getInterestRateDebtTokenContract,
 } from './token';
+export { getApproval } from './approve';
