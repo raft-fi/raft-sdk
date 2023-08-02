@@ -176,13 +176,6 @@ export class Protocol {
     await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
         const collateralTokenAddress = RaftConfig.networkConfig.raftCollateralTokens[collateralToken];
-
-        // Return zero if address is not defined in config
-        if (!collateralTokenAddress) {
-          this._collateralSupply[collateralToken] = Decimal.ZERO;
-          return this._collateralSupply;
-        }
-
         const contract = ERC20Indexable__factory.connect(collateralTokenAddress, this.provider);
 
         this._collateralSupply[collateralToken] = new Decimal(await contract.totalSupply(), Decimal.PRECISION);
@@ -200,13 +193,6 @@ export class Protocol {
     await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
         const debtTokenAddress = RaftConfig.networkConfig.raftDebtTokens[collateralToken];
-
-        // Return zero if address is not defined in config
-        if (!debtTokenAddress) {
-          this._debtSupply[collateralToken] = Decimal.ZERO;
-          return this._debtSupply;
-        }
-
         const contract = ERC20Indexable__factory.connect(debtTokenAddress, this.provider);
 
         this._debtSupply[collateralToken] = new Decimal(await contract.totalSupply(), Decimal.PRECISION);
