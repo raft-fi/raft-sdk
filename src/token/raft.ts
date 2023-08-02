@@ -281,7 +281,7 @@ export class RaftToken {
     return null;
   }
 
-  public async stake(_period: Decimal): Promise<TransactionResponse | null> {
+  public async stake(period: Decimal): Promise<TransactionResponse | null> {
     // TODO: directly interact with balancer v2 pool?
     // https://github.com/balancer/balancer-v2-monorepo/blob/master/pkg/liquidity-mining/contracts/VotingEscrow.vy
     period;
@@ -290,7 +290,7 @@ export class RaftToken {
 
   public async claimAndStake(
     period: Decimal,
-    _signer: Signer,
+    signer: Signer,
     options: TransactionWithFeesOptions = {},
   ): Promise<TransactionResponse | null> {
     if (this.merkleTreeIndex !== null && this.merkleTreeIndex !== undefined && this.merkleProof) {
