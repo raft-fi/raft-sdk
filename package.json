@@ -55,10 +55,10 @@
   },
   "dependencies": {
     "@balancer-labs/sor": "^4.1.1-beta.13",
-    "@ethersproject/bignumber": "^5.7.0",
     "@openzeppelin/merkle-tree": "^1.0.5",
     "@tempusfinance/decimal": "^0.1.0",
     "axios": "^1.4.0",
+    "bignumber.js": "^9.1.1",
     "ethers": "^6.3.0",
     "graphql": "^16.6.0",
     "graphql-request": "^6.0.0"

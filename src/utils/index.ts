@@ -11,3 +11,4 @@ export {
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
 } from './token';
+export { getApproval } from './approve';
