@@ -49,7 +49,9 @@ as well as the URL of the subgraph endpoint (e.g. [our official subgraph](https:
 import { RaftConfig } from '@raft-fi/sdk';
 
 RaftConfig.setNetwork('mainnet');
-RaftConfig.setSubgraphEndpoint('https://gateway.thegraph.com/api/<api-key>/subgraphs/id/93YgGPdoraNcpG6531Jo3KqTcrmQ4BR4Ny9MfkH49NLX');
+RaftConfig.setSubgraphEndpoint(
+  'https://gateway.thegraph.com/api/<api-key>/subgraphs/id/93YgGPdoraNcpG6531Jo3KqTcrmQ4BR4Ny9MfkH49NLX',
+);
 ```
 
 ## Getting Started
@@ -76,6 +78,21 @@ To build the SDK, run the following command:
 
 ```bash
 npm run build
+```
+
+### Testing
+
+To run the tests, run the following command:
+
+```bash
+npm run test
+```
+
+The CI testing requires a local mainnet instance to be running on port 8545. To start the instance, download
+[Foundry](https://github.com/foundry-rs/foundry) and run the following command:
+
+```bash
+ANVIL_FORK_URL=<RPC URL> ANVIL_BLOCK_NUMBER=<block number> npm run anvil
 ```
 
 ## Community
