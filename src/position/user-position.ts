@@ -723,8 +723,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       let amountToSwap: Decimal;
       // User is closing the position
       if (isClosePosition) {
-        // When closing the position, we do not need to set swap amount, contracts will calculate correct amount and inject it in ammData
-        amountToSwap = Decimal.ONE;
+        amountToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(oneInchRate);
       }
       // User is opening the position
       else if (currentCollateral.isZero() && currentDebt.isZero()) {
