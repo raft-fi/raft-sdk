@@ -738,11 +738,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         }
       }
 
-      console.log(`oneInchRate: ${oneInchRate.toString()}`);
-      console.log(`slippage: ${slippage.toString()}`);
-      console.log(`currentDebt: ${currentDebt.toString()}`);
-      console.log(`amountToSwap: ${amountToSwap.toString()}`);
-
       const swapCalldata = await this.getSwapCallDataFrom1inch(
         isDebtIncrease ? rAddress : underlyingCollateralTokenAddress,
         isDebtIncrease ? underlyingCollateralTokenAddress : rAddress,
