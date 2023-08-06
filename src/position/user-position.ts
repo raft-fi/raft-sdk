@@ -723,7 +723,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       let amountToSwap: Decimal;
       // User is closing the position
       if (isClosePosition) {
-        amountToSwap = currentDebt.div(oneInchRate).mul(Decimal.ONE.sub(slippage));
+        amountToSwap = currentDebt.div(oneInchRate);
       }
       // User is opening the position
       else if (currentCollateral.isZero() && currentDebt.isZero()) {
