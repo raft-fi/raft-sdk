@@ -743,7 +743,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         isDebtIncrease ? rAddress : underlyingCollateralTokenAddress,
         isDebtIncrease ? underlyingCollateralTokenAddress : rAddress,
         amountToSwap,
-        slippage,
+        Decimal.ZERO, // no matter what value passed as slippage, it returns same result
       );
 
       const functionSignatureToFromAmountOffset: { [key: string]: number } = {
@@ -768,9 +768,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
       let collateralToSwap: Decimal;
       if (isClosePosition) {
-        collateralToSwap = currentDebt.mul(Decimal.ONE.add(0.001)).div(underlyingCollateralPrice);
+        collateralToSwap = currentDebt.div(underlyingCollateralPrice).mul(Decimal.ONE.add(slippage));
       } else {
-        collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(underlyingCollateralPrice);
+        collateralToSwap = debtChange.abs().div(underlyingCollateralPrice).mul(Decimal.ONE.add(slippage));
       }
 
       yield {
