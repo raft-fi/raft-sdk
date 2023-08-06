@@ -723,7 +723,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       let amountToSwap: Decimal;
       // User is closing the position
       if (isClosePosition) {
-        amountToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(oneInchRate);
+        amountToSwap = currentDebt.div(oneInchRate).mul(Decimal.ONE.sub(slippage));
       }
       // User is opening the position
       else if (currentCollateral.isZero() && currentDebt.isZero()) {
@@ -737,6 +737,11 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
           amountToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(oneInchRate);
         }
       }
+
+      console.log(`oneInchRate: ${oneInchRate.toString()}`);
+      console.log(`slippage: ${slippage.toString()}`);
+      console.log(`currentDebt: ${currentDebt.toString()}`);
+      console.log(`amountToSwap: ${amountToSwap.toString()}`);
 
       const swapCalldata = await this.getSwapCallDataFrom1inch(
         isDebtIncrease ? rAddress : underlyingCollateralTokenAddress,
