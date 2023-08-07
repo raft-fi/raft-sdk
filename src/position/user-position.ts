@@ -1162,7 +1162,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     if (canUsePermit) {
       permitSignature = yield* this.getSignTokenPermitStep(
         token,
-        tokenContract,
+        tokenContract as ERC20Permit,
         approveAmount,
         spenderAddress,
         getStepNumber,
