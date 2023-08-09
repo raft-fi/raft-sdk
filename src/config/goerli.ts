@@ -113,9 +113,10 @@ export const goerliConfig: NetworkConfig = {
   tokens: tokensConfig,
   daiAddress: '', // Add address if we ever deploy one step leverage on goerli
   testNetwork: true,
-  // TODO: wait for deployment
-  raftTokenAddress: '0x0000000000000000000000000000000000000000',
-  raftAirdropAddress: '0x0000000000000000000000000000000000000000',
+  // this is BAL
+  raftTokenAddress: '0xfa8449189744799ad2ace7e0ebac8bb7575eff47',
+  // deploy merkle-distributor everytime
+  raftAirdropAddress: '0x95E18225302AbBc0B57bE97bECB4a6a5cE811612',
   claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
   // this is veBAL
   veRaftAddress: '0x33A99Dcc4C85C014cf12626959111D5898bbCAbF',
