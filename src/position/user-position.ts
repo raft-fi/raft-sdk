@@ -23,7 +23,6 @@ import {
   UnderlyingCollateralToken,
 } from '../types';
 import {
-  createEmptyPermitSignature,
   createPermitSignature,
   getPositionManagerContract,
   getTokenContract,
@@ -31,6 +30,7 @@ import {
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
   buildTransactionWithGasLimit,
+  EMPTY_SIGNATURE,
 } from '../utils';
 import { PositionWithRunner } from './base';
 import { SWAP_ROUTER_MAX_SLIPPAGE } from '../constants';
@@ -424,8 +424,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       yield* this.getWhitelistStep(positionManagerAddress, () => stepCounter++, numberOfSteps);
     }
 
-    let collateralPermitSignature = createEmptyPermitSignature();
-    let rPermitSignature = createEmptyPermitSignature();
+    let collateralPermitSignature = EMPTY_SIGNATURE;
+    let rPermitSignature = EMPTY_SIGNATURE;
 
     if (collateralApprovalStepNeeded) {
       collateralPermitSignature = yield* this.getApproveOrPermitStep(
@@ -1157,7 +1157,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     canUsePermit: boolean,
     cachedPermitSignature?: ERC20PermitSignatureStruct,
   ): AsyncGenerator<PermitStep | ApproveStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
-    let permitSignature = createEmptyPermitSignature();
+    let permitSignature = EMPTY_SIGNATURE;
 
     if (canUsePermit) {
       permitSignature = yield* this.getSignTokenPermitStep(

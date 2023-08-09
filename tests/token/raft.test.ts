@@ -1,5 +1,6 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Provider } from 'ethers';
+import { describe, expect, it } from 'vitest';
 import { RaftToken } from '../../src/token';
 
 describe('RaftToken', () => {
