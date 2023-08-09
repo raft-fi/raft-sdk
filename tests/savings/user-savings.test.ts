@@ -1,22 +1,23 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Signer } from 'ethers';
+import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { UserSavings } from '../../src/savings';
 import { EMPTY_PERMIT_SIGNATURE, buildTransactionWithGasLimit, createPermitSignature } from '../../src/utils';
 import { ERC20PermitSignatureStruct, getTokenAllowance } from '../../src';
 
-jest.mock('../../src/allowance', () => ({
-  ...jest.requireActual('../../src/allowance'),
-  getTokenAllowance: jest.fn(),
+vi.mock('../../src/allowance', async () => ({
+  ...(await vi.importActual<any>('../../src/allowance')),
+  getTokenAllowance: vi.fn(),
 }));
 
-jest.mock('../../src/utils/permit', () => ({
-  ...jest.requireActual('../../src/utils/permit'),
-  createPermitSignature: jest.fn(),
+vi.mock('../../src/utils/permit', async () => ({
+  ...(await vi.importActual<any>('../../src/utils/permit')),
+  createPermitSignature: vi.fn(),
 }));
 
-jest.mock('../../src/utils/transactions', () => ({
-  ...jest.requireActual('../../src/utils/transactions'),
-  buildTransactionWithGasLimit: jest.fn(),
+vi.mock('../../src/utils/transactions', async () => ({
+  ...(await vi.importActual<any>('../../src/utils/transactions')),
+  buildTransactionWithGasLimit: vi.fn(),
 }));
 
 const mockEoaSigner = {
@@ -28,8 +29,8 @@ const mockEoaSigner = {
 
 describe('UserSavings', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.resetAllMocks();
+    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   describe('getManageSavingsSteps', () => {
@@ -37,10 +38,10 @@ describe('UserSavings', () => {
       const savings = new UserSavings(mockEoaSigner);
       const steps = savings.getManageSavingsSteps(new Decimal(100));
 
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
       });
 
@@ -76,10 +77,10 @@ describe('UserSavings', () => {
       const savings = new UserSavings(mockEoaSigner);
       const steps = savings.getManageSavingsSteps(new Decimal(100), { approvalType: 'approve' });
 
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
       });
 
@@ -114,8 +115,8 @@ describe('UserSavings', () => {
       const steps = savings.getManageSavingsSteps(new Decimal(-100));
       const numberOfSteps = 1;
 
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
       });
 

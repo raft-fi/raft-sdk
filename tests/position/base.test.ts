@@ -1,4 +1,5 @@
 import { Decimal } from '@tempusfinance/decimal';
+import { describe, expect, it } from 'vitest';
 import { Position } from '../../src/position';
 
 describe('Position', () => {

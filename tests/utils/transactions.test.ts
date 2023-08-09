@@ -1,13 +1,13 @@
 import { Decimal } from '@tempusfinance/decimal';
+import { describe, expect, it, vi } from 'vitest';
 import { buildTransactionWithGasLimit, getTokenContract } from '../../src/utils';
 import { TypedContractMethod } from '../../src/typechain/common';
 import { JsonRpcProvider, Wallet } from 'ethers';
 import { RaftConfig } from '../../src/config';
-import { itWhenCI } from '../test-utils';
 
 const mockMethod = {
-  estimateGas: jest.fn().mockResolvedValue(100000n),
-  populateTransaction: jest.fn(),
+  estimateGas: vi.fn().mockResolvedValue(100000n),
+  populateTransaction: vi.fn(),
 } as unknown as TypedContractMethod<never[], unknown, 'nonpayable'>;
 
 describe('buildTransactionWithGasLimit', () => {
@@ -23,13 +23,13 @@ describe('buildTransactionWithGasLimit', () => {
     expect(gasLimitNoSigner).toEqual(new Decimal(150000n, Decimal.PRECISION));
   });
 
-  itWhenCI(
+  it.skipIf(process.env.CI !== 'true')(
     'should append tag to transaction data',
     async () => {
       const provider = new JsonRpcProvider('http://127.0.0.1:8545');
       const signer = Wallet.fromPhrase('test test test test test test test test test test test junk', provider);
       const tag = 'tag';
-      const stETH = getTokenContract('R', signer);
+      const stETH = getTokenContract('stETH', signer);
 
       const { sendTransaction: sendTransactionNoTag } = await buildTransactionWithGasLimit(
         stETH.approve,
