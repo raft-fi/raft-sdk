@@ -133,7 +133,7 @@ export async function* getPermitOrApproveTokenStep<T extends Token>(
     permitSignature = yield* getSignTokenPermitStep(
       signer,
       token,
-      tokenContract,
+      tokenContract as ERC20Permit | WstETH,
       approveAmount,
       spender,
       stepNumber,
