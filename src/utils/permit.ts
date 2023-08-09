@@ -31,16 +31,14 @@ const TYPES = {
   ],
 };
 
-export function createEmptyPermitSignature(): ERC20PermitSignatureStruct {
-  return {
-    token: ZeroAddress,
-    value: 0,
-    deadline: 0,
-    v: 0,
-    r: '0x0000000000000000000000000000000000000000000000000000000000000000',
-    s: '0x0000000000000000000000000000000000000000000000000000000000000000',
-  };
-}
+export const EMPTY_SIGNATURE: ERC20PermitSignatureStruct = {
+  token: ZeroAddress,
+  value: 0,
+  deadline: 0,
+  v: 0,
+  r: '0x0000000000000000000000000000000000000000000000000000000000000000',
+  s: '0x0000000000000000000000000000000000000000000000000000000000000000',
+};
 
 export async function createPermitSignature(
   signer: Signer,

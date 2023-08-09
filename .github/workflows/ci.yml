@@ -8,10 +8,8 @@ on:
   push:
     branches:
       - 'main'
+      - 'release-*'
   pull_request:
-  workflow_dispatch:
-    branches:
-      - 'main'
 
 jobs:
   lint:
@@ -128,7 +126,7 @@ jobs:
           ANVIL_FORK_URL: ${{ secrets.ANVIL_FORK_URL }}
 
       - name: 'Run the tests'
-        run: 'npm run test'
+        run: 'npm run test:ci'
 
       - name: 'Add tests summary'
         run: |

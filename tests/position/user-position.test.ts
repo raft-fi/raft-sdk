@@ -1,21 +1,18 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Signer } from 'ethers';
+import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { ERC20PermitSignatureStruct, UserPosition, getTokenAllowance } from '../../src';
-import { buildTransactionWithGasLimit, createEmptyPermitSignature, createPermitSignature } from '../../src/utils';
+import { buildTransactionWithGasLimit, createPermitSignature, EMPTY_SIGNATURE } from '../../src/utils';
 
-jest.mock('../../src/allowance', () => ({
-  ...jest.requireActual('../../src/allowance'),
-  getTokenAllowance: jest.fn(),
+vi.mock('../../src/allowance', async () => ({
+  ...(await vi.importActual<any>('../../src/allowance')),
+  getTokenAllowance: vi.fn(),
 }));
 
-jest.mock('../../src/utils/permit', () => ({
-  ...jest.requireActual('../../src/utils/permit'),
-  createPermitSignature: jest.fn(),
-}));
-
-jest.mock('../../src/utils/transactions', () => ({
-  ...jest.requireActual('../../src/utils/transactions'),
-  buildTransactionWithGasLimit: jest.fn(),
+vi.mock('../../src/utils', async () => ({
+  ...(await vi.importActual<any>('../../src/utils')),
+  buildTransactionWithGasLimit: vi.fn(),
+  createPermitSignature: vi.fn(),
 }));
 
 const mockEoaSigner = {
@@ -25,12 +22,10 @@ const mockEoaSigner = {
   getAddress: () => Promise.resolve('0x123'),
 } as unknown as Signer;
 
-const EMPTY_SIGNATURE = createEmptyPermitSignature();
-
 describe('UserPosition', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.resetAllMocks();
+    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   describe('getManageSteps', () => {
@@ -38,12 +33,12 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'stETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -64,12 +59,12 @@ describe('UserPosition', () => {
         rTokenAllowance: Decimal.ONE,
       });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -86,13 +81,13 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, { collateralToken: 'wstETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -132,13 +127,13 @@ describe('UserPosition', () => {
         approvalType: 'approve',
       });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -173,13 +168,13 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'wstETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -216,12 +211,12 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(new Decimal(-1), Decimal.ONE, { collateralToken: 'wstETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -246,12 +241,12 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'wstETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -276,12 +271,12 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, { collateralToken: 'stETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -325,13 +320,13 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'stETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -387,12 +382,12 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(new Decimal(-1), Decimal.ONE, { collateralToken: 'stETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -426,13 +421,13 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'stETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -478,12 +473,12 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ZERO, Decimal.ONE, { collateralToken: 'stETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -503,13 +498,13 @@ describe('UserPosition', () => {
         collateralPermitSignature: EMPTY_SIGNATURE,
       });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -537,13 +532,13 @@ describe('UserPosition', () => {
         rPermitSignature: EMPTY_SIGNATURE,
       });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });
@@ -584,11 +579,11 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, { collateralToken: 'wstETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as Mock).mockResolvedValue(EMPTY_SIGNATURE);
 
       await steps.next();
 
@@ -599,13 +594,13 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'stETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+      const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (createPermitSignature as Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
         gasLimit: Decimal.ZERO,
       });

@@ -1,3 +1,5 @@
+/// <reference types="vitest" />
+
 import { resolve } from 'path';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
@@ -17,6 +19,12 @@ export default defineConfig({
           '@tempusfinance/decimal': 'Decimal',
         },
       },
+    },
+  },
+  test: {
+    coverage: {
+      exclude: ['node_modules', 'src/typechain'],
+      reporter: ['text', 'json', 'html'],
     },
   },
   plugins: [dts()],

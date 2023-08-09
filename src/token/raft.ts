@@ -15,8 +15,8 @@ import {
   VotingEscrow__factory,
 } from '../typechain';
 import {
+  EMPTY_SIGNATURE,
   buildTransactionWithGasLimit,
-  createEmptyPermitSignature,
   createPermitSignature,
   getApproval,
   isEoaAddress,
@@ -343,8 +343,8 @@ export class RaftToken {
     // approvalAmount = calculated BPT out * (1 + buffer)
     const approvalAmount = new Decimal(bptOutGivenExactRaftIn.toString()).mul(Decimal.ONE.add(TOKEN_APPROVAL_BUFFER));
 
-    let raftTokenPermitSignature = createEmptyPermitSignature();
-    let balancerLPTokenPermitSignature = createEmptyPermitSignature();
+    let raftTokenPermitSignature = EMPTY_SIGNATURE;
+    let balancerLPTokenPermitSignature = EMPTY_SIGNATURE;
     const isEoaWallet = await isEoaAddress(this.walletAddress, this.provider);
 
     // if wallet is EOA, use approval; else use permit
