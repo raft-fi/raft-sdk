@@ -2,7 +2,6 @@ import { SubgraphPoolBase, WeightedPool } from '@balancer-labs/sor';
 import { BigNumber } from 'bignumber.js';
 import { Decimal } from '@tempusfinance/decimal';
 import { Contract, Provider, Signer, TransactionResponse } from 'ethers';
-import { StandardMerkleTree } from '@openzeppelin/merkle-tree';
 import request, { gql } from 'graphql-request';
 import { RaftConfig } from '../config';
 import {
@@ -49,9 +48,17 @@ type VeRaftBalancePoint = {
   blk: bigint;
 };
 
-type WhitelistAddress = string;
-type WhitelistClaimAmount = string;
-type WhitelistItem = [WhitelistAddress, WhitelistClaimAmount];
+type WhitelistMerkleProof = [string, string];
+type WhitelistMerkleTreeItem = {
+  index: number;
+  amount: string;
+  proof: WhitelistMerkleProof;
+};
+type WhitelistMerkleTree = {
+  merkleRoot: string;
+  tokenTotal: string;
+  claims: Record<string, WhitelistMerkleTreeItem>;
+};
 
 export class RaftToken {
   private provider: Provider;
@@ -61,8 +68,8 @@ export class RaftToken {
   private airdropContract: MerkleDistributor;
   private claimAndStakeContract: Contract;
   private balancerPoolLPTokenContract: ERC20Permit;
-  private merkleTree?: StandardMerkleTree<string[]>;
-  private merkleProof?: string[] | null;
+  private merkleTree?: WhitelistMerkleTree;
+  private merkleProof?: WhitelistMerkleProof | null;
   private merkleTreeIndex?: number | null;
   private claimableAmount: Decimal = Decimal.ZERO;
 
@@ -90,17 +97,17 @@ export class RaftToken {
     );
   }
 
-  public setWhitelist(items: WhitelistItem[]): void {
+  public setWhitelist(merkleTree: WhitelistMerkleTree): void {
     if (!this.merkleTree) {
-      this.merkleTree = StandardMerkleTree.of(items, ['address', 'uint256']);
+      this.merkleTree = merkleTree;
 
-      const index = items.findIndex(([address]) => address === this.walletAddress);
-      if (index >= 0) {
-        const found = items[index];
-        const [, amount] = found;
+      const claim = merkleTree.claims[this.walletAddress];
+
+      if (claim) {
+        const { index, amount, proof } = claim;
 
         this.merkleTreeIndex = index;
-        this.merkleProof = this.merkleTree.getProof(index);
+        this.merkleProof = proof;
         this.claimableAmount = new Decimal(BigInt(amount), Decimal.PRECISION);
       } else {
         this.merkleTreeIndex = null;
