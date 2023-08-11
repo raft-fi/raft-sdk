@@ -8,11 +8,17 @@ import {
   EMPTY_PERMIT_SIGNATURE,
   getPositionManagerContract,
 } from '../../src/utils';
-import { VaultV1 } from '../../src/types';
+import { CollateralToken, UnderlyingCollateralToken, VaultV1 } from '../../src/types';
+import { getWstEthToStEthRate } from '../../src/price';
+import { SWAP_ROUTER_MAX_SLIPPAGE } from '../../src/constants';
 
 vi.mock('../../src/allowance', async () => ({
   ...(await vi.importActual<any>('../../src/allowance')),
   getTokenAllowance: vi.fn(),
+}));
+
+vi.mock('../../src/price/rates', async () => ({
+  getWstEthToStEthRate: vi.fn(),
 }));
 
 vi.mock('../../src/utils', async () => ({
@@ -755,6 +761,94 @@ describe('UserPosition', () => {
       const steps = userPosition.getManageSteps(Decimal.ZERO, new Decimal(100), { collateralToken: 'wstETH-v1' });
 
       await expect(steps.next()).rejects.toThrow('Cannot borrow more debt from v1 vaults');
+    });
+  });
+
+  describe('getLeverageSteps', () => {
+    it.each([
+      ['wstETH' as CollateralToken, 'wstETH' as UnderlyingCollateralToken],
+      ['stETH' as CollateralToken, 'wstETH' as UnderlyingCollateralToken],
+      ['rETH' as CollateralToken, 'wcrETH' as UnderlyingCollateralToken],
+    ])(
+      'should generate steps [whitelist + approve + leverage] for %s leveraging',
+      async (collateralToken, underlyingCollateralToken) => {
+        const userPosition = new UserPosition(mockEoaSigner, underlyingCollateralToken);
+        const steps = userPosition.getLeverageSteps(Decimal.ONE, new Decimal(0.5), new Decimal(2), new Decimal(0.1), {
+          collateralToken,
+          currentCollateral: Decimal.ZERO,
+          currentDebt: Decimal.ZERO,
+          borrowRate: new Decimal(0.1),
+          underlyingCollateralPrice: new Decimal(1000),
+        });
+
+        const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
+        const getWstEthToStEthRateMock = vi.fn().mockResolvedValue(new Decimal(1.1));
+
+        vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+        (getWstEthToStEthRate as Mock).mockImplementation(getWstEthToStEthRateMock);
+        (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+          sendTransaction: vi.fn(),
+          gasEstimate: Decimal.ZERO,
+          gasLimit: Decimal.ZERO,
+        });
+
+        const numberOfSteps = 3;
+
+        const firstStep = await steps.next();
+        await firstStep.value?.action?.();
+
+        expect(firstStep.done).toBe(false);
+        expect(firstStep.value?.type).toEqual({
+          name: 'whitelist',
+        });
+        expect(firstStep.value?.stepNumber).toEqual(1);
+        expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+        const secondStep = await steps.next();
+
+        expect(secondStep.done).toBe(false);
+        expect(secondStep.value?.type).toEqual({
+          name: 'approve',
+          token: collateralToken,
+        });
+        expect(secondStep.value?.stepNumber).toEqual(2);
+        expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+        const thirdStep = await steps.next();
+
+        expect(thirdStep.done).toBe(false);
+        expect(thirdStep.value?.type).toEqual({
+          name: 'leverage',
+        });
+        expect(thirdStep.value?.stepNumber).toEqual(3);
+        expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+        const termination = await steps.next();
+
+        expect(termination.done).toBe(true);
+      },
+    );
+
+    it('should throw an error if provider for signer is not set', () => {
+      const userPosition = new UserPosition({} as unknown as Signer, 'wstETH');
+      const steps = userPosition.getLeverageSteps(Decimal.ZERO, Decimal.ZERO, new Decimal(2), Decimal.ZERO);
+
+      expect(() => steps.next()).rejects.toThrow('Provider not set, please set provider before calling this method');
+    });
+
+    it('should throw an error if provider slippage is too high', () => {
+      const swapRouter = '1inch';
+      const maxSlippage = SWAP_ROUTER_MAX_SLIPPAGE[swapRouter];
+      const slippage = maxSlippage.add(new Decimal(0.001));
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
+      const steps = userPosition.getLeverageSteps(Decimal.ONE, new Decimal(0.5), new Decimal(2), slippage, {
+        collateralToken: 'wstETH',
+        swapRouter,
+      });
+
+      expect(() => steps.next()).rejects.toThrow(
+        `Slippage (${slippage.toTruncated(4)}) should not be greater than ${maxSlippage.toTruncated(4)}`,
+      );
     });
   });
 });
