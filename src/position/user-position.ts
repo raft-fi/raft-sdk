@@ -586,7 +586,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     if (slippage.gt(SWAP_ROUTER_MAX_SLIPPAGE[swapRouter])) {
       throw new Error(
-        `Slippage (${slippage.toTruncated(4)}) should not be greater than ${SWAP_ROUTER_MAX_SLIPPAGE[swapRouter]}`,
+        `Slippage (${slippage.toTruncated(4)}) should not be greater than ${SWAP_ROUTER_MAX_SLIPPAGE[
+          swapRouter
+        ].toTruncated(4)}`,
       );
     }
 
@@ -660,7 +662,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
 
     const underlyingCollateralTokenAddress = RaftConfig.getTokenAddress(this.underlyingCollateralToken);
-    const rAddress = RaftConfig.networkConfig.tokens['R'].address;
+    const rAddress = RaftConfig.getTokenAddress('R');
 
     if (collateralToken === 'wstETH' || collateralToken === 'stETH') {
       if (!underlyingCollateralPrice) {
@@ -795,7 +797,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         },
         stepNumber: stepCounter++,
         numberOfSteps,
-        // TODO: implement the actual leverage function and gas estimate
         action: sendTransaction,
         gasEstimate,
       };
