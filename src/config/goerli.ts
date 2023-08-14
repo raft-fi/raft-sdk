@@ -163,7 +163,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
     priceFeed: Decimal.ONE,
   },
   'B-80RAFT-20R': {
-    address: '0x0000000000000000000000000000000000000000', // TODO: update address
+    address: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00', // TODO: update address
     ticker: 'B-80RAFT-20R',
     decimals: 18,
     supportsPermit: true,
@@ -215,8 +215,8 @@ export const goerliConfig: NetworkConfig = {
   testNetwork: true,
   rSavingsModule: '0xDeEae93bf4bdA40529Fe5769Dd817996e86eb4Dd',
   // deploy merkle-distributor everytime
-  raftAirdropAddress: '0x95E18225302AbBc0B57bE97bECB4a6a5cE811612',
-  claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
+  raftAirdropAddress: '0x552e7271Dd11502BfaAD488140F3de9ca15bEd84',
+  claimRaftStakeVeRaftAddress: '0x2b1ad5011846D737fc13F2D3ed238C62942e4410',
   // this is veBAL
   veRaftAddress: '0x33A99Dcc4C85C014cf12626959111D5898bbCAbF',
   // this is veBAL/WETH pool
