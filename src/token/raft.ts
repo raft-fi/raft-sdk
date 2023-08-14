@@ -1,10 +1,12 @@
 import { SubgraphPoolBase, WeightedPool } from '@balancer-labs/sor';
 import { BigNumber } from 'bignumber.js';
 import { Decimal } from '@tempusfinance/decimal';
-import { Contract, Provider, Signer, TransactionResponse } from 'ethers';
+import { Provider, Signer, TransactionResponse } from 'ethers';
 import request, { gql } from 'graphql-request';
 import { RaftConfig } from '../config';
 import {
+  ClaimRaftAndStake,
+  ClaimRaftAndStake__factory,
   ERC20,
   ERC20Permit,
   ERC20Permit__factory,
@@ -23,10 +25,10 @@ import {
 import { TransactionWithFeesOptions } from '../types';
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
 
+const YEAR_IN_MS = 365 * 24 * 60 * 60 * 1000;
+
 // annual give away = 10% of 1B evenly over 3 years
 const ANNUAL_GIVE_AWAY = new Decimal(1000000000).mul(0.1).div(3);
-
-const TOKEN_APPROVAL_BUFFER = 0.01;
 
 type EstimateAprOption = {
   veRaftAvgTotalSupply?: Decimal;
@@ -63,11 +65,9 @@ type WhitelistMerkleTree = {
 export class RaftToken {
   private provider: Provider;
   private walletAddress: string;
-  private tokenContract: ERC20Permit;
   private veContract: VotingEscrow;
   private airdropContract: MerkleDistributor;
-  private claimAndStakeContract: Contract;
-  private balancerPoolLPTokenContract: ERC20Permit;
+  private claimAndStakeContract: ClaimRaftAndStake;
   private merkleTree?: WhitelistMerkleTree;
   private merkleProof?: WhitelistMerkleProof | null;
   private merkleTreeIndex?: number | null;
@@ -76,23 +76,10 @@ export class RaftToken {
   public constructor(walletAddress: string, provider: Provider) {
     this.provider = provider;
     this.walletAddress = walletAddress;
-    this.tokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.raftTokenAddress, provider);
     this.veContract = VotingEscrow__factory.connect(RaftConfig.networkConfig.veRaftAddress, provider);
-    this.balancerPoolLPTokenContract = ERC20Permit__factory.connect(
-      RaftConfig.networkConfig.balancerPoolLPTokenAddress,
-      provider,
-    );
-
-    // TODO: update ABI for RAFT airdrop contract
-    // https://github.com/raft-fi/raft-staking/blob/master/contracts/dependencies/IMerkleDistributor.sol
     this.airdropContract = MerkleDistributor__factory.connect(RaftConfig.networkConfig.raftAirdropAddress, provider);
-
-    // TODO: set ClaimRaftAndStake contract
-    // https://github.com/raft-fi/raft-staking/blob/master/contracts/ClaimRaftAndStake.sol
-    this.claimAndStakeContract = new Contract(
+    this.claimAndStakeContract = ClaimRaftAndStake__factory.connect(
       RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      [] as any,
       provider,
     );
   }
@@ -286,10 +273,17 @@ export class RaftToken {
     }
 
     const pool = WeightedPool.fromPool(poolData);
-    const poolPairData = pool.parsePoolPairData(poolData.tokensList[0], poolData.tokensList[1]);
-    const tokenIn = new BigNumber(stakeAmount.toString());
+    const tokenIn = poolData.tokensList.find(token => token === RaftConfig.networkConfig.raftTokenAddress);
+    const tokenOut = poolData.tokensList.find(token => token !== RaftConfig.networkConfig.raftTokenAddress);
 
-    return pool._exactTokenInForTokenOut(poolPairData, tokenIn);
+    if (!tokenIn || !tokenOut) {
+      return null;
+    }
+
+    const poolPairData = pool.parsePoolPairData(tokenIn, tokenOut);
+    const amountTokenIn = new BigNumber(stakeAmount.toString());
+
+    return pool._exactTokenInForTokenOut(poolPairData, amountTokenIn);
   }
 
   public async claim(signer: Signer, options: TransactionWithFeesOptions = {}): Promise<TransactionResponse> {
@@ -335,6 +329,7 @@ export class RaftToken {
     const { gasLimitMultiplier = Decimal.ONE } = options;
     const index = BigInt(this.merkleTreeIndex);
     const amount = this.claimableAmount.toBigInt(Decimal.PRECISION);
+    const unlockTime = BigInt(Date.now()) + period.mul(YEAR_IN_MS).toBigInt();
 
     const poolData = await this.getBalancerPoolData();
     const bptOutGivenExactRaftIn = await this.calculateBptOutGivenExactRaftIn(this.claimableAmount.mul(period), {
@@ -347,8 +342,12 @@ export class RaftToken {
 
     // minBptAmountOut = calculated BPT out * (1 - slippage)
     const minBptAmountOut = new Decimal(bptOutGivenExactRaftIn.toString()).mul(Decimal.ONE.sub(slippage));
-    // approvalAmount = calculated BPT out * (1 + buffer)
-    const approvalAmount = new Decimal(bptOutGivenExactRaftIn.toString()).mul(Decimal.ONE.add(TOKEN_APPROVAL_BUFFER));
+
+    const tokenContract = ERC20Permit__factory.connect(RaftConfig.networkConfig.raftTokenAddress, signer);
+    const balancerPoolLPTokenContract = ERC20Permit__factory.connect(
+      RaftConfig.networkConfig.balancerPoolLPTokenAddress,
+      signer,
+    );
 
     let raftTokenPermitSignature = EMPTY_SIGNATURE;
     let balancerLPTokenPermitSignature = EMPTY_SIGNATURE;
@@ -358,29 +357,23 @@ export class RaftToken {
     if (isEoaWallet) {
       // approve $RAFT token for approval amount
       await this.getApproval(
-        approvalAmount,
-        this.tokenContract as ERC20,
-        RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
-      );
-      // approve LP token for approval amount
-      await this.getApproval(
-        approvalAmount,
-        this.balancerPoolLPTokenContract as ERC20,
+        this.claimableAmount,
+        tokenContract as ERC20,
         RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
       );
     } else {
       // sign permit for $RAFT token for approval amount
       raftTokenPermitSignature = await this.getPermit(
-        approvalAmount,
+        this.claimableAmount,
         signer,
-        this.tokenContract,
+        tokenContract,
         RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
       );
       // sign permit for LP token for approval amount
       balancerLPTokenPermitSignature = await this.getPermit(
-        approvalAmount,
+        this.claimableAmount,
         signer,
-        this.balancerPoolLPTokenContract,
+        balancerPoolLPTokenContract,
         RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
       );
     }
@@ -388,10 +381,10 @@ export class RaftToken {
     const { sendTransaction } = await buildTransactionWithGasLimit(
       this.claimAndStakeContract.execute,
       [
-        index,
+        { index, merkleProof: this.merkleProof },
         this.walletAddress,
         amount,
-        this.merkleProof,
+        unlockTime,
         minBptAmountOut.toBigInt(Decimal.PRECISION),
         raftTokenPermitSignature,
         balancerLPTokenPermitSignature,

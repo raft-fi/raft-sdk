@@ -116,12 +116,11 @@ export const goerliConfig: NetworkConfig = {
   // this is BAL
   raftTokenAddress: '0xfa8449189744799ad2ace7e0ebac8bb7575eff47',
   // deploy merkle-distributor everytime
-  raftAirdropAddress: '0x95E18225302AbBc0B57bE97bECB4a6a5cE811612',
-  claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
+  raftAirdropAddress: '0x552e7271Dd11502BfaAD488140F3de9ca15bEd84',
+  claimRaftStakeVeRaftAddress: '0x2b1ad5011846D737fc13F2D3ed238C62942e4410',
   // this is veBAL
   veRaftAddress: '0x33A99Dcc4C85C014cf12626959111D5898bbCAbF',
   // this is veBAL/WETH pool
   balancerWeightedPoolId: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00000200000000000000000060',
-  // TODO: wait for deployment
-  balancerPoolLPTokenAddress: '0x0000000000000000000000000000000000000000',
+  balancerPoolLPTokenAddress: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00',
 };
