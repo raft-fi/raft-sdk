@@ -76,6 +76,7 @@ export class RaftToken {
   private provider: Provider;
   private walletAddress: string;
   private veContract: VotingEscrow;
+  private raftBptContract: ERC20Permit;
   private airdropContract: MerkleDistributor;
   private claimAndStakeContract: ClaimRaftAndStake;
   private merkleTree?: WhitelistMerkleTree;
@@ -87,6 +88,7 @@ export class RaftToken {
     this.provider = provider;
     this.walletAddress = walletAddress;
     this.veContract = VotingEscrow__factory.connect(RaftConfig.networkConfig.veRaftAddress, provider);
+    this.raftBptContract = getTokenContract(LP_BALANCER_TOKEN, this.provider);
     this.airdropContract = MerkleDistributor__factory.connect(RaftConfig.networkConfig.raftAirdropAddress, provider);
     this.claimAndStakeContract = ClaimRaftAndStake__factory.connect(
       RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
@@ -304,14 +306,19 @@ export class RaftToken {
 
     return {
       amount: new Decimal(lockedBalance.amount, Decimal.PRECISION),
-      unlockTime: lockedBalance.end ? new Date(Number(lockedBalance.end)) : null,
+      unlockTime: lockedBalance.end ? new Date(Number(lockedBalance.end) * 1000) : null,
       supply: new Decimal(totalSupply, Decimal.PRECISION),
     };
   }
 
-  public async claim(signer: Signer, options: TransactionWithFeesOptions = {}): Promise<TransactionResponse> {
+  public async getUserBptBalance(): Promise<Decimal> {
+    const balance = await this.raftBptContract.balanceOf(this.walletAddress);
+    return new Decimal(balance, Decimal.PRECISION);
+  }
+
+  public async claimRaft(signer: Signer, options: TransactionWithFeesOptions = {}): Promise<TransactionResponse> {
     if (this.merkleTreeIndex === null || this.merkleTreeIndex === undefined || !this.merkleProof) {
-      throw new Error('User is not on whitelist to claim!');
+      throw new Error('User is not on whitelist to claim RAFT!');
     }
 
     const { gasLimitMultiplier = Decimal.ONE } = options;
@@ -329,24 +336,14 @@ export class RaftToken {
     return sendTransaction();
   }
 
-  public async stake(period: Decimal): Promise<TransactionResponse | null> {
-    // TODO: lock RAFT/ETH LP token to get veRAFT
-    // https://github.com/balancer/balancer-v2-monorepo/blob/master/pkg/liquidity-mining/contracts/VotingEscrow.vy
-    // - create_lock
-    // - increase_amount
-    // - increase_unlock_time
-    period;
-    return null;
-  }
-
-  public async claimAndStake(
+  public async claimRaftAndStakeBptForVeRaft(
     period: Decimal,
     slippage: Decimal,
     signer: Signer,
     options: TransactionWithFeesOptions = {},
   ): Promise<TransactionResponse | null> {
     if (this.merkleTreeIndex === null || this.merkleTreeIndex === undefined || !this.merkleProof) {
-      throw new Error('User is not on whitelist to claim!');
+      throw new Error('User is not on whitelist to claim RAFT!');
     }
 
     const { gasLimitMultiplier = Decimal.ONE } = options;
@@ -367,7 +364,6 @@ export class RaftToken {
     const minBptAmountOut = new Decimal(bptOutGivenExactRaftIn.toString()).mul(Decimal.ONE.sub(slippage));
 
     const tokenContract = getTokenContract(RAFT_TOKEN, signer);
-    const balancerPoolLPTokenContract = getTokenContract(LP_BALANCER_TOKEN, signer);
 
     let raftTokenPermitSignature = EMPTY_PERMIT_SIGNATURE;
     let balancerLPTokenPermitSignature = EMPTY_PERMIT_SIGNATURE;
@@ -397,7 +393,7 @@ export class RaftToken {
         signer,
         this.claimableAmount,
         RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
-        balancerPoolLPTokenContract,
+        this.raftBptContract,
       );
     }
 
@@ -412,6 +408,34 @@ export class RaftToken {
         raftTokenPermitSignature,
         balancerLPTokenPermitSignature,
       ],
+      gasLimitMultiplier,
+      'raft',
+      signer,
+    );
+
+    return sendTransaction();
+  }
+
+  public async stakeBptForVeRaft(amount: Decimal, period: Decimal): Promise<TransactionResponse | null> {
+    // TODO: lock RAFT/ETH LP token to get veRAFT
+    // https://github.com/balancer/balancer-v2-monorepo/blob/master/pkg/liquidity-mining/contracts/VotingEscrow.vy
+    // - create_lock
+    // - increase_amount
+    // - increase_unlock_time
+    amount;
+    period;
+    return null;
+  }
+
+  public async withdrawVeRaft(
+    signer: Signer,
+    options: TransactionWithFeesOptions = {},
+  ): Promise<TransactionResponse | null> {
+    const { gasLimitMultiplier = Decimal.ONE } = options;
+
+    const { sendTransaction } = await buildTransactionWithGasLimit(
+      this.veContract.withdraw,
+      [],
       gasLimitMultiplier,
       'raft',
       signer,
