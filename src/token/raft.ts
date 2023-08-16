@@ -50,6 +50,17 @@ type VeRaftBalancePoint = {
   blk: bigint;
 };
 
+type VeRaftLockedBalance = {
+  amount: bigint;
+  end: bigint;
+};
+
+export type UserVeRaftBalance = {
+  amount: Decimal;
+  unlockTime: Date | null;
+  supply: Decimal;
+};
+
 type WhitelistMerkleProof = [string, string];
 type WhitelistMerkleTreeItem = {
   index: number;
@@ -128,7 +139,7 @@ export class RaftToken {
     return this.claimableAmount;
   }
 
-  private getVeRaftBalance(point: VeRaftBalancePoint, supplyAtTimestamp: number): bigint {
+  private getTotalVeRaftBalanceFromPoint(point: VeRaftBalancePoint, supplyAtTimestamp: number): bigint {
     return point.bias + point.slope * (BigInt(supplyAtTimestamp) - point.ts);
   }
 
@@ -144,7 +155,7 @@ export class RaftToken {
     const epoch = await this.veContract.epoch();
     const lastPoint = (await this.veContract.point_history(epoch)) as VeRaftBalancePoint;
 
-    const totalSupply = this.getVeRaftBalance(lastPoint, currentTimeInSecond + stakePeriodInSecond / 2);
+    const totalSupply = this.getTotalVeRaftBalanceFromPoint(lastPoint, currentTimeInSecond + stakePeriodInSecond / 2);
     return new Decimal(totalSupply, Decimal.PRECISION);
   }
 
@@ -284,6 +295,19 @@ export class RaftToken {
     const amountTokenIn = new BigNumber(stakeAmount.toString());
 
     return pool._exactTokenInForTokenOut(poolPairData, amountTokenIn);
+  }
+
+  public async getUserVeRaftBalance(): Promise<UserVeRaftBalance> {
+    const [lockedBalance, totalSupply] = await Promise.all([
+      this.veContract.locked(this.walletAddress) as Promise<VeRaftLockedBalance>,
+      this.veContract.supply(),
+    ]);
+
+    return {
+      amount: new Decimal(lockedBalance.amount, Decimal.PRECISION),
+      unlockTime: lockedBalance.end ? new Date(Number(lockedBalance.end)) : null,
+      supply: new Decimal(totalSupply, Decimal.PRECISION),
+    };
   }
 
   public async claim(signer: Signer, options: TransactionWithFeesOptions = {}): Promise<TransactionResponse> {

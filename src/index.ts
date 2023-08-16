@@ -19,7 +19,7 @@ export {
 } from './position';
 export { PriceFeed } from './price';
 export { Protocol } from './protocol';
-export { RaftToken } from './token';
+export { RaftToken, type UserVeRaftBalance } from './token';
 export {
   COLLATERAL_TOKENS,
   R_TOKEN,
