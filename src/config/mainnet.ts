@@ -123,5 +123,5 @@ export const mainnetConfig: NetworkConfig = {
   // TODO: update this to RAFT/R pool
   balancerWeightedPoolId: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014',
   // TODO: wait for deployment
-  balancerPoolLPTokenAddress: '0x0000000000000000000000000000000000000000',
+  raftBptAddress: '0x0000000000000000000000000000000000000000',
 };

@@ -122,5 +122,5 @@ export const goerliConfig: NetworkConfig = {
   veRaftAddress: '0x33A99Dcc4C85C014cf12626959111D5898bbCAbF',
   // this is veBAL/WETH pool
   balancerWeightedPoolId: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00000200000000000000000060',
-  balancerPoolLPTokenAddress: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00',
+  raftBptAddress: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00',
 };
