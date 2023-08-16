@@ -52,5 +52,5 @@ export interface NetworkConfig {
   veRaftAddress: string;
   // 80/20 balancer weighted pool for RAFT/R
   balancerWeightedPoolId: string;
-  balancerPoolLPTokenAddress: string;
+  raftBptAddress: string;
 }
