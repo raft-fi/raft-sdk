@@ -415,15 +415,66 @@ export class RaftToken {
     return sendTransaction();
   }
 
-  public async stakeBptForVeRaft(amount: Decimal, period: Decimal): Promise<TransactionResponse | null> {
-    // TODO: lock RAFT/ETH LP token to get veRAFT
-    // https://github.com/balancer/balancer-v2-monorepo/blob/master/pkg/liquidity-mining/contracts/VotingEscrow.vy
-    // - create_lock
-    // - increase_amount
-    // - increase_unlock_time
-    amount;
-    period;
-    return null;
+  public async stakeBptForVeRaft(
+    bptAmount: Decimal,
+    unlockTime: Date,
+    signer: Signer,
+    options: TransactionWithFeesOptions = {},
+  ): Promise<TransactionResponse | null> {
+    const { gasLimitMultiplier = Decimal.ONE } = options;
+
+    const amount = bptAmount.toBigInt(Decimal.PRECISION);
+    const unlockTimestamp = BigInt(Math.floor(unlockTime.getTime() / 1000));
+
+    const { sendTransaction } = await buildTransactionWithGasLimit(
+      this.veContract.create_lock,
+      [amount, unlockTimestamp],
+      gasLimitMultiplier,
+      'raft',
+      signer,
+    );
+
+    return sendTransaction();
+  }
+
+  public async increaseStakeBptForVeRaft(
+    bptAmount: Decimal,
+    signer: Signer,
+    options: TransactionWithFeesOptions = {},
+  ): Promise<TransactionResponse | null> {
+    const { gasLimitMultiplier = Decimal.ONE } = options;
+
+    const amount = bptAmount.toBigInt(Decimal.PRECISION);
+
+    const { sendTransaction } = await buildTransactionWithGasLimit(
+      this.veContract.increase_amount,
+      [amount],
+      gasLimitMultiplier,
+      'raft',
+      signer,
+    );
+
+    return sendTransaction();
+  }
+
+  public async extendStakeBptForVeRaft(
+    unlockTime: Date,
+    signer: Signer,
+    options: TransactionWithFeesOptions = {},
+  ): Promise<TransactionResponse | null> {
+    const { gasLimitMultiplier = Decimal.ONE } = options;
+
+    const unlockTimestamp = BigInt(Math.floor(unlockTime.getTime() / 1000));
+
+    const { sendTransaction } = await buildTransactionWithGasLimit(
+      this.veContract.increase_unlock_time,
+      [unlockTimestamp],
+      gasLimitMultiplier,
+      'raft',
+      signer,
+    );
+
+    return sendTransaction();
   }
 
   public async withdrawVeRaft(
