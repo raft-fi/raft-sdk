@@ -49,13 +49,14 @@ type VeRaftBalancePoint = {
   blk: bigint;
 };
 
-type VeRaftLockedBalance = {
+type BptLockedBalance = {
   amount: bigint;
   end: bigint;
 };
 
 export type UserVeRaftBalance = {
-  amount: Decimal;
+  bptLockedBalance: Decimal;
+  veRaftBalance: Decimal;
   unlockTime: Date | null;
   supply: Decimal;
 };
@@ -299,13 +300,15 @@ export class RaftToken {
   }
 
   public async getUserVeRaftBalance(): Promise<UserVeRaftBalance> {
-    const [lockedBalance, totalSupply] = await Promise.all([
-      this.veContract.locked(this.walletAddress) as Promise<VeRaftLockedBalance>,
+    const [lockedBalance, veRaftBalance, totalSupply] = await Promise.all([
+      this.veContract.locked(this.walletAddress) as Promise<BptLockedBalance>,
+      this.veContract['balanceOf(address)'](this.walletAddress) as Promise<bigint>,
       this.veContract.supply(),
     ]);
 
     return {
-      amount: new Decimal(lockedBalance.amount, Decimal.PRECISION),
+      bptLockedBalance: new Decimal(lockedBalance.amount, Decimal.PRECISION),
+      veRaftBalance: new Decimal(veRaftBalance, Decimal.PRECISION),
       unlockTime: lockedBalance.end ? new Date(Number(lockedBalance.end) * 1000) : null,
       supply: new Decimal(totalSupply, Decimal.PRECISION),
     };
