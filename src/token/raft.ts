@@ -341,7 +341,7 @@ export class RaftToken {
     bptAmount: Decimal,
     unlockTime: Date,
     signer: Signer,
-    options: TransactionWithFeesOptions & StakeBptPrefetch = {},
+    options: StakeBptPrefetch = {},
   ): AsyncGenerator<StakeBptStep, void, void> {
     let { userVeRaftBalance, bptAllowance } = options;
 
@@ -370,7 +370,7 @@ export class RaftToken {
 
     if (lockedBptAmount.isZero()) {
       // new stake
-      const action = () => this.stakeBptForVeRaft(bptAmount, unlockTime, signer, options);
+      const action = () => this.stakeBptForVeRaft(bptAmount, unlockTime, signer);
 
       yield {
         type: 'stake-new',
@@ -383,7 +383,7 @@ export class RaftToken {
 
       if (bptAmount.gt(0)) {
         // increase lock amount
-        const action = () => this.increaseStakeBptForVeRaft(bptAmount, signer, options);
+        const action = () => this.increaseStakeBptForVeRaft(bptAmount, signer);
 
         yield {
           type: 'stake-increase',
@@ -393,7 +393,7 @@ export class RaftToken {
 
       if (currentUnlockedTime && currentUnlockedTime.getTime() < unlockTime.getTime()) {
         // extend lock period
-        const action = () => this.extendStakeBptForVeRaft(unlockTime, signer, options);
+        const action = () => this.extendStakeBptForVeRaft(unlockTime, signer);
 
         yield {
           type: 'stake-extend',
@@ -503,79 +503,27 @@ export class RaftToken {
     return sendTransaction();
   }
 
-  public async stakeBptForVeRaft(
-    bptAmount: Decimal,
-    unlockTime: Date,
-    signer: Signer,
-    options: TransactionWithFeesOptions = {},
-  ): Promise<TransactionResponse> {
-    const { gasLimitMultiplier = Decimal.ONE } = options;
-
+  public async stakeBptForVeRaft(bptAmount: Decimal, unlockTime: Date, signer: Signer): Promise<TransactionResponse> {
     const amount = bptAmount.toBigInt(Decimal.PRECISION);
     const unlockTimestamp = BigInt(Math.floor(unlockTime.getTime() / 1000));
-
-    const { sendTransaction } = await buildTransactionWithGasLimit(
-      this.veContract.create_lock,
-      [amount, unlockTimestamp],
-      gasLimitMultiplier,
-      'raft',
-      signer,
-    );
-
-    return sendTransaction();
+    const txnRequest = await this.veContract.create_lock.populateTransaction(amount, unlockTimestamp);
+    return signer.sendTransaction(txnRequest);
   }
 
-  public async increaseStakeBptForVeRaft(
-    bptAmount: Decimal,
-    signer: Signer,
-    options: TransactionWithFeesOptions = {},
-  ): Promise<TransactionResponse> {
-    const { gasLimitMultiplier = Decimal.ONE } = options;
-
+  public async increaseStakeBptForVeRaft(bptAmount: Decimal, signer: Signer): Promise<TransactionResponse> {
     const amount = bptAmount.toBigInt(Decimal.PRECISION);
-
-    const { sendTransaction } = await buildTransactionWithGasLimit(
-      this.veContract.increase_amount,
-      [amount],
-      gasLimitMultiplier,
-      'raft',
-      signer,
-    );
-
-    return sendTransaction();
+    const txnRequest = await this.veContract.increase_amount.populateTransaction(amount);
+    return signer.sendTransaction(txnRequest);
   }
 
-  public async extendStakeBptForVeRaft(
-    unlockTime: Date,
-    signer: Signer,
-    options: TransactionWithFeesOptions = {},
-  ): Promise<TransactionResponse> {
-    const { gasLimitMultiplier = Decimal.ONE } = options;
-
+  public async extendStakeBptForVeRaft(unlockTime: Date, signer: Signer): Promise<TransactionResponse> {
     const unlockTimestamp = BigInt(Math.floor(unlockTime.getTime() / 1000));
-
-    const { sendTransaction } = await buildTransactionWithGasLimit(
-      this.veContract.increase_unlock_time,
-      [unlockTimestamp],
-      gasLimitMultiplier,
-      'raft',
-      signer,
-    );
-
-    return sendTransaction();
+    const txnRequest = await this.veContract.increase_unlock_time.populateTransaction(unlockTimestamp);
+    return signer.sendTransaction(txnRequest);
   }
 
-  public async withdrawVeRaft(signer: Signer, options: TransactionWithFeesOptions = {}): Promise<TransactionResponse> {
-    const { gasLimitMultiplier = Decimal.ONE } = options;
-
-    const { sendTransaction } = await buildTransactionWithGasLimit(
-      this.veContract.withdraw,
-      [],
-      gasLimitMultiplier,
-      'raft',
-      signer,
-    );
-
-    return sendTransaction();
+  public async withdrawVeRaft(signer: Signer): Promise<TransactionResponse> {
+    const txnRequest = await this.veContract.withdraw.populateTransaction();
+    return signer.sendTransaction(txnRequest);
   }
 }
