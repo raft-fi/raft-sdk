@@ -48,3 +48,7 @@ export interface TransactionWithFeesOptions {
 }
 
 export type SwapRouter = '1inch';
+
+export const RAFT_TOKEN = 'RAFT';
+export const VERAFT_TOKEN = 'veRAFT';
+export const RAFT_BPT_TOKEN = 'B-80RAFT-20WETH';

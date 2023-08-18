@@ -26,7 +26,13 @@ export {
 } from './savings';
 export { PriceFeed } from './price';
 export { Protocol } from './protocol';
-export { RaftToken, type UserVeRaftBalance } from './token';
+export {
+  RaftToken,
+  type UserVeRaftBalance,
+  type StakeBptStep,
+  type StakeBptStepType,
+  type StakeBptPrefetch,
+} from './token';
 export {
   COLLATERAL_TOKENS,
   R_TOKEN,
@@ -34,6 +40,9 @@ export {
   UNDERLYING_COLLATERAL_TOKENS,
   WRAPPABLE_CAPPED_COLLATERAL_TOKENS,
   WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS,
+  RAFT_TOKEN,
+  VERAFT_TOKEN,
+  RAFT_BPT_TOKEN,
   type CollateralToken,
   type RToken,
   type Token,

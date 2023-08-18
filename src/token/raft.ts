@@ -73,6 +73,16 @@ type WhitelistMerkleTree = {
   claims: Record<string, WhitelistMerkleTreeItem>;
 };
 
+export type StakeBptStepType = 'approve' | 'stake-new' | 'stake-increase' | 'stake-extend';
+export type StakeBptStep = {
+  type: StakeBptStepType;
+  action: () => Promise<TransactionResponse>;
+};
+export type StakeBptPrefetch = {
+  userVeRaftBalance?: UserVeRaftBalance;
+  bptAllowance?: Decimal;
+};
+
 export class RaftToken {
   private provider: Provider;
   private walletAddress: string;
@@ -319,6 +329,80 @@ export class RaftToken {
     return new Decimal(balance, Decimal.PRECISION);
   }
 
+  public async getUserBptAllowance(): Promise<Decimal> {
+    const tokenAllowance = await this.raftBptContract.allowance(
+      this.walletAddress,
+      RaftConfig.networkConfig.veRaftAddress,
+    );
+    return new Decimal(tokenAllowance, Decimal.PRECISION);
+  }
+
+  public async *getStakeBptSteps(
+    bptAmount: Decimal,
+    unlockTime: Date,
+    signer: Signer,
+    options: TransactionWithFeesOptions & StakeBptPrefetch = {},
+  ): AsyncGenerator<StakeBptStep, void, void> {
+    let { userVeRaftBalance, bptAllowance } = options;
+
+    if (!bptAllowance) {
+      bptAllowance = await this.getUserBptAllowance();
+    }
+
+    // veRAFT contract doesnt accept permit
+    if (bptAllowance.lt(bptAmount)) {
+      // ask for BPT token approval
+      const action = () =>
+        this.raftBptContract.approve(RaftConfig.networkConfig.veRaftAddress, bptAmount.toBigInt(Decimal.PRECISION));
+
+      yield {
+        type: 'approve',
+        action,
+      };
+    }
+
+    if (!userVeRaftBalance) {
+      userVeRaftBalance = await this.getUserVeRaftBalance();
+    }
+
+    const lockedBptAmount = userVeRaftBalance.bptLockedBalance;
+    const currentUnlockedTime = userVeRaftBalance.unlockTime;
+
+    if (lockedBptAmount.isZero()) {
+      // new stake
+      const action = () => this.stakeBptForVeRaft(bptAmount, unlockTime, signer, options);
+
+      yield {
+        type: 'stake-new',
+        action,
+      };
+    } else {
+      if (currentUnlockedTime && currentUnlockedTime.getTime() > unlockTime.getTime()) {
+        throw new Error('Unlock time cannot be earlier than the current one');
+      }
+
+      if (bptAmount.gt(0)) {
+        // increase lock amount
+        const action = () => this.increaseStakeBptForVeRaft(bptAmount, signer, options);
+
+        yield {
+          type: 'stake-increase',
+          action,
+        };
+      }
+
+      if (currentUnlockedTime && currentUnlockedTime.getTime() < unlockTime.getTime()) {
+        // extend lock period
+        const action = () => this.extendStakeBptForVeRaft(unlockTime, signer, options);
+
+        yield {
+          type: 'stake-extend',
+          action,
+        };
+      }
+    }
+  }
+
   public async claimRaft(signer: Signer, options: TransactionWithFeesOptions = {}): Promise<TransactionResponse> {
     if (this.merkleTreeIndex === null || this.merkleTreeIndex === undefined || !this.merkleProof) {
       throw new Error('User is not on whitelist to claim RAFT!');
@@ -344,7 +428,7 @@ export class RaftToken {
     slippage: Decimal,
     signer: Signer,
     options: TransactionWithFeesOptions = {},
-  ): Promise<TransactionResponse | null> {
+  ): Promise<TransactionResponse> {
     if (this.merkleTreeIndex === null || this.merkleTreeIndex === undefined || !this.merkleProof) {
       throw new Error('User is not on whitelist to claim RAFT!');
     }
@@ -424,7 +508,7 @@ export class RaftToken {
     unlockTime: Date,
     signer: Signer,
     options: TransactionWithFeesOptions = {},
-  ): Promise<TransactionResponse | null> {
+  ): Promise<TransactionResponse> {
     const { gasLimitMultiplier = Decimal.ONE } = options;
 
     const amount = bptAmount.toBigInt(Decimal.PRECISION);
@@ -445,7 +529,7 @@ export class RaftToken {
     bptAmount: Decimal,
     signer: Signer,
     options: TransactionWithFeesOptions = {},
-  ): Promise<TransactionResponse | null> {
+  ): Promise<TransactionResponse> {
     const { gasLimitMultiplier = Decimal.ONE } = options;
 
     const amount = bptAmount.toBigInt(Decimal.PRECISION);
@@ -465,7 +549,7 @@ export class RaftToken {
     unlockTime: Date,
     signer: Signer,
     options: TransactionWithFeesOptions = {},
-  ): Promise<TransactionResponse | null> {
+  ): Promise<TransactionResponse> {
     const { gasLimitMultiplier = Decimal.ONE } = options;
 
     const unlockTimestamp = BigInt(Math.floor(unlockTime.getTime() / 1000));
@@ -481,10 +565,7 @@ export class RaftToken {
     return sendTransaction();
   }
 
-  public async withdrawVeRaft(
-    signer: Signer,
-    options: TransactionWithFeesOptions = {},
-  ): Promise<TransactionResponse | null> {
+  public async withdrawVeRaft(signer: Signer, options: TransactionWithFeesOptions = {}): Promise<TransactionResponse> {
     const { gasLimitMultiplier = Decimal.ONE } = options;
 
     const { sendTransaction } = await buildTransactionWithGasLimit(
