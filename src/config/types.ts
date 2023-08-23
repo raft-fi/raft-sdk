@@ -45,4 +45,5 @@ export interface NetworkConfig {
   tokens: Record<Token, TokenConfig>;
   testNetwork: boolean;
   daiAddress: string;
+  rSavingsModule: string;
 }

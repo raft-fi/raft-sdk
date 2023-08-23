@@ -113,4 +113,5 @@ export const goerliConfig: NetworkConfig = {
   tokens: tokensConfig,
   daiAddress: '', // Add address if we ever deploy one step leverage on goerli
   testNetwork: true,
+  rSavingsModule: '0xDeEae93bf4bdA40529Fe5769Dd817996e86eb4Dd',
 };
