@@ -155,6 +155,14 @@ export class UserSavings extends Savings {
     return this.userAddress;
   }
 
+  public async currentSavings(): Promise<Decimal> {
+    const userAddress = await this.getUserAddress();
+
+    const userSavings = await this.rSavingsModuleContract.maxWithdraw(userAddress);
+
+    return new Decimal(userSavings, Decimal.PRECISION);
+  }
+
   private *getSignTokenPermitStep(
     tokenContract: ERC20Permit,
     approveAmount: Decimal,
