@@ -1,13 +1,13 @@
-import { Provider, Signer, ethers } from 'ethers';
+import { ContractRunner, ethers } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from '../config';
 import { RSavingsModule, RSavingsModule__factory } from '../typechain';
 
 export class Savings {
-  protected providerOrSigner: Provider | Signer;
+  protected providerOrSigner: ContractRunner;
   protected rSavingsModuleContract: RSavingsModule;
 
-  constructor(providerOrSigner: Provider | Signer) {
+  constructor(providerOrSigner: ContractRunner) {
     this.providerOrSigner = providerOrSigner;
 
     this.rSavingsModuleContract = RSavingsModule__factory.connect(
