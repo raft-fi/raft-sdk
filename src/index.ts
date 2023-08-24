@@ -17,7 +17,7 @@ export {
   type PositionTransaction,
   type PositionTransactionType,
 } from './position';
-export { type ManageSavingsStep, UserSavings } from './savings';
+export { type ManageSavingsStep, UserSavings, Savings } from './savings';
 export { PriceFeed } from './price';
 export { Protocol } from './protocol';
 export {
