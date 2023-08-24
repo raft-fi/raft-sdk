@@ -1,11 +1,12 @@
 import { Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { ERC20PermitSignatureStruct, RSavingsModule } from '../typechain/RSavingsModule';
+import { ERC20PermitSignatureStruct } from '../typechain/RSavingsModule';
 import { R_TOKEN, TransactionWithFeesOptions } from '../types';
 import { createEmptyPermitSignature, createPermitSignature, isEoaAddress, sendTransactionWithGasLimit } from '../utils';
-import { ERC20, ERC20Permit, ERC20Permit__factory, RSavingsModule__factory } from '../typechain';
+import { ERC20, ERC20Permit, ERC20Permit__factory } from '../typechain';
 import { RaftConfig } from '../config';
 import { getTokenAllowance } from '../allowance';
+import { Savings } from './savings';
 
 export interface ManageSavingsStepType {
   name: 'approve' | 'permit' | 'manageSavings';
@@ -45,18 +46,18 @@ type ApproveStep = {
   action: () => Promise<TransactionResponse>;
 };
 
-export class UserSavings {
+export class UserSavings extends Savings {
   private userAddress: string;
   private user: Signer;
   private rToken: ERC20Permit;
-  private rSavingsModuleContract: RSavingsModule;
 
   constructor(user: Signer) {
+    super(user);
+
     this.user = user;
     this.userAddress = '';
 
     this.rToken = ERC20Permit__factory.connect(RaftConfig.networkConfig.tokens[R_TOKEN].address, this.user);
-    this.rSavingsModuleContract = RSavingsModule__factory.connect(RaftConfig.networkConfig.rSavingsModule, this.user);
   }
 
   public async *getManageSavingsSteps(
