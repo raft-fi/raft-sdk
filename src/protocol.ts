@@ -20,7 +20,7 @@ import {
   isWrappedCappedUnderlyingCollateralToken,
   sendTransactionWithGasLimit,
 } from './utils';
-import { FLASH_MINT_FEE } from './constants';
+import { FLASH_MINT_FEE, SECONDS_IN_MINUTE } from './constants';
 
 interface OpenPositionsResponse {
   count: string;
@@ -31,7 +31,7 @@ const ORACLE_DEVIATION: Record<UnderlyingCollateralToken, Decimal> = {
   wstETH: new Decimal(0.01), // 1%
   wcrETH: new Decimal(0.015), // 1.5%
 };
-const SECONDS_IN_MINUTE = 60;
+
 const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)
 
 export class Protocol {
