@@ -16,6 +16,8 @@ export type WrappableCappedCollateralToken = (typeof WRAPPABLE_CAPPED_COLLATERAL
 export type WrappedCappedUnderlyingCollateralToken = (typeof WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS)[number];
 export type UnderlyingCollateralToken = (typeof UNDERLYING_COLLATERAL_TOKENS)[number];
 export type CollateralToken = (typeof COLLATERAL_TOKENS)[number];
+export type RaftCollateralToken = `r${UnderlyingCollateralToken}-c`;
+export type RaftDebtToken = `r${UnderlyingCollateralToken}-d`;
 export type RToken = typeof R_TOKEN;
 export type Token = (typeof TOKENS)[number];
 

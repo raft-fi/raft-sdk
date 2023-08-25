@@ -3,11 +3,15 @@ export { createPermitSignature, EMPTY_SIGNATURE } from './permit';
 export { getPositionManagerContract } from './position-manager';
 export { buildTransactionWithGasLimit } from './transactions';
 export {
+  getRaftCollateralToken,
+  getRaftDebtToken,
   getTokenContract,
   getWrappedCappedCollateralToken,
   isCollateralToken,
-  isUnderlyingCollateralToken,
+  isRaftCollateralToken,
+  isRaftDebtToken,
   isRToken,
+  isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
 } from './token';
