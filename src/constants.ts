@@ -1,6 +1,11 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { SwapRouter, UnderlyingCollateralToken } from './types';
 
+// Time constants
+
+export const SECONDS_IN_MINUTE = 60;
+export const SECONDS_PER_YEAR = 60 * 60 * 24 * 365.2425; // One Gregorian year has 365.2425 days
+
 // Protocol constants
 
 export const MIN_COLLATERAL_RATIO: Record<UnderlyingCollateralToken, Decimal> = {
