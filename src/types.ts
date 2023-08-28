@@ -18,6 +18,7 @@ export const COLLATERAL_TOKENS = [
   ...UNDERLYING_COLLATERAL_TOKENS,
 ] as const;
 export const RAFT_TOKEN = 'RAFT';
+export const VERAFT_TOKEN = 'veRAFT';
 export const R_TOKEN = 'R';
 export const LP_BALANCER_TOKEN = 'B-80RAFT-20R';
 export const TOKENS = [...COLLATERAL_TOKENS, RAFT_TOKEN, R_TOKEN, LP_BALANCER_TOKEN] as const;
@@ -31,6 +32,8 @@ export type WrappedCappedUnderlyingCollateralToken = (typeof WRAPPED_CAPPED_UNDE
 export type UnderlyingCollateralToken = (typeof UNDERLYING_COLLATERAL_TOKENS)[number];
 export type CollateralToken = (typeof COLLATERAL_TOKENS)[number];
 export type RaftToken = typeof RAFT_TOKEN;
+export type RaftCollateralToken = `r${UnderlyingCollateralToken}-c`;
+export type RaftDebtToken = `r${UnderlyingCollateralToken}-d`;
 export type RToken = typeof R_TOKEN;
 export type Token = (typeof TOKENS)[number];
 
@@ -48,7 +51,3 @@ export interface TransactionWithFeesOptions {
 }
 
 export type SwapRouter = '1inch';
-
-export const RAFT_TOKEN = 'RAFT';
-export const VERAFT_TOKEN = 'veRAFT';
-export const RAFT_BPT_TOKEN = 'B-80RAFT-20WETH';
