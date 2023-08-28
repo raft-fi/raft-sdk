@@ -2,6 +2,8 @@ import { ContractRunner, ZeroAddress } from 'ethers';
 import { RaftConfig } from '../config';
 import {
   ERC20,
+  ERC20Indexable,
+  ERC20Indexable__factory,
   ERC20PermitRToken,
   ERC20PermitRToken__factory,
   ERC20Permit__factory,
@@ -16,6 +18,8 @@ import {
   CollateralToken,
   RToken,
   R_TOKEN,
+  RaftCollateralToken,
+  RaftDebtToken,
   Token,
   UNDERLYING_COLLATERAL_TOKENS,
   UnderlyingCollateralToken,
@@ -37,6 +41,10 @@ type TokenContractTypes = {
   rETH: ERC20;
   wcrETH: WrappedCollateralToken;
   R: ERC20PermitRToken;
+  'rwstETH-c': ERC20Indexable;
+  'rwstETH-d': ERC20Indexable;
+  'rwcrETH-c': ERC20Indexable;
+  'rwcrETH-d': ERC20Indexable;
 };
 
 export function isWrappableCappedCollateralToken(token: Token): token is WrappableCappedCollateralToken {
@@ -61,14 +69,55 @@ export function isRToken(token: Token): token is RToken {
   return token === R_TOKEN;
 }
 
-export function getWrappedCappedCollateralToken<T extends WrappableCappedCollateralToken>(
-  underlyingToken: T,
+export function getWrappedCappedCollateralToken(
+  underlyingToken: WrappableCappedCollateralToken,
 ): WrappedCappedUnderlyingCollateralToken {
   return `wc${underlyingToken}`;
 }
 
-export function getTokenContract<T extends Token>(token: T, runner: ContractRunner): TokenContractTypes[T] {
-  const tokenConfig = RaftConfig.networkConfig.tokens[token];
+export function getRaftCollateralToken(token: UnderlyingCollateralToken): RaftCollateralToken {
+  return `r${token}-c`;
+}
+
+export function getRaftDebtToken(token: UnderlyingCollateralToken): RaftDebtToken {
+  return `r${token}-d`;
+}
+
+export function isRaftCollateralToken(token: string): token is RaftCollateralToken {
+  return token.startsWith('r') && token.endsWith('-c') && token.slice(1, -2) in UNDERLYING_COLLATERAL_TOKEN_SET;
+}
+
+export function isRaftDebtToken(token: string): token is RaftDebtToken {
+  return token.startsWith('r') && token.endsWith('-d') && token.slice(1, -2) in UNDERLYING_COLLATERAL_TOKEN_SET;
+}
+
+export function getUnderlyingCollateralTokenFromRaftToken(
+  token: RaftCollateralToken | RaftDebtToken,
+): UnderlyingCollateralToken {
+  return token.slice(1, -2) as UnderlyingCollateralToken;
+}
+
+export function getTokenContract<T extends Token | RaftCollateralToken | RaftDebtToken>(
+  token: T,
+  runner: ContractRunner,
+): TokenContractTypes[T] {
+  if (isRaftCollateralToken(token)) {
+    const underlyingToken = getUnderlyingCollateralTokenFromRaftToken(token);
+    return ERC20Indexable__factory.connect(
+      RaftConfig.networkConfig.raftCollateralTokens[underlyingToken],
+      runner,
+    ) as TokenContractTypes[T];
+  }
+
+  if (isRaftDebtToken(token)) {
+    const underlyingToken = getUnderlyingCollateralTokenFromRaftToken(token);
+    return ERC20Indexable__factory.connect(
+      RaftConfig.networkConfig.raftDebtTokens[underlyingToken],
+      runner,
+    ) as TokenContractTypes[T];
+  }
+
+  const tokenConfig = RaftConfig.networkConfig.tokens[token as Token];
   const tokenAddress = RaftConfig.getTokenAddress(token);
 
   if (tokenAddress === ZeroAddress) {

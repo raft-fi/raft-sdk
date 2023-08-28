@@ -2,7 +2,7 @@ import { request, gql } from 'graphql-request';
 import { Provider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
-import { ERC20Indexable__factory, ERC20PermitRToken, PositionManager, WrappedCollateralToken } from './typechain';
+import { ERC20PermitRToken, PositionManager, WrappedCollateralToken } from './typechain';
 import {
   CollateralToken,
   R_TOKEN,
@@ -19,6 +19,8 @@ import {
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
   buildTransactionWithGasLimit,
+  getRaftCollateralToken,
+  getRaftDebtToken,
 } from './utils';
 
 interface OpenPositionsResponse {
@@ -175,9 +177,7 @@ export class Protocol {
   async fetchCollateralSupply(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
     await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
-        const collateralTokenAddress = RaftConfig.networkConfig.raftCollateralTokens[collateralToken];
-        const contract = ERC20Indexable__factory.connect(collateralTokenAddress, this.provider);
-
+        const contract = getTokenContract(getRaftCollateralToken(collateralToken), this.provider);
         this._collateralSupply[collateralToken] = new Decimal(await contract.totalSupply(), Decimal.PRECISION);
       }),
     );
@@ -192,9 +192,7 @@ export class Protocol {
   async fetchDebtSupply(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
     await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
-        const debtTokenAddress = RaftConfig.networkConfig.raftDebtTokens[collateralToken];
-        const contract = ERC20Indexable__factory.connect(debtTokenAddress, this.provider);
-
+        const contract = getTokenContract(getRaftDebtToken(collateralToken), this.provider);
         this._debtSupply[collateralToken] = new Decimal(await contract.totalSupply(), Decimal.PRECISION);
       }),
     );
