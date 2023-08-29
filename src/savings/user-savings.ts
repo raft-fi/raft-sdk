@@ -1,4 +1,5 @@
 import { Signer, TransactionResponse } from 'ethers';
+import request, { gql } from 'graphql-request';
 import { Decimal } from '@tempusfinance/decimal';
 import { ERC20PermitSignatureStruct } from '../typechain/RSavingsModule';
 import { R_TOKEN, TransactionWithFeesOptions } from '../types';
@@ -45,6 +46,28 @@ type ApproveStep = {
   numberOfSteps: number;
   action: () => Promise<TransactionResponse>;
 };
+
+export type SavingsTransactionType = 'DEPOSIT' | 'WITHDRAW';
+
+interface SavingsTransactionQuery {
+  id: string;
+  type: SavingsTransactionType;
+  amount: string;
+  timestamp: string;
+}
+
+interface SavingsTransactionsQuery {
+  position: {
+    savings: SavingsTransactionQuery[];
+  } | null;
+}
+
+export interface SavingsTransaction {
+  id: string;
+  type: SavingsTransactionType;
+  amount: Decimal;
+  timestamp: Date;
+}
 
 export class UserSavings extends Savings {
   private userAddress: string;
@@ -161,6 +184,36 @@ export class UserSavings extends Savings {
     const userSavings = await this.rSavingsModuleContract.maxWithdraw(userAddress);
 
     return new Decimal(userSavings, Decimal.PRECISION);
+  }
+
+  async getSavingsTransactions(): Promise<SavingsTransaction[]> {
+    const query = gql`
+      query GetTransactions($ownerAddress: String!) {
+        position(id: $ownerAddress) {
+          savings(orderBy: timestamp, orderDirection: desc) {
+            id
+            type
+            amount
+            timestamp
+          }
+        }
+      }
+    `;
+
+    const userAddress = await this.getUserAddress();
+    const response = await request<SavingsTransactionsQuery>(RaftConfig.subgraphEndpoint, query, {
+      ownerAddress: userAddress.toLowerCase(),
+    });
+
+    if (!response.position?.savings) {
+      return [];
+    }
+
+    return response.position.savings.map(savingsTransaction => ({
+      ...savingsTransaction,
+      amount: Decimal.parse(BigInt(savingsTransaction.amount), 0n, Decimal.PRECISION),
+      timestamp: new Date(Number(savingsTransaction.timestamp) * 1000),
+    }));
   }
 
   private *getSignTokenPermitStep(
