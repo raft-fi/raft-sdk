@@ -7,8 +7,6 @@ import {
   ChaiToken__factory,
   ChainlinkDaiUsdAggregator__factory,
   ERC20Indexable__factory,
-  ERC20PermitRToken,
-  PositionManager,
   WrappedCollateralToken,
 } from './typechain';
 import {
@@ -53,9 +51,6 @@ export class Protocol {
   private static instance: Protocol;
 
   private provider: Provider;
-  private positionManager: PositionManager;
-  private rToken: ERC20PermitRToken;
-
   private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
     'wstETH-v1': null,
     'wcrETH-v1': null,
@@ -105,8 +100,6 @@ export class Protocol {
    */
   private constructor(provider: Provider) {
     this.provider = provider;
-    this.positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, this.provider);
-    this.rToken = getTokenContract(R_TOKEN, this.provider);
   }
 
   /**
@@ -260,6 +253,8 @@ export class Protocol {
    * @returns Fetched borrowing rate.
    */
   async fetchBorrowingRate(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
+    const positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, this.provider);
+
     await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
         const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
@@ -269,7 +264,7 @@ export class Protocol {
         }
 
         this._borrowingRate[collateralToken] = new Decimal(
-          await this.positionManager.getBorrowingRate(collateralTokenAddress),
+          await positionManager.getBorrowingRate(collateralTokenAddress),
           BORROWING_RATE_PRECISION,
         );
       }),
@@ -328,7 +323,8 @@ export class Protocol {
    * @returns Fetched flash mint fee.
    */
   public async fetchFlashMintFee(): Promise<Decimal> {
-    this._flashMintFee = new Decimal(await this.rToken.flashMintFeePercentage(), 0).div(FLASH_MINT_FEE_PERCENTAGE_BASE);
+    const rToken = getTokenContract(R_TOKEN, this.provider);
+    this._flashMintFee = new Decimal(await rToken.flashMintFeePercentage(), 0).div(FLASH_MINT_FEE_PERCENTAGE_BASE);
     return this._flashMintFee;
   }
 
