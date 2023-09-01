@@ -114,5 +114,5 @@ export const mainnetConfig: NetworkConfig = {
   tokens: tokensConfig,
   daiAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   testNetwork: false,
-  rSavingsModule: '', // TODO - Add address once deployed to mainnet
+  rSavingsModule: '0x2ba26bae6df1153e29813d7f926143f9c94402f3',
 };
