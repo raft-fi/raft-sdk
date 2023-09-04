@@ -224,8 +224,8 @@ export class Protocol {
       console.warn('PSM TVL is only available on mainnet');
 
       this._psmTvl = {
-        daiLocked: new Decimal(0),
-        usdValue: new Decimal(0),
+        daiLocked: Decimal.ZERO,
+        usdValue: Decimal.ZERO,
       };
 
       return this._psmTvl;
