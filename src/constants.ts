@@ -17,6 +17,10 @@ export const FLASH_MINT_FEE = new Decimal(0.0001); // default flash mint fee
 export const SUBGRAPH_PRICE_PRECISION = 8;
 export const BALANCER_R_DAI_POOL_ID = '0x20a61b948e33879ce7f23e535cc7baa3bc66c5a9000000000000000000000555';
 export const DAI_TOKEN_ADDRESS = '0x6B175474E89094C44Da98b954EedeAC495271d0F';
+export const CHAI_TOKEN_ADDRESS = '0x06af07097c9eeb7fd685c692751d5c66db49c215';
+export const R_CHAI_PSM_ADDRESS = '0xa03342feb2e1d4690b60ef556509ec3b76c97ee7';
+export const CHAI_RATE_PRECISION = 27;
+export const CHAINLINK_DAI_USD_AGGREGATOR = '0xaed0c38402a5d19df6e4c03f4e2dced6e29c1ee9';
 
 export const SWAP_ROUTER_MAX_SLIPPAGE: Record<SwapRouter, Decimal> = {
   '1inch': new Decimal(0.5),

@@ -2,7 +2,15 @@ import { request, gql } from 'graphql-request';
 import { Provider, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
-import { ERC20Indexable__factory, ERC20Permit, PositionManager, WrappedCollateralToken } from './typechain';
+import {
+  ChaiPot__factory,
+  ChaiToken__factory,
+  ChainlinkDaiUsdAggregator__factory,
+  ERC20Indexable__factory,
+  ERC20Permit,
+  PositionManager,
+  WrappedCollateralToken,
+} from './typechain';
 import {
   CollateralToken,
   R_TOKEN,
@@ -20,10 +28,22 @@ import {
   isWrappedCappedUnderlyingCollateralToken,
   sendTransactionWithGasLimit,
 } from './utils';
-import { FLASH_MINT_FEE, SECONDS_IN_MINUTE } from './constants';
+import {
+  CHAINLINK_DAI_USD_AGGREGATOR,
+  CHAI_RATE_PRECISION,
+  CHAI_TOKEN_ADDRESS,
+  FLASH_MINT_FEE,
+  R_CHAI_PSM_ADDRESS,
+  SECONDS_IN_MINUTE,
+} from './constants';
 
 interface OpenPositionsResponse {
   count: string;
+}
+
+interface PsmTvlData {
+  usdValue: Decimal;
+  daiLocked: Decimal;
 }
 
 const BETA = new Decimal(2);
@@ -56,6 +76,7 @@ export class Protocol {
   private _redemptionRate: Decimal | null = null;
   private _openPositionCount: number | null = null;
   private _flashMintFee: Decimal = FLASH_MINT_FEE;
+  private _psmTvl: PsmTvlData | null = null;
 
   /**
    * Creates a new representation of a stats class. Stats is a singleton, so constructor is set to private.
@@ -166,6 +187,10 @@ export class Protocol {
     return this._flashMintFee;
   }
 
+  get psmTvl(): PsmTvlData | null {
+    return this._psmTvl;
+  }
+
   /**
    * Fetches current collateral supply for each underlying token.
    * @returns Fetched collateral supplies per underlying collateral token.
@@ -188,6 +213,53 @@ export class Protocol {
     );
 
     return this._collateralSupply;
+  }
+
+  /**
+   * Fetches and stores current PSM TVL.
+   * @returns Fetched PSM TVL.
+   */
+  async fetchPsmTvl(): Promise<PsmTvlData | null> {
+    if (RaftConfig.networkId !== 1) {
+      console.warn('PSM TVL is only available on mainnet');
+
+      this._psmTvl = {
+        daiLocked: new Decimal(0),
+        usdValue: new Decimal(0),
+      };
+
+      return this._psmTvl;
+    }
+
+    const chaiToken = ChaiToken__factory.connect(CHAI_TOKEN_ADDRESS, this.provider);
+
+    const chaiPotAddress = await chaiToken.pot();
+    const chaiPot = ChaiPot__factory.connect(chaiPotAddress, this.provider);
+
+    const chaiRate = await chaiPot.chi();
+    const chaiRateParsed = new Decimal(chaiRate, CHAI_RATE_PRECISION);
+
+    const chaiPsmBalance = await chaiToken.balanceOf(R_CHAI_PSM_ADDRESS);
+    const chaiPsmBalanceParsed = new Decimal(chaiPsmBalance, Decimal.PRECISION);
+
+    const psmDaiBalance = chaiRateParsed.mul(chaiPsmBalanceParsed);
+
+    const chainlinkAggregatorStEthUsd = ChainlinkDaiUsdAggregator__factory.connect(
+      CHAINLINK_DAI_USD_AGGREGATOR,
+      this.provider,
+    );
+    const [rate, decimals] = await Promise.all([
+      chainlinkAggregatorStEthUsd.latestAnswer(),
+      chainlinkAggregatorStEthUsd.decimals(),
+    ]);
+    const daiRate = new Decimal(rate, Number(decimals));
+
+    this._psmTvl = {
+      daiLocked: psmDaiBalance,
+      usdValue: psmDaiBalance.mul(daiRate),
+    };
+
+    return this._psmTvl;
   }
 
   /**
