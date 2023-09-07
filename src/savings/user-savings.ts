@@ -15,6 +15,7 @@ export interface ManageSavingsStepType {
 
 export interface ManageSavingsOptions extends TransactionWithFeesOptions {
   frontendTag?: string;
+  approvalType?: 'permit' | 'approve';
 }
 
 export interface ManageSavingsStep {
@@ -87,7 +88,12 @@ export class UserSavings extends Savings {
     amount: Decimal,
     options: ManageSavingsOptions & ManageSavingsStepsPrefetch = {},
   ): AsyncGenerator<ManageSavingsStep, void, ERC20PermitSignatureStruct | undefined> {
-    const { gasLimitMultiplier = Decimal.ONE, rPermitSignature: cachedRPermitSignature, frontendTag } = options;
+    const {
+      gasLimitMultiplier = Decimal.ONE,
+      rPermitSignature: cachedRPermitSignature,
+      frontendTag,
+      approvalType = 'permit',
+    } = options;
 
     let { rTokenAllowance } = options;
 
@@ -95,7 +101,7 @@ export class UserSavings extends Savings {
     const isEoaSavingsOwner = await isEoaAddress(userAddress, this.user);
     const isSavingsIncrease = amount.gt(Decimal.ZERO);
     const rTokenAllowanceRequired = isSavingsIncrease;
-    const canUsePermit = isEoaSavingsOwner;
+    const canUsePermit = isEoaSavingsOwner && approvalType === 'permit';
 
     // In case the R token allowance check is not passed externally, check the allowance
     if (rTokenAllowance === undefined) {
