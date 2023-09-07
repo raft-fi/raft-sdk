@@ -13,13 +13,13 @@ import {
   getTokenContract,
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
-  isWrappedCappedUnderlyingCollateralToken,
   sendTransactionWithGasLimit,
 } from '../utils';
 import { PositionWithRunner } from './base';
 import { SWAP_ROUTER_MAX_SLIPPAGE } from '../constants';
 import { Protocol } from '../protocol';
 import {
+  BasePositionManaging,
   ManagePositionOptions,
   ManagePositionStep,
   ManagePositionStepsPrefetch,
@@ -290,47 +290,34 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       collateralToken = this.underlyingCollateralToken as T;
     }
 
+    let positionManaging: BasePositionManaging;
+
     if (isUnderlyingCollateralToken(collateralToken)) {
-      const positionManaging = new UnderlyingCollateralTokenPositionManaging(this.user, this.underlyingCollateralToken);
-      yield* positionManaging.manage(collateralChange, debtChange, this.isDelegateWhitelisted, {
-        ...options,
-        maxFeePercentage,
-        gasLimitMultiplier,
-        frontendTag,
-        approvalType,
-        collateralToken,
-      });
-    } else if (
-      isWrappableCappedCollateralToken(collateralToken) &&
-      isWrappedCappedUnderlyingCollateralToken(this.underlyingCollateralToken)
-    ) {
-      const positionManaging = new WrappableCappedCollateralTokenPositionManaging(
-        this.user,
-        this.underlyingCollateralToken,
-      );
-      yield* positionManaging.manage(collateralChange, debtChange, this.isDelegateWhitelisted, {
-        ...options,
-        maxFeePercentage,
-        gasLimitMultiplier,
-        frontendTag,
-        approvalType,
-        collateralToken,
-      });
+      positionManaging = new UnderlyingCollateralTokenPositionManaging(this.user);
+    } else if (isWrappableCappedCollateralToken(collateralToken)) {
+      positionManaging = new WrappableCappedCollateralTokenPositionManaging(this.user);
     } else if (this.underlyingCollateralToken === 'wstETH' && collateralToken === 'stETH') {
-      const positionManaging = new StEthPositionManaging(this.user, this.underlyingCollateralToken);
-      yield* positionManaging.manage(collateralChange, debtChange, this.isDelegateWhitelisted, {
-        ...options,
-        maxFeePercentage,
-        gasLimitMultiplier,
-        frontendTag,
-        approvalType,
-        collateralToken,
-      });
+      positionManaging = new StEthPositionManaging(this.user);
     } else {
       throw new Error(
         `Underlying collateral token ${this.underlyingCollateralToken} does not support collateral token ${collateralToken}`,
       );
     }
+
+    yield* positionManaging.manage(
+      collateralChange,
+      debtChange,
+      this.underlyingCollateralToken,
+      this.isDelegateWhitelisted,
+      {
+        ...options,
+        maxFeePercentage,
+        gasLimitMultiplier,
+        frontendTag,
+        approvalType,
+        collateralToken,
+      },
+    );
   }
 
   /**
