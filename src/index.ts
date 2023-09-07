@@ -43,3 +43,10 @@ export {
   type SwapRouter,
 } from './types';
 export type { ERC20PermitSignatureStruct } from './typechain/PositionManager';
+export {
+  Bridge,
+  SUPPORTED_BRIDGE_NETWORKS,
+  type BridgeTokensStep,
+  type BridgeTokensStepType,
+  type SupportedBridgeNetworks,
+} from './bridge';
