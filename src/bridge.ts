@@ -231,7 +231,9 @@ export class Bridge {
   }
 }
 
-const messageExecutionState: { [key: number]: 'UNTOUCHED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE' } = {
+type ExecutionState = 'UNTOUCHED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
+
+const messageExecutionState: { [key: number]: ExecutionState } = {
   0: 'UNTOUCHED',
   1: 'IN_PROGRESS',
   2: 'SUCCESS',
