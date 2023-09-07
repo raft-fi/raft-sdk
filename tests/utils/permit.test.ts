@@ -1,22 +1,7 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Signer } from 'ethers';
 import { ERC20Permit__factory } from '../../src/typechain';
-import { createEmptyPermitSignature, createPermitSignature } from '../../src/utils';
-
-describe('createEmptyPermitSignature', () => {
-  it('should return an empty permit signature', () => {
-    const emptySignature = createEmptyPermitSignature();
-
-    expect(emptySignature).toEqual({
-      token: '0x0000000000000000000000000000000000000000',
-      value: 0,
-      deadline: 0,
-      v: 0,
-      r: '0x0000000000000000000000000000000000000000000000000000000000000000',
-      s: '0x0000000000000000000000000000000000000000000000000000000000000000',
-    });
-  });
-});
+import { createPermitSignature } from '../../src/utils';
 
 describe('createPermitSignature', () => {
   it('should return a permit signature', () => {

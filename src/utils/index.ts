@@ -1,5 +1,5 @@
 export { isEoaAddress } from './account';
-export { createEmptyPermitSignature, createPermitSignature } from './permit';
+export { createPermitSignature, EMPTY_PERMIT_SIGNATURE } from './permit';
 export { getPositionManagerContract } from './position-manager';
 export { sendTransactionWithGasLimit } from './transactions';
 export {

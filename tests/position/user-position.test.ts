@@ -1,7 +1,7 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Signer } from 'ethers';
 import { ERC20PermitSignatureStruct, UserPosition, getTokenAllowance } from '../../src';
-import { createEmptyPermitSignature, createPermitSignature } from '../../src/utils';
+import { createPermitSignature, EMPTY_PERMIT_SIGNATURE } from '../../src/utils';
 
 jest.mock('../../src/allowance', () => ({
   ...jest.requireActual('../../src/allowance'),
@@ -19,8 +19,6 @@ const mockEoaSigner = {
   },
   getAddress: () => Promise.resolve('0x123'),
 } as unknown as Signer;
-
-const EMPTY_SIGNATURE = createEmptyPermitSignature();
 
 describe('UserPosition', () => {
   beforeEach(() => {
@@ -75,7 +73,7 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
 
       const numberOfSteps = 2;
 
@@ -89,7 +87,7 @@ describe('UserPosition', () => {
       });
       expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
-      expect(signature).toEqual(EMPTY_SIGNATURE);
+      expect(signature).toEqual(EMPTY_PERMIT_SIGNATURE);
 
       const secondStep = await steps.next(signature as ERC20PermitSignatureStruct);
 
@@ -116,7 +114,7 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
 
       const numberOfSteps = 2;
 
@@ -152,7 +150,7 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
 
       const numberOfSteps = 2;
 
@@ -166,7 +164,7 @@ describe('UserPosition', () => {
       });
       expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
-      expect(signature).toEqual(EMPTY_SIGNATURE);
+      expect(signature).toEqual(EMPTY_PERMIT_SIGNATURE);
 
       const secondStep = await steps.next(signature as ERC20PermitSignatureStruct);
 
@@ -284,7 +282,7 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
 
       const numberOfSteps = 4;
 
@@ -317,7 +315,7 @@ describe('UserPosition', () => {
       });
       expect(thirdStep.value?.stepNumber).toEqual(3);
       expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
-      expect(signature).toEqual(EMPTY_SIGNATURE);
+      expect(signature).toEqual(EMPTY_PERMIT_SIGNATURE);
 
       const fourthStep = await steps.next(signature as ERC20PermitSignatureStruct);
 
@@ -375,7 +373,7 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
 
       const numberOfSteps = 3;
 
@@ -398,7 +396,7 @@ describe('UserPosition', () => {
       });
       expect(secondStep.value?.stepNumber);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
-      expect(signature).toEqual(EMPTY_SIGNATURE);
+      expect(signature).toEqual(EMPTY_PERMIT_SIGNATURE);
 
       const thirdStep = await steps.next(signature as ERC20PermitSignatureStruct);
 
@@ -435,14 +433,14 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, {
         collateralToken: 'wstETH',
-        collateralPermitSignature: EMPTY_SIGNATURE,
+        collateralPermitSignature: EMPTY_PERMIT_SIGNATURE,
       });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
 
       const numberOfSteps = 1;
 
@@ -464,14 +462,14 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), {
         collateralToken: 'stETH',
-        rPermitSignature: EMPTY_SIGNATURE,
+        rPermitSignature: EMPTY_PERMIT_SIGNATURE,
       });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
 
       const numberOfSteps = 2;
 
@@ -513,7 +511,7 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
 
       await steps.next();
 
@@ -528,7 +526,7 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
 
       await steps.next();
       await steps.next();

@@ -3,7 +3,7 @@ import request, { gql } from 'graphql-request';
 import { Decimal } from '@tempusfinance/decimal';
 import { ERC20PermitSignatureStruct } from '../typechain/RSavingsModule';
 import { R_TOKEN, TransactionWithFeesOptions } from '../types';
-import { createEmptyPermitSignature, createPermitSignature, isEoaAddress, sendTransactionWithGasLimit } from '../utils';
+import { createPermitSignature, EMPTY_PERMIT_SIGNATURE, isEoaAddress, sendTransactionWithGasLimit } from '../utils';
 import { ERC20, ERC20Permit, ERC20Permit__factory } from '../typechain';
 import { RaftConfig } from '../config';
 import { getTokenAllowance } from '../allowance';
@@ -110,7 +110,7 @@ export class UserSavings extends Savings {
     const numberOfSteps = Number(rTokenApprovalStepNeeded) + 1;
     let stepCounter = 1;
 
-    let rPermitSignature = createEmptyPermitSignature();
+    let rPermitSignature = EMPTY_PERMIT_SIGNATURE;
     if (rTokenApprovalStepNeeded) {
       rPermitSignature = yield* this.getApproveOrPermitStep(
         this.rToken,
@@ -268,7 +268,7 @@ export class UserSavings extends Savings {
     canUsePermit: boolean,
     cachedPermitSignature?: ERC20PermitSignatureStruct,
   ): Generator<PermitStep | ApproveStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
-    let permitSignature = createEmptyPermitSignature();
+    let permitSignature = EMPTY_PERMIT_SIGNATURE;
 
     if (canUsePermit) {
       permitSignature = yield* this.getSignTokenPermitStep(
