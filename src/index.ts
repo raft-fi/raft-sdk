@@ -46,6 +46,7 @@ export type { ERC20PermitSignatureStruct } from './typechain/PositionManager';
 export {
   Bridge,
   SUPPORTED_BRIDGE_NETWORKS,
+  BRIDGE_NETWORK_LANES,
   type BridgeTokensStep,
   type BridgeTokensStepType,
   type SupportedBridgeNetworks,

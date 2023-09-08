@@ -32,9 +32,14 @@ export interface BridgeTokensStep {
   action: () => Promise<TransactionResponse>;
 }
 
-export const SUPPORTED_BRIDGE_NETWORKS = ['ethereum', 'ethereumSepolia', 'base', 'arbitrumGoerli'];
+export type SupportedBridgeNetworks = 'ethereum' | 'ethereumSepolia' | 'base' | 'arbitrumGoerli';
 
-export type SupportedBridgeNetworks = (typeof SUPPORTED_BRIDGE_NETWORKS)[number];
+export const SUPPORTED_BRIDGE_NETWORKS: SupportedBridgeNetworks[] = [
+  'ethereum',
+  'ethereumSepolia',
+  'base',
+  'arbitrumGoerli',
+];
 
 interface BridgeNetworkConfig {
   routerAddress: string;
@@ -63,6 +68,13 @@ export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetworks]: BridgeNetworkC
     chainSelector: '6101244977088475029',
     tokenAddress: '',
   },
+};
+
+export const BRIDGE_NETWORK_LANES: { [key in SupportedBridgeNetworks]: SupportedBridgeNetworks[] } = {
+  ethereum: ['base'],
+  ethereumSepolia: ['arbitrumGoerli'],
+  base: ['ethereum'],
+  arbitrumGoerli: ['ethereumSepolia'],
 };
 
 export class Bridge {
