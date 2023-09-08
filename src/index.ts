@@ -47,6 +47,7 @@ export {
   Bridge,
   SUPPORTED_BRIDGE_NETWORKS,
   BRIDGE_NETWORK_LANES,
+  BRIDGE_NETWORKS,
   type BridgeTokensStep,
   type BridgeTokensStepType,
   type SupportedBridgeNetwork,
