@@ -32,9 +32,14 @@ export interface BridgeTokensStep {
   action: () => Promise<TransactionResponse>;
 }
 
-export const SUPPORTED_BRIDGE_NETWORKS = ['ethereum', 'ethereumSepolia', 'base', 'arbitrumGoerli'];
+export type SupportedBridgeNetwork = 'ethereum' | 'ethereumSepolia' | 'base' | 'arbitrumGoerli';
 
-export type SupportedBridgeNetworks = (typeof SUPPORTED_BRIDGE_NETWORKS)[number];
+export const SUPPORTED_BRIDGE_NETWORKS: SupportedBridgeNetwork[] = [
+  'ethereum',
+  'ethereumSepolia',
+  'base',
+  'arbitrumGoerli',
+];
 
 interface BridgeNetworkConfig {
   routerAddress: string;
@@ -42,7 +47,7 @@ interface BridgeNetworkConfig {
   tokenAddress: string;
 }
 
-export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetworks]: BridgeNetworkConfig } = {
+export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkConfig } = {
   ethereum: {
     routerAddress: '0xE561d5E02207fb5eB32cca20a699E0d8919a1476',
     chainSelector: '5009297550715157269',
@@ -65,6 +70,13 @@ export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetworks]: BridgeNetworkC
   },
 };
 
+export const BRIDGE_NETWORK_LANES: { [key in SupportedBridgeNetwork]: SupportedBridgeNetwork[] } = {
+  ethereum: ['base'],
+  ethereumSepolia: ['arbitrumGoerli'],
+  base: ['ethereum'],
+  arbitrumGoerli: ['ethereumSepolia'],
+};
+
 export class Bridge {
   private user: Signer;
 
@@ -73,8 +85,8 @@ export class Bridge {
   }
 
   async *getBridgeRSteps(
-    sourceChainName: SupportedBridgeNetworks,
-    destinationChainName: SupportedBridgeNetworks,
+    sourceChainName: SupportedBridgeNetwork,
+    destinationChainName: SupportedBridgeNetwork,
     amountToBridge: Decimal,
     options: BridgeTokensOptions & BridgeTokensStepsPrefetch = {},
   ): AsyncGenerator<BridgeTokensStep> {
@@ -157,9 +169,9 @@ export class Bridge {
   async waitForBridgeToComplete(
     bridgeTransaction: ContractTransactionResponse,
     bridgeTransactionReceipt: TransactionReceipt,
-    sourceChainName: SupportedBridgeNetworks,
+    sourceChainName: SupportedBridgeNetwork,
     destinationChainRpc: string,
-    destinationChainName: SupportedBridgeNetworks,
+    destinationChainName: SupportedBridgeNetwork,
     pollInterval = 60000, // 60 seconds in milliseconds
     timeout = 40 * 60 * 1000, // 40 minutes in milliseconds
   ) {
