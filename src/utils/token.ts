@@ -1,4 +1,4 @@
-import { ContractRunner, ZeroAddress } from 'ethers';
+import { ContractRunner } from 'ethers';
 import { RaftConfig } from '../config';
 import {
   ERC20,
@@ -28,10 +28,10 @@ const UNDERLYING_COLLATERAL_TOKEN_SET = new Set<string>(UNDERLYING_COLLATERAL_TO
 const COLLATERAL_TOKEN_SET = new Set<string>(COLLATERAL_TOKENS);
 
 type TokenContractTypes = {
-  ETH: null;
   stETH: ERC20;
   wstETH: ERC20Permit;
   rETH: ERC20;
+  WETH: ERC20;
   wcrETH: WrappedCollateralToken;
   R: ERC20Permit;
 };
@@ -67,10 +67,6 @@ export function getWrappedCappedCollateralToken<T extends WrappableCappedCollate
 export function getTokenContract<T extends Token>(collateralToken: T, runner: ContractRunner): TokenContractTypes[T] {
   const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
   const tokenAddress = RaftConfig.getTokenAddress(collateralToken);
-
-  if (tokenAddress === ZeroAddress) {
-    return null as TokenContractTypes[T];
-  }
 
   if (isWrappedCappedUnderlyingCollateralToken(collateralToken)) {
     return WrappedCollateralToken__factory.connect(tokenAddress, runner) as TokenContractTypes[T];

@@ -7,7 +7,14 @@ import { PriceFeed } from '../price';
 import { PositionManager, OneInchOneStepLeverageStETH__factory, OneInchOneStepLeverageStETH } from '../typechain';
 import OneInchOneStepLeverageStETHABI from './../abi/OneInchOneStepLeverageStETH.json';
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
-import { CollateralToken, SwapRouter, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
+import {
+  CollateralToken,
+  SupportedVaultVersionUnderlyingCollateralTokens,
+  SwapRouter,
+  Token,
+  TransactionWithFeesOptions,
+  VaultVersion,
+} from '../types';
 import {
   getPositionManagerContract,
   getTokenContract,
@@ -20,6 +27,7 @@ import { SWAP_ROUTER_MAX_SLIPPAGE } from '../constants';
 import { Protocol } from '../protocol';
 import {
   BasePositionManaging,
+  InterestRatePositionManaging,
   ManagePositionOptions,
   ManagePositionStep,
   ManagePositionStepsPrefetch,
@@ -28,13 +36,6 @@ import {
   WrappableCappedCollateralTokenPositionManaging,
 } from './manage';
 import { getPermitOrApproveTokenStep, getWhitelistStep } from './steps';
-
-type VaultVersion = 'v1' | 'v2';
-
-type SupportedVaults = {
-  v1: 'wstETH' | 'wcrETH';
-  v2: UnderlyingCollateralToken;
-};
 
 export interface LeveragePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'leverage';
@@ -99,7 +100,10 @@ export interface ManagePositionCallbacks {
  * position (e.g. managing collateral and debt). For read-only operations on the position, use the
  * {@link PositionWithAddress} class.
  */
-export class UserPosition<V extends VaultVersion, T extends SupportedVaults[V]> extends PositionWithRunner {
+export class UserPosition<
+  V extends VaultVersion,
+  T extends SupportedVaultVersionUnderlyingCollateralTokens[V],
+> extends PositionWithRunner {
   private user: Signer;
   private positionManager: PositionManager;
   private vaultVersion: V;
@@ -111,7 +115,7 @@ export class UserPosition<V extends VaultVersion, T extends SupportedVaults[V]> 
    * @param user The signer of the position's owner.
    * @returns The position of the user or null.
    */
-  public static async fromUser<VV extends VaultVersion, C extends SupportedVaults[VV]>(
+  public static async fromUser<C extends SupportedVaultVersionUnderlyingCollateralTokens['v1']>(
     user: Signer,
   ): Promise<UserPosition<'v1', C> | null> {
     const query = gql`
@@ -146,7 +150,11 @@ export class UserPosition<V extends VaultVersion, T extends SupportedVaults[V]> 
     const isLeveraged = response.position?.isLeveraged ?? false;
 
     // TODO: support v2 vaults
-    const position = new UserPosition(user, underlyingCollateralToken, 'v1');
+    const position = new UserPosition(
+      user,
+      underlyingCollateralToken as SupportedVaultVersionUnderlyingCollateralTokens['v1'],
+      'v1',
+    );
     position.setIsLeveraged(isLeveraged);
     await position.fetch();
 
@@ -310,7 +318,9 @@ export class UserPosition<V extends VaultVersion, T extends SupportedVaults[V]> 
 
     let positionManaging: BasePositionManaging;
 
-    if (isUnderlyingCollateralToken(collateralToken)) {
+    if (this.vaultVersion === 'v2') {
+      positionManaging = new InterestRatePositionManaging(this.user);
+    } else if (isUnderlyingCollateralToken(collateralToken)) {
       positionManaging = new UnderlyingCollateralTokenPositionManaging(this.user);
     } else if (isWrappableCappedCollateralToken(collateralToken)) {
       positionManaging = new WrappableCappedCollateralTokenPositionManaging(this.user);
