@@ -33,6 +33,7 @@ export interface BridgeTokensStep {
 }
 
 export type SupportedBridgeNetwork = 'ethereum' | 'ethereumSepolia' | 'base' | 'arbitrumGoerli';
+export type SupportedBridgeToken = 'R' | 'CCIP-LnM' | 'clCCIP-LnM';
 
 export const SUPPORTED_BRIDGE_NETWORKS: SupportedBridgeNetwork[] = [
   'ethereum',
@@ -45,28 +46,33 @@ interface BridgeNetworkConfig {
   routerAddress: string;
   chainSelector: string;
   tokenAddress: string;
+  tokenTicker: SupportedBridgeToken;
 }
 
 export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkConfig } = {
   ethereum: {
     routerAddress: '0xE561d5E02207fb5eB32cca20a699E0d8919a1476',
     chainSelector: '5009297550715157269',
-    tokenAddress: '',
+    tokenAddress: '0x183015a9ba6ff60230fdeadc3f43b3d788b13e21',
+    tokenTicker: 'R',
   },
   ethereumSepolia: {
     routerAddress: '0xd0daae2231e9cb96b94c8512223533293c3693bf',
     chainSelector: '16015286601757825753',
-    tokenAddress: '0x466D489b6d36E7E3b824ef491C225F5830E81cC1', // CCIP-LnM - Token for testing bridging integration
+    tokenAddress: '0x466D489b6d36E7E3b824ef491C225F5830E81cC1',
+    tokenTicker: 'CCIP-LnM',
   },
   base: {
-    routerAddress: '', // TODO - Once Chainlink deploys router for Base chain add address for it
+    routerAddress: '', // TODO - Fill in once contracts are deployed
     chainSelector: '',
     tokenAddress: '',
+    tokenTicker: 'R',
   },
   arbitrumGoerli: {
     routerAddress: '0x88E492127709447A5ABEFdaB8788a15B4567589E',
     chainSelector: '6101244977088475029',
-    tokenAddress: '',
+    tokenAddress: '0x0E14dBe2c8e1121902208be173A3fb91Bb125CDB',
+    tokenTicker: 'clCCIP-LnM',
   },
 };
 
@@ -240,6 +246,23 @@ export class Bridge {
       );
       clearInterval(pollingId);
     }, timeout);
+  }
+
+  async fetchBalance(network: SupportedBridgeNetwork, rpc: string) {
+    const provider = new JsonRpcProvider(rpc);
+
+    const tokenAddress = BRIDGE_NETWORKS[network].tokenAddress;
+    if (!tokenAddress) {
+      console.warn(`Token address for ${network} is not defined!`);
+
+      return Decimal.ZERO;
+    }
+
+    const tokenContract = ERC20__factory.connect(tokenAddress, provider);
+
+    const balance = await tokenContract.balanceOf(await this.user.getAddress());
+
+    return new Decimal(balance, Decimal.PRECISION);
   }
 }
 
