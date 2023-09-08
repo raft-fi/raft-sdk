@@ -572,5 +572,19 @@ describe('UserPosition', () => {
 
       expect(() => steps.next()).rejects.toThrow('R permit signature is required');
     });
+
+    it('should not allow opening a position for v1 vaults', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v1');
+      const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, { collateralToken: 'wstETH' });
+
+      await expect(steps.next()).rejects.toThrow('Cannot borrow more debt from v1 vaults');
+    });
+
+    it('should not allow borrowing more debt from v1 vaults', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v1', new Decimal(100), new Decimal(3000));
+      const steps = userPosition.getManageSteps(Decimal.ZERO, new Decimal(100), { collateralToken: 'wstETH' });
+
+      await expect(steps.next()).rejects.toThrow('Cannot borrow more debt from v1 vaults');
+    });
   });
 });

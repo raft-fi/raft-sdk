@@ -13,13 +13,13 @@ import {
   getTokenContract,
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
-  isWrappedCappedUnderlyingCollateralToken,
   sendTransactionWithGasLimit,
 } from '../utils';
 import { PositionWithRunner } from './base';
 import { SWAP_ROUTER_MAX_SLIPPAGE } from '../constants';
 import { Protocol } from '../protocol';
 import {
+  BasePositionManaging,
   ManagePositionOptions,
   ManagePositionStep,
   ManagePositionStepsPrefetch,
@@ -28,6 +28,13 @@ import {
   WrappableCappedCollateralTokenPositionManaging,
 } from './manage';
 import { getPermitOrApproveTokenStep, getWhitelistStep } from './steps';
+
+type VaultVersion = 'v1' | 'v2';
+
+type SupportedVaults = {
+  v1: 'wstETH' | 'wcrETH';
+  v2: UnderlyingCollateralToken;
+};
 
 export interface LeveragePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'leverage';
@@ -92,9 +99,10 @@ export interface ManagePositionCallbacks {
  * position (e.g. managing collateral and debt). For read-only operations on the position, use the
  * {@link PositionWithAddress} class.
  */
-export class UserPosition<T extends UnderlyingCollateralToken> extends PositionWithRunner {
+export class UserPosition<V extends VaultVersion, T extends SupportedVaults[V]> extends PositionWithRunner {
   private user: Signer;
   private positionManager: PositionManager;
+  private vaultVersion: V;
 
   /**
    * Fetches the position of a given user or returns null if the user does not have a position. Differs from the
@@ -103,7 +111,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * @param user The signer of the position's owner.
    * @returns The position of the user or null.
    */
-  public static async fromUser<C extends UnderlyingCollateralToken>(user: Signer): Promise<UserPosition<C> | null> {
+  public static async fromUser<VV extends VaultVersion, C extends SupportedVaults[VV]>(
+    user: Signer,
+  ): Promise<UserPosition<'v1', C> | null> {
     const query = gql`
       query getPosition($positionId: String!) {
         position(id: $positionId) {
@@ -135,7 +145,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     const isLeveraged = response.position?.isLeveraged ?? false;
 
-    const position = new UserPosition(user, underlyingCollateralToken);
+    // TODO: support v2 vaults
+    const position = new UserPosition(user, underlyingCollateralToken, 'v1');
     position.setIsLeveraged(isLeveraged);
     await position.fetch();
 
@@ -152,6 +163,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
   public constructor(
     user: Signer,
     underlyingCollateralToken: T,
+    vaultVersion: V = 'v2' as V,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
   ) {
@@ -159,6 +171,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     this.user = user;
     this.positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, user);
+    this.vaultVersion = vaultVersion;
   }
 
   /**
@@ -279,6 +292,11 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     } = options;
     let { collateralToken = this.underlyingCollateralToken as T } = options;
 
+    // Only allow depositing more collateral or repaying debt
+    if (this.vaultVersion === 'v1' && debtChange.gt(Decimal.ZERO)) {
+      throw new Error('Cannot borrow more debt from v1 vaults');
+    }
+
     // check whether it's closing position (i.e. collateralChange is ZERO while debtChange is negative MAX)
     if (collateralChange.isZero() && !debtChange.equals(DEBT_CHANGE_TO_CLOSE)) {
       if (debtChange.isZero()) {
@@ -290,47 +308,34 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       collateralToken = this.underlyingCollateralToken as T;
     }
 
+    let positionManaging: BasePositionManaging;
+
     if (isUnderlyingCollateralToken(collateralToken)) {
-      const positionManaging = new UnderlyingCollateralTokenPositionManaging(this.user, this.underlyingCollateralToken);
-      yield* positionManaging.manage(collateralChange, debtChange, this.isDelegateWhitelisted, {
-        ...options,
-        maxFeePercentage,
-        gasLimitMultiplier,
-        frontendTag,
-        approvalType,
-        collateralToken,
-      });
-    } else if (
-      isWrappableCappedCollateralToken(collateralToken) &&
-      isWrappedCappedUnderlyingCollateralToken(this.underlyingCollateralToken)
-    ) {
-      const positionManaging = new WrappableCappedCollateralTokenPositionManaging(
-        this.user,
-        this.underlyingCollateralToken,
-      );
-      yield* positionManaging.manage(collateralChange, debtChange, this.isDelegateWhitelisted, {
-        ...options,
-        maxFeePercentage,
-        gasLimitMultiplier,
-        frontendTag,
-        approvalType,
-        collateralToken,
-      });
+      positionManaging = new UnderlyingCollateralTokenPositionManaging(this.user);
+    } else if (isWrappableCappedCollateralToken(collateralToken)) {
+      positionManaging = new WrappableCappedCollateralTokenPositionManaging(this.user);
     } else if (this.underlyingCollateralToken === 'wstETH' && collateralToken === 'stETH') {
-      const positionManaging = new StEthPositionManaging(this.user, this.underlyingCollateralToken);
-      yield* positionManaging.manage(collateralChange, debtChange, this.isDelegateWhitelisted, {
-        ...options,
-        maxFeePercentage,
-        gasLimitMultiplier,
-        frontendTag,
-        approvalType,
-        collateralToken,
-      });
+      positionManaging = new StEthPositionManaging(this.user);
     } else {
       throw new Error(
         `Underlying collateral token ${this.underlyingCollateralToken} does not support collateral token ${collateralToken}`,
       );
     }
+
+    yield* positionManaging.manage(
+      collateralChange,
+      debtChange,
+      this.underlyingCollateralToken,
+      this.isDelegateWhitelisted,
+      {
+        ...options,
+        maxFeePercentage,
+        gasLimitMultiplier,
+        frontendTag,
+        approvalType,
+        collateralToken,
+      },
+    );
   }
 
   /**

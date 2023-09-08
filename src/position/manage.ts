@@ -1,13 +1,6 @@
 import { Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import {
-  CollateralToken,
-  R_TOKEN,
-  Token,
-  TransactionWithFeesOptions,
-  UnderlyingCollateralToken,
-  WrappedCappedUnderlyingCollateralToken,
-} from '../types';
+import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
 import {
   EMPTY_PERMIT_SIGNATURE,
   getPositionManagerContract,
@@ -84,25 +77,24 @@ interface PermitChecks {
   canCollateralTokenUsePermit: boolean;
 }
 
-abstract class BasePositionManaging<U extends UnderlyingCollateralToken> {
+export abstract class BasePositionManaging {
   protected readonly positionManager: PositionManager;
   protected readonly user: Signer;
 
-  private readonly underlyingCollateralToken: U;
   private readonly rToken: ERC20Permit;
 
-  constructor(user: Signer, underlyingCollateralToken: U) {
+  constructor(user: Signer) {
     this.positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, user);
     this.user = user;
-    this.underlyingCollateralToken = underlyingCollateralToken;
     this.rToken = getTokenContract(R_TOKEN, user);
   }
 
   protected abstract getManagePositionAction(args: ManagePositionArgs): Promise<() => Promise<TransactionResponse>>;
 
-  async *manage(
+  async *manage<U extends UnderlyingCollateralToken>(
     collateralChange: Decimal,
     debtChange: Decimal,
+    underlyingCollateralToken: U,
     checkIfDelegateWhitelisted: (delegate: string, user: string) => Promise<boolean>,
     options: Required<ManagePositionOptions<SupportedCollateralTokens[U]>> & ManagePositionStepsPrefetch,
   ): AsyncGenerator<ManagePositionStep, void, ERC20PermitSignatureStruct | undefined> {
@@ -115,16 +107,14 @@ abstract class BasePositionManaging<U extends UnderlyingCollateralToken> {
       maxFeePercentage,
     } = options;
     const collateralTokenContract = getTokenContract(collateralToken, this.user);
-    const positionManagerAddress = RaftConfig.getPositionManagerAddress(
-      this.underlyingCollateralToken,
-      collateralToken,
-    );
+    const positionManagerAddress = RaftConfig.getPositionManagerAddress(underlyingCollateralToken, collateralToken);
     const permitChecks = await this.checkPermitSupport(options);
     const { whitelistingStepNeeded, collateralApprovalStepNeeded, rTokenApprovalStepNeeded } =
       await this.getNeededSteps(
         collateralChange,
         debtChange,
         collateralTokenContract,
+        underlyingCollateralToken,
         positionManagerAddress,
         checkIfDelegateWhitelisted,
         permitChecks,
@@ -194,7 +184,7 @@ abstract class BasePositionManaging<U extends UnderlyingCollateralToken> {
     };
   }
 
-  private async checkPermitSupport(
+  private async checkPermitSupport<U extends UnderlyingCollateralToken>(
     options: Required<ManagePositionOptions<SupportedCollateralTokens[U]>> & ManagePositionStepsPrefetch,
   ): Promise<PermitChecks> {
     const { collateralToken, approvalType = 'permit' } = options;
@@ -207,10 +197,11 @@ abstract class BasePositionManaging<U extends UnderlyingCollateralToken> {
     };
   }
 
-  private async getNeededSteps(
+  private async getNeededSteps<U extends UnderlyingCollateralToken>(
     collateralChange: Decimal,
     debtChange: Decimal,
     collateralTokenContract: ERC20 | ERC20Permit,
+    underlyingCollateralToken: U,
     positionManagerAddress: string,
     checkIfDelegateWhitelisted: (delegate: string, user: string) => Promise<boolean>,
     permitChecks: PermitChecks,
@@ -219,7 +210,7 @@ abstract class BasePositionManaging<U extends UnderlyingCollateralToken> {
     const { collateralToken } = options;
     const isCollateralIncrease = collateralChange.gt(Decimal.ZERO);
     const isDebtIncrease = debtChange.gt(Decimal.ZERO);
-    const isUnderlyingToken = collateralToken === this.underlyingCollateralToken;
+    const isUnderlyingToken = collateralToken === underlyingCollateralToken;
 
     const { collateralPermitSignature: cachedCollateralPermitSignature, rPermitSignature: cachedRPermitSignature } =
       options;
@@ -277,9 +268,7 @@ abstract class BasePositionManaging<U extends UnderlyingCollateralToken> {
   }
 }
 
-export class UnderlyingCollateralTokenPositionManaging<
-  U extends UnderlyingCollateralToken,
-> extends BasePositionManaging<U> {
+export class UnderlyingCollateralTokenPositionManaging extends BasePositionManaging {
   protected async getManagePositionAction(args: ManagePositionArgs): Promise<() => Promise<TransactionResponse>> {
     const {
       collateralToken,
@@ -309,9 +298,7 @@ export class UnderlyingCollateralTokenPositionManaging<
   }
 }
 
-export class WrappableCappedCollateralTokenPositionManaging<
-  U extends WrappedCappedUnderlyingCollateralToken,
-> extends BasePositionManaging<U> {
+export class WrappableCappedCollateralTokenPositionManaging extends BasePositionManaging {
   protected async getManagePositionAction(args: ManagePositionArgs): Promise<() => Promise<TransactionResponse>> {
     const {
       collateralChange,
@@ -339,7 +326,7 @@ export class WrappableCappedCollateralTokenPositionManaging<
   }
 }
 
-export class StEthPositionManaging extends BasePositionManaging<'wstETH'> {
+export class StEthPositionManaging extends BasePositionManaging {
   protected async getManagePositionAction(args: ManagePositionArgs): Promise<() => Promise<TransactionResponse>> {
     const {
       collateralChange,
