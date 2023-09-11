@@ -1,4 +1,6 @@
 import {
+  InterestRatePositionManager,
+  InterestRatePositionManager__factory,
   PositionManager,
   PositionManagerStETH,
   PositionManagerStETH__factory,
@@ -13,6 +15,7 @@ type PositionManagerContractTypes = {
   base: PositionManager;
   stETH: PositionManagerStETH;
   wrapped: PositionManagerWrappedCollateralToken;
+  'interest-rate': InterestRatePositionManager;
 };
 
 export function getPositionManagerContract<T extends PositionManagerType>(
@@ -26,6 +29,9 @@ export function getPositionManagerContract<T extends PositionManagerType>(
 
     case 'wrapped':
       return PositionManagerWrappedCollateralToken__factory.connect(address, runner) as PositionManagerContractTypes[T];
+
+    case 'interest-rate':
+      return InterestRatePositionManager__factory.connect(address, runner) as PositionManagerContractTypes[T];
 
     default:
       return PositionManager__factory.connect(address, runner) as PositionManagerContractTypes[T];

@@ -268,6 +268,42 @@ export abstract class BasePositionManaging {
   }
 }
 
+export class InterestRatePositionManaging extends BasePositionManaging {
+  protected async getManagePositionAction(args: ManagePositionArgs): Promise<() => Promise<TransactionResponse>> {
+    const {
+      collateralToken,
+      collateralChange,
+      debtChange,
+      maxFeePercentage,
+      collateralPermitSignature,
+      gasLimitMultiplier,
+      frontendTag,
+    } = args;
+    const method = getPositionManagerContract(
+      'interest-rate',
+      RaftConfig.networkConfig.interestRatePositionManager,
+      this.user,
+    ).managePosition;
+    const userAddress = await this.user.getAddress();
+
+    return () =>
+      sendTransactionWithGasLimit(
+        method,
+        [
+          RaftConfig.getTokenAddress(collateralToken),
+          userAddress,
+          ...this.getAbsValueAndIsIncrease(collateralChange),
+          ...this.getAbsValueAndIsIncrease(debtChange),
+          maxFeePercentage.value,
+          collateralPermitSignature,
+        ],
+        gasLimitMultiplier,
+        frontendTag,
+        this.user,
+      );
+  }
+}
+
 export class UnderlyingCollateralTokenPositionManaging extends BasePositionManaging {
   protected async getManagePositionAction(args: ManagePositionArgs): Promise<() => Promise<TransactionResponse>> {
     const {
@@ -279,13 +315,14 @@ export class UnderlyingCollateralTokenPositionManaging extends BasePositionManag
       gasLimitMultiplier,
       frontendTag,
     } = args;
+    const userAddress = await this.user.getAddress();
 
-    return async () =>
+    return () =>
       sendTransactionWithGasLimit(
         this.positionManager.managePosition,
         [
           RaftConfig.getTokenAddress(collateralToken),
-          await this.user.getAddress(),
+          userAddress,
           ...this.getAbsValueAndIsIncrease(collateralChange),
           ...this.getAbsValueAndIsIncrease(debtChange),
           maxFeePercentage.value,
@@ -310,7 +347,7 @@ export class WrappableCappedCollateralTokenPositionManaging extends BasePosition
       frontendTag,
     } = args;
 
-    return async () =>
+    return () =>
       sendTransactionWithGasLimit(
         getPositionManagerContract('wrapped', positionManagerAddress, this.user).managePosition,
         [
@@ -338,7 +375,7 @@ export class StEthPositionManaging extends BasePositionManaging {
       frontendTag,
     } = args;
 
-    return async () =>
+    return () =>
       sendTransactionWithGasLimit(
         getPositionManagerContract('wrapped', positionManagerAddress, this.user).managePosition,
         [
