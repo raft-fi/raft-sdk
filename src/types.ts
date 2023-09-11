@@ -2,9 +2,8 @@ import { Decimal } from '@tempusfinance/decimal';
 
 export const WRAPPABLE_CAPPED_COLLATERAL_TOKENS = ['rETH'] as const;
 export const WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS = ['wcrETH'] as const;
-export const UNDERLYING_COLLATERAL_TOKENS = ['wstETH', ...WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS] as const;
+export const UNDERLYING_COLLATERAL_TOKENS = ['wstETH', 'WETH', ...WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS] as const;
 export const COLLATERAL_TOKENS = [
-  'ETH',
   'stETH',
   ...WRAPPABLE_CAPPED_COLLATERAL_TOKENS,
   ...UNDERLYING_COLLATERAL_TOKENS,
@@ -18,6 +17,12 @@ export type UnderlyingCollateralToken = (typeof UNDERLYING_COLLATERAL_TOKENS)[nu
 export type CollateralToken = (typeof COLLATERAL_TOKENS)[number];
 export type RToken = typeof R_TOKEN;
 export type Token = (typeof TOKENS)[number];
+
+export type VaultVersion = 'v1' | 'v2';
+export type SupportedVaultVersionUnderlyingCollateralTokens = {
+  v1: 'wstETH' | 'wcrETH';
+  v2: Exclude<UnderlyingCollateralToken, 'wcrETH'>;
+};
 
 /**
  * @param maxFeePercentage Maximum fee percentage to pay for transaction.

@@ -27,13 +27,11 @@ describe('RaftConfig', () => {
 
   it('should get token address', () => {
     RaftConfig.setNetwork('mainnet');
-    expect(RaftConfig.getTokenAddress('ETH')).toEqual(mainnetConfig.tokens.ETH.address);
     expect(RaftConfig.getTokenAddress('stETH')).toEqual(mainnetConfig.tokens.stETH.address);
     expect(RaftConfig.getTokenAddress('wstETH')).toEqual(mainnetConfig.tokens.wstETH.address);
     expect(RaftConfig.getTokenAddress('R')).toEqual(mainnetConfig.tokens.R.address);
 
     RaftConfig.setNetwork('goerli');
-    expect(RaftConfig.getTokenAddress('ETH')).toEqual(goerliConfig.tokens.ETH.address);
     expect(RaftConfig.getTokenAddress('stETH')).toEqual(goerliConfig.tokens.stETH.address);
     expect(RaftConfig.getTokenAddress('wstETH')).toEqual(goerliConfig.tokens.wstETH.address);
     expect(RaftConfig.getTokenAddress('R')).toEqual(goerliConfig.tokens.R.address);
@@ -41,13 +39,11 @@ describe('RaftConfig', () => {
 
   it('should get token ticker', () => {
     RaftConfig.setNetwork('mainnet');
-    expect(RaftConfig.getTokenTicker(ZeroAddress)).toEqual('ETH');
     expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.stETH.address)).toEqual('stETH');
     expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.wstETH.address)).toEqual('wstETH');
     expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.R.address)).toEqual('R');
 
     RaftConfig.setNetwork('goerli');
-    expect(RaftConfig.getTokenTicker(ZeroAddress)).toEqual('ETH');
     expect(RaftConfig.getTokenTicker(goerliConfig.tokens.stETH.address)).toEqual('stETH');
     expect(RaftConfig.getTokenTicker(goerliConfig.tokens.wstETH.address)).toEqual('wstETH');
     expect(RaftConfig.getTokenTicker(goerliConfig.tokens.R.address)).toEqual('R');

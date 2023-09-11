@@ -3,12 +3,13 @@ import { Token, UnderlyingCollateralToken, WrappedCappedUnderlyingCollateralToke
 import { ContractRunner } from 'ethers';
 
 export type SupportedNetwork = 'goerli' | 'mainnet';
-export type PositionManagerType = 'base' | 'stETH' | 'wrapped';
+export type PositionManagerType = 'base' | 'stETH' | 'wrapped' | 'interest-rate';
 export type SubgraphPriceFeedToken = 'ETH' | 'stETH';
 
 export type SupportedCollateralTokens = {
   wstETH: 'stETH' | 'wstETH';
   wcrETH: 'rETH' | 'wcrETH';
+  WETH: 'WETH';
 };
 
 export type UnderlyingCollateralTokenConfig<U extends UnderlyingCollateralToken> = {
@@ -46,6 +47,7 @@ export type TokenConfig = {
 export interface NetworkConfig {
   positionManager: string;
   positionManagerStEth: string;
+  interestRatePositionManager: string;
   oneInchOneStepLeverageStEth: string;
   wrappedCollateralTokenPositionManagers: Record<WrappedCappedUnderlyingCollateralToken, string>;
   raftCollateralTokens: Record<UnderlyingCollateralToken, string>;

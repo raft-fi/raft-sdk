@@ -50,6 +50,7 @@ const BETA = new Decimal(2);
 const ORACLE_DEVIATION: Record<UnderlyingCollateralToken, Decimal> = {
   wstETH: new Decimal(0.01), // 1%
   wcrETH: new Decimal(0.015), // 1.5%
+  WETH: new Decimal(0.005), // TODO: add oracle deviation for WETH
 };
 
 const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)
@@ -64,14 +65,17 @@ export class Protocol {
   private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
     wstETH: null,
     wcrETH: null,
+    WETH: null,
   };
   private _debtSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
     wstETH: null,
     wcrETH: null,
+    WETH: null,
   };
   private _borrowingRate: Record<UnderlyingCollateralToken, Decimal | null> = {
     wstETH: null,
     wcrETH: null,
+    WETH: null,
   };
   private _redemptionRate: Decimal | null = null;
   private _openPositionCount: number | null = null;

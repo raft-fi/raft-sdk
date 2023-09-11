@@ -7,7 +7,7 @@ import {
   UserPosition,
   getTokenAllowance,
 } from '../../src';
-import { createPermitSignature, EMPTY_PERMIT_SIGNATURE } from '../../src/utils';
+import { createPermitSignature, EMPTY_PERMIT_SIGNATURE, getPositionManagerContract } from '../../src/utils';
 import { SupportedCollateralTokens } from '../../src/config';
 
 jest.mock('../../src/allowance', () => ({
@@ -18,6 +18,11 @@ jest.mock('../../src/allowance', () => ({
 jest.mock('../../src/utils/permit', () => ({
   ...jest.requireActual('../../src/utils/permit'),
   createPermitSignature: jest.fn(),
+}));
+
+jest.mock('../../src/utils/position-manager', () => ({
+  ...jest.requireActual('../../src/utils/position-manager'),
+  getPositionManagerContract: jest.fn(),
 }));
 
 const mockEoaSigner = {
@@ -450,6 +455,126 @@ describe('UserPosition', () => {
         expect(termination.done).toBe(true);
       },
     );
+
+    it('should generate steps [approve collateral + manage] for WETH deposit + R borrowing', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'WETH');
+      const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, { collateralToken: 'WETH' });
+
+      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (getPositionManagerContract as jest.Mock).mockResolvedValue({
+        managePosition: jest.fn(),
+      });
+
+      const numberOfSteps = 2;
+
+      const firstStep = await steps.next();
+
+      expect(firstStep.done).toBe(false);
+      expect(firstStep.value?.type).toEqual({
+        name: 'approve',
+        token: 'WETH',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
+      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const secondStep = await steps.next();
+
+      expect(secondStep.done).toBe(false);
+      expect(secondStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(secondStep.value?.stepNumber).toEqual(2);
+      expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const termination = await steps.next();
+
+      expect(termination.done).toBe(true);
+    });
+
+    it('should generate steps [approve collateral + manage] for WETH deposit + R repayment', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'WETH');
+      const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'WETH' });
+
+      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (getPositionManagerContract as jest.Mock).mockResolvedValue({
+        managePosition: jest.fn(),
+      });
+
+      const numberOfSteps = 2;
+
+      const firstStep = await steps.next();
+
+      expect(firstStep.done).toBe(false);
+      expect(firstStep.value?.type).toEqual({
+        name: 'approve',
+        token: 'WETH',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
+      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const secondStep = await steps.next();
+
+      expect(secondStep.done).toBe(false);
+      expect(secondStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(secondStep.value?.stepNumber).toEqual(2);
+      expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const termination = await steps.next();
+
+      expect(termination.done).toBe(true);
+    });
+
+    it('should generate steps [manage] for WETH withdrawal + R borrowing', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'WETH');
+      const steps = userPosition.getManageSteps(new Decimal(-1), Decimal.ONE, { collateralToken: 'WETH' });
+
+      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (getPositionManagerContract as jest.Mock).mockResolvedValue({
+        managePosition: jest.fn(),
+      });
+
+      const numberOfSteps = 1;
+
+      const firstStep = await steps.next();
+
+      expect(firstStep.done).toBe(false);
+      expect(firstStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
+      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const termination = await steps.next();
+
+      expect(termination.done).toBe(true);
+    });
+
+    it('should generate steps [manage] for WETH withdrawal + R repayment', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'WETH');
+      const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'WETH' });
+
+      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (getPositionManagerContract as jest.Mock).mockResolvedValue({
+        managePosition: jest.fn(),
+      });
+
+      const numberOfSteps = 1;
+
+      const firstStep = await steps.next();
+
+      expect(firstStep.done).toBe(false);
+      expect(firstStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
+      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const termination = await steps.next();
+
+      expect(termination.done).toBe(true);
+    });
 
     it('should skip using delegate if there is no collateral change', async () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
