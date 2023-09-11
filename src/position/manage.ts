@@ -89,7 +89,7 @@ export abstract class BasePositionManaging {
     this.rToken = getTokenContract(R_TOKEN, user);
   }
 
-  protected abstract getManagePositionAction(args: ManagePositionArgs): Promise<TransactionResponse>;
+  protected abstract getManagePositionAction(args: ManagePositionArgs): Promise<() => Promise<TransactionResponse>>;
 
   async *manage<U extends UnderlyingCollateralToken>(
     collateralChange: Decimal,
@@ -170,18 +170,17 @@ export abstract class BasePositionManaging {
       },
       stepNumber: stepCounter++,
       numberOfSteps,
-      action: () =>
-        this.getManagePositionAction({
-          collateralToken,
-          collateralChange,
-          debtChange,
-          maxFeePercentage,
-          collateralPermitSignature,
-          rPermitSignature,
-          positionManagerAddress,
-          gasLimitMultiplier,
-          frontendTag,
-        }),
+      action: await this.getManagePositionAction({
+        collateralToken,
+        collateralChange,
+        debtChange,
+        maxFeePercentage,
+        collateralPermitSignature,
+        rPermitSignature,
+        positionManagerAddress,
+        gasLimitMultiplier,
+        frontendTag,
+      }),
     };
   }
 
@@ -270,7 +269,7 @@ export abstract class BasePositionManaging {
 }
 
 export class InterestRatePositionManaging extends BasePositionManaging {
-  protected async getManagePositionAction(args: ManagePositionArgs): Promise<TransactionResponse> {
+  protected async getManagePositionAction(args: ManagePositionArgs): Promise<() => Promise<TransactionResponse>> {
     const {
       collateralToken,
       collateralChange,
@@ -285,26 +284,28 @@ export class InterestRatePositionManaging extends BasePositionManaging {
       RaftConfig.networkConfig.interestRatePositionManager,
       this.user,
     ).managePosition;
+    const userAddress = await this.user.getAddress();
 
-    return sendTransactionWithGasLimit(
-      method,
-      [
-        RaftConfig.getTokenAddress(collateralToken),
-        await this.user.getAddress(),
-        ...this.getAbsValueAndIsIncrease(collateralChange),
-        ...this.getAbsValueAndIsIncrease(debtChange),
-        maxFeePercentage.value,
-        collateralPermitSignature,
-      ],
-      gasLimitMultiplier,
-      frontendTag,
-      this.user,
-    );
+    return () =>
+      sendTransactionWithGasLimit(
+        method,
+        [
+          RaftConfig.getTokenAddress(collateralToken),
+          userAddress,
+          ...this.getAbsValueAndIsIncrease(collateralChange),
+          ...this.getAbsValueAndIsIncrease(debtChange),
+          maxFeePercentage.value,
+          collateralPermitSignature,
+        ],
+        gasLimitMultiplier,
+        frontendTag,
+        this.user,
+      );
   }
 }
 
 export class UnderlyingCollateralTokenPositionManaging extends BasePositionManaging {
-  protected async getManagePositionAction(args: ManagePositionArgs): Promise<TransactionResponse> {
+  protected async getManagePositionAction(args: ManagePositionArgs): Promise<() => Promise<TransactionResponse>> {
     const {
       collateralToken,
       collateralChange,
@@ -314,26 +315,28 @@ export class UnderlyingCollateralTokenPositionManaging extends BasePositionManag
       gasLimitMultiplier,
       frontendTag,
     } = args;
+    const userAddress = await this.user.getAddress();
 
-    return sendTransactionWithGasLimit(
-      this.positionManager.managePosition,
-      [
-        RaftConfig.getTokenAddress(collateralToken),
-        await this.user.getAddress(),
-        ...this.getAbsValueAndIsIncrease(collateralChange),
-        ...this.getAbsValueAndIsIncrease(debtChange),
-        maxFeePercentage.value,
-        collateralPermitSignature,
-      ],
-      gasLimitMultiplier,
-      frontendTag,
-      this.user,
-    );
+    return () =>
+      sendTransactionWithGasLimit(
+        this.positionManager.managePosition,
+        [
+          RaftConfig.getTokenAddress(collateralToken),
+          userAddress,
+          ...this.getAbsValueAndIsIncrease(collateralChange),
+          ...this.getAbsValueAndIsIncrease(debtChange),
+          maxFeePercentage.value,
+          collateralPermitSignature,
+        ],
+        gasLimitMultiplier,
+        frontendTag,
+        this.user,
+      );
   }
 }
 
 export class WrappableCappedCollateralTokenPositionManaging extends BasePositionManaging {
-  protected async getManagePositionAction(args: ManagePositionArgs): Promise<TransactionResponse> {
+  protected async getManagePositionAction(args: ManagePositionArgs): Promise<() => Promise<TransactionResponse>> {
     const {
       collateralChange,
       debtChange,
@@ -344,23 +347,24 @@ export class WrappableCappedCollateralTokenPositionManaging extends BasePosition
       frontendTag,
     } = args;
 
-    return sendTransactionWithGasLimit(
-      getPositionManagerContract('wrapped', positionManagerAddress, this.user).managePosition,
-      [
-        ...this.getAbsValueAndIsIncrease(collateralChange),
-        ...this.getAbsValueAndIsIncrease(debtChange),
-        maxFeePercentage.value,
-        rPermitSignature,
-      ],
-      gasLimitMultiplier,
-      frontendTag,
-      this.user,
-    );
+    return () =>
+      sendTransactionWithGasLimit(
+        getPositionManagerContract('wrapped', positionManagerAddress, this.user).managePosition,
+        [
+          ...this.getAbsValueAndIsIncrease(collateralChange),
+          ...this.getAbsValueAndIsIncrease(debtChange),
+          maxFeePercentage.value,
+          rPermitSignature,
+        ],
+        gasLimitMultiplier,
+        frontendTag,
+        this.user,
+      );
   }
 }
 
 export class StEthPositionManaging extends BasePositionManaging {
-  protected async getManagePositionAction(args: ManagePositionArgs): Promise<TransactionResponse> {
+  protected async getManagePositionAction(args: ManagePositionArgs): Promise<() => Promise<TransactionResponse>> {
     const {
       collateralChange,
       debtChange,
@@ -371,17 +375,18 @@ export class StEthPositionManaging extends BasePositionManaging {
       frontendTag,
     } = args;
 
-    return sendTransactionWithGasLimit(
-      getPositionManagerContract('wrapped', positionManagerAddress, this.user).managePosition,
-      [
-        ...this.getAbsValueAndIsIncrease(collateralChange),
-        ...this.getAbsValueAndIsIncrease(debtChange),
-        maxFeePercentage.value,
-        rPermitSignature,
-      ],
-      gasLimitMultiplier,
-      frontendTag,
-      this.user,
-    );
+    return () =>
+      sendTransactionWithGasLimit(
+        getPositionManagerContract('wrapped', positionManagerAddress, this.user).managePosition,
+        [
+          ...this.getAbsValueAndIsIncrease(collateralChange),
+          ...this.getAbsValueAndIsIncrease(debtChange),
+          maxFeePercentage.value,
+          rPermitSignature,
+        ],
+        gasLimitMultiplier,
+        frontendTag,
+        this.user,
+      );
   }
 }
