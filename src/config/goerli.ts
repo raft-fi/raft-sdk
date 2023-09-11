@@ -6,34 +6,26 @@ import { Token } from '../types';
 
 const POSITION_MANAGER_ADDRESS = '0xeaf8aad45d563f14d8b443277dd51c426ad8607f';
 const POSITION_MANAGER_STETH_ADDRESS = '0x4e01f8c03893be67b60af6a1b49d6e51a8781e3c';
-const POSITION_MANAGER_WRAPPED_RETH = '0x109a9dace6e89cc5ddffebe374e15f029f6b1440';
+const POSITION_MANAGER_WRAPPED_RETH_ADDRESS = '0x109a9dace6e89cc5ddffebe374e15f029f6b1440';
 
 const underlyingTokensConfig: UnderlyingTokens = {
   wstETH: {
     supportedCollateralTokens: {
       stETH: {
         positionManager: POSITION_MANAGER_STETH_ADDRESS,
-        underlyingCollateralRate: getWstEthToStEthRate,
-        underlyingTokenTicker: 'wstETH',
       },
       wstETH: {
         positionManager: POSITION_MANAGER_ADDRESS,
-        underlyingCollateralRate: Decimal.ONE,
-        underlyingTokenTicker: 'wstETH',
       },
     },
   },
   wcrETH: {
     supportedCollateralTokens: {
       rETH: {
-        positionManager: POSITION_MANAGER_WRAPPED_RETH,
-        underlyingCollateralRate: Decimal.ONE,
-        underlyingTokenTicker: 'wcrETH',
+        positionManager: POSITION_MANAGER_WRAPPED_RETH_ADDRESS,
       },
       wcrETH: {
         positionManager: POSITION_MANAGER_ADDRESS,
-        underlyingCollateralRate: Decimal.ONE,
-        underlyingTokenTicker: 'wcrETH',
       },
     },
   },
@@ -43,50 +35,46 @@ const tokensConfig: Record<Token, TokenConfig> = {
   ETH: {
     address: ZeroAddress,
     ticker: 'ETH',
-    hardcodedPrice: null,
-    priceFeedTicker: null,
-    subgraphPriceDataTicker: null,
     supportsPermit: false,
+    priceFeed: {
+      ticker: 'ETH',
+      fallbackToken: 'wstETH',
+      getFallbackRate: getWstEthToStEthRate,
+    }, // TODO: will be replaced with WETH price feed
   },
   stETH: {
     address: '0x1643E812aE58766192Cf7D2Cf9567dF2C37e9B7F',
-    hardcodedPrice: null,
-    priceFeedTicker: null,
-    subgraphPriceDataTicker: null,
-    supportsPermit: false,
     ticker: 'stETH',
+    supportsPermit: false,
+    priceFeed: {
+      ticker: 'stETH',
+      fallbackToken: 'wstETH',
+      getFallbackRate: getWstEthToStEthRate,
+    },
   },
   wstETH: {
     address: '0x6320cD32aA674d2898A68ec82e869385Fc5f7E2f',
-    hardcodedPrice: null,
-    priceFeedTicker: 'wstETH',
-    subgraphPriceDataTicker: null,
-    supportsPermit: true,
     ticker: 'wstETH',
+    supportsPermit: true,
+    priceFeed: 'wstETH',
   },
   rETH: {
     address: '0x0b26a03413aCca79eE539015f036B7dF79ddD1c5',
-    hardcodedPrice: null,
-    priceFeedTicker: 'wcrETH',
-    subgraphPriceDataTicker: null,
-    supportsPermit: false,
     ticker: 'rETH',
+    supportsPermit: false,
+    priceFeed: 'wcrETH',
   },
   wcrETH: {
     address: '0x27d7f9921933DfA737B1006E5EFb637cC4b21fc8',
-    hardcodedPrice: null,
-    priceFeedTicker: 'wcrETH',
-    subgraphPriceDataTicker: null,
-    supportsPermit: true,
     ticker: 'wcrETH',
+    supportsPermit: true,
+    priceFeed: 'wcrETH',
   },
   R: {
     address: '0x9b41fE4EE4F23507953CCA339A4eC27eAc9e02b8',
-    hardcodedPrice: Decimal.ONE,
-    priceFeedTicker: null,
-    subgraphPriceDataTicker: null,
-    supportsPermit: true,
     ticker: 'R',
+    supportsPermit: true,
+    priceFeed: Decimal.ONE,
   },
 };
 
@@ -95,7 +83,7 @@ export const goerliConfig: NetworkConfig = {
   positionManagerStEth: POSITION_MANAGER_STETH_ADDRESS,
   oneInchOneStepLeverageStEth: '', // Add address if we ever deploy one step leverage on goerli
   wrappedCollateralTokenPositionManagers: {
-    wcrETH: POSITION_MANAGER_WRAPPED_RETH,
+    wcrETH: POSITION_MANAGER_WRAPPED_RETH_ADDRESS,
   },
   raftCollateralTokens: {
     wstETH: '0x86695745Ce31FBd45Db7F6866d5d3Abe048ce033',

@@ -1,9 +1,10 @@
-import { Provider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { Token, UnderlyingCollateralToken, WrappedCappedUnderlyingCollateralToken } from '../types';
+import { ContractRunner } from 'ethers';
 
 export type SupportedNetwork = 'goerli' | 'mainnet';
 export type PositionManagerType = 'base' | 'stETH' | 'wrapped';
+export type SubgraphPriceFeedToken = 'ETH' | 'stETH';
 
 export type SupportedCollateralTokens = {
   wstETH: 'stETH' | 'wstETH';
@@ -20,17 +21,26 @@ export type UnderlyingTokens = {
 
 export type CollateralTokenConfig = {
   positionManager: string;
-  underlyingTokenTicker: UnderlyingCollateralToken;
-  underlyingCollateralRate: Decimal | ((address: string, provider: Provider) => Promise<Decimal>);
 };
+
+/**
+ * This type is used to define the price feed for a collateral token that is fetched from the subgraph.
+ * In case the price fetching fails, the fallback token and fallback rate are used.
+ * @property ticker Ticker of the collateral token for which the price feed is defined on the subgraph.
+ * @property fallbackToken Ticker of the fallback token whose price is fetched from the blockchain.
+ * @property fallbackRate Function that returns the fallback `ticker`-`fallbackToken` rate.
+ */
+export interface SubgraphPriceFeed {
+  ticker: SubgraphPriceFeedToken;
+  fallbackToken: UnderlyingCollateralToken;
+  getFallbackRate: (address: string, runner: ContractRunner) => Promise<Decimal>;
+}
 
 export type TokenConfig = {
   address: string;
   ticker: Token;
   supportsPermit: boolean;
-  priceFeedTicker: UnderlyingCollateralToken | null;
-  hardcodedPrice: Decimal | null;
-  subgraphPriceDataTicker: Token | null;
+  priceFeed: Decimal | UnderlyingCollateralToken | SubgraphPriceFeed;
 };
 
 export interface NetworkConfig {
