@@ -172,14 +172,9 @@ export class Bridge {
     };
   }
 
-  async waitForBridgeToComplete(
+  async getBridgeMessageId(
     bridgeTransaction: ContractTransactionResponse,
     bridgeTransactionReceipt: TransactionReceipt,
-    sourceChainName: SupportedBridgeNetwork,
-    destinationChainRpc: string,
-    destinationChainName: SupportedBridgeNetwork,
-    pollInterval = 60000, // 60 seconds in milliseconds
-    timeout = 40 * 60 * 1000, // 40 minutes in milliseconds
   ) {
     const call = {
       from: bridgeTransaction.from,
@@ -193,6 +188,17 @@ export class Bridge {
 
     const messageId = await this.user.call(call);
 
+    return messageId;
+  }
+
+  async waitForBridgeToComplete(
+    messageId: string,
+    sourceChainName: SupportedBridgeNetwork,
+    destinationChainRpc: string,
+    destinationChainName: SupportedBridgeNetwork,
+    pollInterval = 60000, // 60 seconds in milliseconds
+    timeout = 40 * 60 * 1000, // 40 minutes in milliseconds
+  ) {
     const sourceChainSelector = BRIDGE_NETWORKS[sourceChainName].chainSelector;
 
     const destinationProvider = new JsonRpcProvider(destinationChainRpc);
