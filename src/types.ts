@@ -3,8 +3,8 @@ import { Decimal } from '@tempusfinance/decimal';
 export const WRAPPABLE_CAPPED_COLLATERAL_TOKENS = ['rETH'] as const;
 export const WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS = ['wcrETH'] as const;
 export const UNDERLYING_COLLATERAL_TOKENS = [
-  'wstETH-v1',
   'wstETH',
+  'wstETH-v1',
   'WETH',
   ...WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS,
 ] as const;

@@ -50,6 +50,10 @@ export class RaftConfig {
       ticker => this.networkConfig.tokens[ticker].address.toLowerCase() === address.toLowerCase(),
     );
 
+    if (tokenTicker === 'wstETH-v1') {
+      return 'wstETH';
+    }
+
     return tokenTicker ?? null;
   }
 
