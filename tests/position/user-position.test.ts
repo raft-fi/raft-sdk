@@ -403,7 +403,7 @@ describe('UserPosition', () => {
       expect(termination.done).toBe(true);
     });
 
-    it('should generate steps [approve collateral + manage] for WETH deposit + R repayment', async () => {
+    it('should generate steps [approve collateral + approve R + manage] for WETH deposit + R repayment', async () => {
       const userPosition = new UserPosition(mockEoaSigner, 'WETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'WETH' });
 
@@ -412,7 +412,7 @@ describe('UserPosition', () => {
         managePosition: null,
       });
 
-      const numberOfSteps = 2;
+      const numberOfSteps = 3;
 
       const firstStep = await steps.next();
 
@@ -424,14 +424,24 @@ describe('UserPosition', () => {
       expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
-      const secondStep = await steps.next();
+      const secondsStep = await steps.next();
 
-      expect(secondStep.done).toBe(false);
-      expect(secondStep.value?.type).toEqual({
+      expect(secondsStep.done).toBe(false);
+      expect(secondsStep.value?.type).toEqual({
+        name: 'approve',
+        token: 'R',
+      });
+      expect(secondsStep.value?.stepNumber).toEqual(2);
+      expect(secondsStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const thirdStep = await steps.next();
+
+      expect(thirdStep.done).toBe(false);
+      expect(thirdStep.value?.type).toEqual({
         name: 'manage',
       });
-      expect(secondStep.value?.stepNumber).toEqual(2);
-      expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
+      expect(thirdStep.value?.stepNumber).toEqual(3);
+      expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
 
@@ -463,7 +473,7 @@ describe('UserPosition', () => {
       expect(termination.done).toBe(true);
     });
 
-    it('should generate steps [manage] for WETH withdrawal + R repayment', async () => {
+    it('should generate steps [approve, manage] for WETH withdrawal + R repayment', async () => {
       const userPosition = new UserPosition(mockEoaSigner, 'WETH');
       const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'WETH' });
 
@@ -472,16 +482,26 @@ describe('UserPosition', () => {
         managePosition: null,
       });
 
-      const numberOfSteps = 1;
+      const numberOfSteps = 2;
 
       const firstStep = await steps.next();
 
       expect(firstStep.done).toBe(false);
       expect(firstStep.value?.type).toEqual({
-        name: 'manage',
+        name: 'approve',
+        token: 'R',
       });
       expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const secondStep = await steps.next();
+
+      expect(secondStep.done).toBe(false);
+      expect(secondStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(secondStep.value?.stepNumber).toEqual(2);
+      expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
 
