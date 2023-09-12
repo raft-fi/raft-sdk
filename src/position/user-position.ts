@@ -62,6 +62,7 @@ export interface LeveragePositionStep {
 interface UserPositionResponse {
   underlyingCollateralToken: string | null;
   isLeveraged: boolean | null;
+  vaultVersion: VaultVersion | null;
 }
 
 const DEBT_CHANGE_TO_CLOSE = Decimal.MAX_DECIMAL.mul(-1);
@@ -115,14 +116,15 @@ export class UserPosition<
    * @param user The signer of the position's owner.
    * @returns The position of the user or null.
    */
-  public static async fromUser<C extends SupportedVaultVersionUnderlyingCollateralTokens['v1']>(
+  public static async fromUser<C extends SupportedVaultVersionUnderlyingCollateralTokens[VaultVersion]>(
     user: Signer,
-  ): Promise<UserPosition<'v1', C> | null> {
+  ): Promise<UserPosition<VaultVersion, C> | null> {
     const query = gql`
       query getPosition($positionId: String!) {
         position(id: $positionId) {
           underlyingCollateralToken
           isLeveraged
+          vaultVersion
         }
       }
     `;
@@ -148,12 +150,13 @@ export class UserPosition<
     }
 
     const isLeveraged = response.position?.isLeveraged ?? false;
+    const vaultVersion = response.position?.vaultVersion ?? 'v2';
 
     // TODO: support v2 vaults
     const position = new UserPosition(
       user,
-      underlyingCollateralToken as SupportedVaultVersionUnderlyingCollateralTokens['v1'],
-      'v1',
+      underlyingCollateralToken as SupportedVaultVersionUnderlyingCollateralTokens[VaultVersion],
+      vaultVersion,
     );
     position.setIsLeveraged(isLeveraged);
     await position.fetch();
@@ -180,6 +183,10 @@ export class UserPosition<
     this.user = user;
     this.positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, user);
     this.vaultVersion = vaultVersion;
+  }
+
+  public getVaultVersion(): V {
+    return this.vaultVersion;
   }
 
   /**
