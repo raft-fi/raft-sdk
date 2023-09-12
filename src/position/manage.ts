@@ -13,6 +13,7 @@ import { getTokenAllowance } from '../allowance';
 import { ERC20PermitSignatureStruct, PositionManager } from '../typechain/PositionManager';
 import { ERC20, ERC20Permit } from '../typechain';
 import { getPermitOrApproveTokenStep, getWhitelistStep } from './steps';
+import { isInterestRateVault } from '../utils/token';
 
 export interface ManagePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'manage';
@@ -109,6 +110,7 @@ export abstract class BasePositionManaging {
     const collateralTokenContract = getTokenContract(collateralToken, this.user);
     const positionManagerAddress = RaftConfig.getPositionManagerAddress(underlyingCollateralToken, collateralToken);
     const permitChecks = await this.checkPermitSupport(options);
+    const interestRateVault = isInterestRateVault(underlyingCollateralToken);
     const { whitelistingStepNeeded, collateralApprovalStepNeeded, rTokenApprovalStepNeeded } =
       await this.getNeededSteps(
         collateralChange,
@@ -159,7 +161,8 @@ export abstract class BasePositionManaging {
         positionManagerAddress,
         stepCounter++,
         numberOfSteps,
-        canUserUsePermit,
+        // Interest rate vaults don't support signing permit for R token
+        canUserUsePermit && !interestRateVault,
         cachedRPermitSignature,
       );
     }
@@ -211,6 +214,7 @@ export abstract class BasePositionManaging {
     const isCollateralIncrease = collateralChange.gt(Decimal.ZERO);
     const isDebtIncrease = debtChange.gt(Decimal.ZERO);
     const isUnderlyingToken = collateralToken === underlyingCollateralToken;
+    const interestRateVault = isInterestRateVault(underlyingCollateralToken);
 
     const { collateralPermitSignature: cachedCollateralPermitSignature, rPermitSignature: cachedRPermitSignature } =
       options;
@@ -218,7 +222,8 @@ export abstract class BasePositionManaging {
 
     const whitelistingRequired = !isUnderlyingToken;
     const collateralTokenAllowanceRequired = collateralTokenContract !== null && isCollateralIncrease;
-    const rTokenAllowanceRequired = !isDebtIncrease && !isUnderlyingToken;
+    const rTokenAllowanceRequired =
+      (!interestRateVault && !isDebtIncrease && !isUnderlyingToken) || (interestRateVault && !isDebtIncrease);
     const userAddress = await this.user.getAddress();
 
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
