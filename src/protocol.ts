@@ -48,8 +48,9 @@ interface PsmTvlData {
 
 const BETA = new Decimal(2);
 const ORACLE_DEVIATION: Record<UnderlyingCollateralToken, Decimal> = {
-  wstETH: new Decimal(0.01), // 1%
+  'wstETH-v1': new Decimal(0.01), // 1%
   wcrETH: new Decimal(0.015), // 1.5%
+  wstETH: new Decimal(0.01), // 1%
   WETH: new Decimal(0.005), // TODO: add oracle deviation for WETH
 };
 
@@ -63,18 +64,21 @@ export class Protocol {
   private rToken: ERC20Permit;
 
   private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
-    wstETH: null,
+    'wstETH-v1': null,
     wcrETH: null,
+    wstETH: null,
     WETH: null,
   };
   private _debtSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
-    wstETH: null,
+    'wstETH-v1': null,
     wcrETH: null,
+    wstETH: null,
     WETH: null,
   };
   private _borrowingRate: Record<UnderlyingCollateralToken, Decimal | null> = {
-    wstETH: null,
+    'wstETH-v1': null,
     wcrETH: null,
+    wstETH: null,
     WETH: null,
   };
   private _redemptionRate: Decimal | null = null;
