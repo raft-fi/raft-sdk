@@ -172,14 +172,9 @@ export class Bridge {
     };
   }
 
-  async waitForBridgeToComplete(
+  async getBridgeMessageId(
     bridgeTransaction: ContractTransactionResponse,
     bridgeTransactionReceipt: TransactionReceipt,
-    sourceChainName: SupportedBridgeNetwork,
-    destinationChainRpc: string,
-    destinationChainName: SupportedBridgeNetwork,
-    pollInterval = 60000, // 60 seconds in milliseconds
-    timeout = 40 * 60 * 1000, // 40 minutes in milliseconds
   ) {
     const call = {
       from: bridgeTransaction.from,
@@ -193,6 +188,17 @@ export class Bridge {
 
     const messageId = await this.user.call(call);
 
+    return messageId;
+  }
+
+  async waitForBridgeToComplete(
+    messageId: string,
+    sourceChainName: SupportedBridgeNetwork,
+    destinationChainRpc: string,
+    destinationChainName: SupportedBridgeNetwork,
+    pollInterval = 60000, // 60 seconds in milliseconds
+    timeout = 40 * 60 * 1000, // 40 minutes in milliseconds
+  ) {
     const sourceChainSelector = BRIDGE_NETWORKS[sourceChainName].chainSelector;
 
     const destinationProvider = new JsonRpcProvider(destinationChainRpc);
@@ -200,52 +206,53 @@ export class Bridge {
 
     const destinationRouterContract = CCIPRouter__factory.connect(destinationRouterAddress, destinationProvider);
 
-    const pollStatus = async () => {
-      // Fetch the OffRamp contract addresses on the destination chain
-      const offRamps = await destinationRouterContract.getOffRamps();
+    return new Promise<void>((resolve, reject) => {
+      const pollStatus = async () => {
+        // Fetch the OffRamp contract addresses on the destination chain
+        const offRamps = await destinationRouterContract.getOffRamps();
 
-      // Iterate through OffRamps to find the one linked to the source chain and check message status
-      for (const offRamp of offRamps) {
-        if (offRamp.sourceChainSelector.toString() === sourceChainSelector) {
-          const offRampContract = CCIPOffRamp__factory.connect(offRamp.offRamp, destinationProvider);
-          const events = await offRampContract.queryFilter(offRampContract.filters.ExecutionStateChanged);
+        // Iterate through OffRamps to find the one linked to the source chain and check message status
+        for (const offRamp of offRamps) {
+          if (offRamp.sourceChainSelector.toString() === sourceChainSelector) {
+            const offRampContract = CCIPOffRamp__factory.connect(offRamp.offRamp, destinationProvider);
+            const events = await offRampContract.queryFilter(offRampContract.filters.ExecutionStateChanged);
 
-          // Check if an event with the specific messageId exists and log its status
-          for (const event of events) {
-            if (event.args && event.args.messageId === messageId) {
-              const state = event.args.state;
-              const status = getMessageState(Number(state));
-              console.log(
-                `\nStatus of message ${messageId} is ${status} - Check the explorer https://ccip.chain.link/msg/${messageId} for more information.`,
-              );
+            // Check if an event with the specific messageId exists and log its status
+            for (const event of events) {
+              if (event.args && event.args.messageId === messageId) {
+                const state = event.args.state;
+                const status = getMessageState(Number(state));
+                console.log(
+                  `\nStatus of message ${messageId} is ${status} - Check the explorer https://ccip.chain.link/msg/${messageId} for more information.`,
+                );
 
-              // Clear the polling and the timeout
-              clearInterval(pollingId);
-              clearTimeout(timeoutId);
-              return;
+                // Clear the polling and the timeout
+                clearInterval(pollingId);
+                clearTimeout(timeoutId);
+                resolve();
+              }
             }
           }
         }
-      }
-      // If no event found, the message has not yet been processed on the destination chain
-      console.info(
-        `Message ${messageId} has not been processed yet on the destination chain. Checking again in ${pollInterval} milliseconds. Check the explorer https://ccip.chain.link/msg/${messageId} for status.`,
-      );
-    };
+        // If no event found, the message has not yet been processed on the destination chain
+        console.info(
+          `Message ${messageId} has not been processed yet on the destination chain. Checking again in ${pollInterval} milliseconds. Check the explorer https://ccip.chain.link/msg/${messageId} for status.`,
+        );
+      };
 
-    // Start polling
-    console.info(
-      `\nWaiting for message ${messageId} to be executed on the destination chain - Check the explorer https://ccip.chain.link/msg/${messageId} for status.`,
-    );
-    const pollingId = setInterval(pollStatus, pollInterval);
-
-    // Set timeout to stop polling after specified timeout period
-    const timeoutId = setTimeout(() => {
+      // Start polling
       console.info(
-        `\nTimeout reached. Stopping polling - check the explorer https://ccip.chain.link/msg/${messageId} for status.`,
+        `\nWaiting for message ${messageId} to be executed on the destination chain - Check the explorer https://ccip.chain.link/msg/${messageId} for status.`,
       );
-      clearInterval(pollingId);
-    }, timeout);
+      const pollingId = setInterval(pollStatus, pollInterval);
+
+      // Set timeout to stop polling after specified timeout period
+      const timeoutId = setTimeout(() => {
+        clearInterval(pollingId);
+        const errorMsg = `Timeout reached. Stopping polling - check the explorer https://ccip.chain.link/msg/${messageId} for status.`;
+        reject(new Error(errorMsg));
+      }, timeout);
+    });
   }
 
   async fetchBalance(network: SupportedBridgeNetwork, rpc: string) {
