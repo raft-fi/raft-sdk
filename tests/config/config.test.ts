@@ -1,4 +1,3 @@
-import { ZeroAddress } from 'ethers';
 import { RaftConfig } from '../../src';
 import { goerliConfig } from '../../src/config/goerli';
 import { mainnetConfig } from '../../src/config/mainnet';
@@ -40,12 +39,12 @@ describe('RaftConfig', () => {
   it('should get token ticker', () => {
     RaftConfig.setNetwork('mainnet');
     expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.stETH.address)).toEqual('stETH');
-    expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.wstETH.address)).toEqual('wstETH');
+    expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.wstETH.address)).toEqual('wstETH-v1');
     expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.R.address)).toEqual('R');
 
     RaftConfig.setNetwork('goerli');
     expect(RaftConfig.getTokenTicker(goerliConfig.tokens.stETH.address)).toEqual('stETH');
-    expect(RaftConfig.getTokenTicker(goerliConfig.tokens.wstETH.address)).toEqual('wstETH');
+    expect(RaftConfig.getTokenTicker(goerliConfig.tokens.wstETH.address)).toEqual('wstETH-v1');
     expect(RaftConfig.getTokenTicker(goerliConfig.tokens.R.address)).toEqual('R');
   });
 
@@ -58,11 +57,11 @@ describe('RaftConfig', () => {
 
   it('should return position manager', () => {
     RaftConfig.setNetwork('mainnet');
-    expect(RaftConfig.getPositionManagerAddress('wstETH', 'stETH')).toEqual(mainnetConfig.positionManagerStEth);
-    expect(RaftConfig.getPositionManagerAddress('wstETH', 'wstETH')).toEqual(mainnetConfig.positionManager);
+    expect(RaftConfig.getPositionManagerAddress('wstETH-v1', 'stETH')).toEqual(mainnetConfig.positionManagerStEth);
+    expect(RaftConfig.getPositionManagerAddress('wstETH-v1', 'wstETH-v1')).toEqual(mainnetConfig.positionManager);
 
     RaftConfig.setNetwork('goerli');
-    expect(RaftConfig.getPositionManagerAddress('wstETH', 'stETH')).toEqual(goerliConfig.positionManagerStEth);
-    expect(RaftConfig.getPositionManagerAddress('wstETH', 'wstETH')).toEqual(goerliConfig.positionManager);
+    expect(RaftConfig.getPositionManagerAddress('wstETH-v1', 'stETH')).toEqual(goerliConfig.positionManagerStEth);
+    expect(RaftConfig.getPositionManagerAddress('wstETH-v1', 'wstETH-v1')).toEqual(goerliConfig.positionManager);
   });
 });

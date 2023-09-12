@@ -9,12 +9,12 @@ const POSITION_MANAGER_WRAPPED_RETH_ADDRESS = '0x109a9dace6e89cc5ddffebe374e15f0
 const INTEREST_RATE_POSITION_MANAGER_ADDRESS = '0x7B07fC0C5829FC8c74cC18dF99C50b7d7fe830b4';
 
 const underlyingTokensConfig: UnderlyingTokens = {
-  wstETH: {
+  'wstETH-v1': {
     supportedCollateralTokens: {
       stETH: {
         positionManager: POSITION_MANAGER_STETH_ADDRESS,
       },
-      wstETH: {
+      'wstETH-v1': {
         positionManager: POSITION_MANAGER_ADDRESS,
       },
     },
@@ -26,6 +26,13 @@ const underlyingTokensConfig: UnderlyingTokens = {
       },
       wcrETH: {
         positionManager: POSITION_MANAGER_ADDRESS,
+      },
+    },
+  },
+  wstETH: {
+    supportedCollateralTokens: {
+      wstETH: {
+        positionManager: INTEREST_RATE_POSITION_MANAGER_ADDRESS,
       },
     },
   },
@@ -54,6 +61,12 @@ const tokensConfig: Record<Token, TokenConfig> = {
     ticker: 'wstETH',
     supportsPermit: true,
     priceFeed: 'wstETH',
+  },
+  'wstETH-v1': {
+    address: '0x6320cD32aA674d2898A68ec82e869385Fc5f7E2f',
+    ticker: 'wstETH',
+    supportsPermit: true,
+    priceFeed: 'wstETH-v1',
   },
   rETH: {
     address: '0x0b26a03413aCca79eE539015f036B7dF79ddD1c5',
@@ -90,18 +103,21 @@ export const goerliConfig: NetworkConfig = {
     wcrETH: POSITION_MANAGER_WRAPPED_RETH_ADDRESS,
   },
   raftCollateralTokens: {
-    wstETH: '0x86695745Ce31FBd45Db7F6866d5d3Abe048ce033',
+    'wstETH-v1': '0x86695745Ce31FBd45Db7F6866d5d3Abe048ce033',
     wcrETH: '0x1678f15179dF5608786561A8d56E498449dF2f28',
+    wstETH: '0xBF2b30825759EdC6eF771CC071af38DF8f321b9B',
     WETH: '0x798671e454935c9Dd326289113aF1c91cAcCe4fE',
   },
   raftDebtTokens: {
-    wstETH: '0xAABF1f5e5C9b559aaCD3c97B41B0B1ae593e31A8',
+    'wstETH-v1': '0xAABF1f5e5C9b559aaCD3c97B41B0B1ae593e31A8',
     wcrETH: '0xB9F64d21b776abCA4aD2d04846D65cB0d072925F',
+    wstETH: '0x7b485Fd7eDab0D354649Af4d73778FA26BE43369',
     WETH: '0xe001CD1C9C611A8B7631eA66495465db7e54348e',
   },
   priceFeeds: {
-    wstETH: '0x0341b185e55A0860D6a7e853fd44D1f4fe37dB37',
+    'wstETH-v1': '0x0341b185e55A0860D6a7e853fd44D1f4fe37dB37',
     wcrETH: '0xfd7970eE3eF2E717346016f439A691Ea3DFd71BA',
+    wstETH: '0x93Fc3ef17A627913f9aD6507E07f28736286134D',
     WETH: '0x93Fc3ef17A627913f9aD6507E07f28736286134D',
   },
   underlyingTokens: underlyingTokensConfig,

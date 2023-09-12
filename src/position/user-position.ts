@@ -9,10 +9,10 @@ import OneInchOneStepLeverageStETHABI from './../abi/OneInchOneStepLeverageStETH
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
 import {
   CollateralToken,
-  SupportedVaultVersionUnderlyingCollateralTokens,
   SwapRouter,
   Token,
   TransactionWithFeesOptions,
+  UnderlyingCollateralToken,
   VaultVersion,
 } from '../types';
 import {
@@ -36,6 +36,7 @@ import {
   WrappableCappedCollateralTokenPositionManaging,
 } from './manage';
 import { getPermitOrApproveTokenStep, getWhitelistStep } from './steps';
+import { isInterestRateVault } from '../utils/token';
 
 export interface LeveragePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'leverage';
@@ -62,6 +63,7 @@ export interface LeveragePositionStep {
 interface UserPositionResponse {
   underlyingCollateralToken: string | null;
   isLeveraged: boolean | null;
+  vaultVersion: VaultVersion;
 }
 
 const DEBT_CHANGE_TO_CLOSE = Decimal.MAX_DECIMAL.mul(-1);
@@ -100,13 +102,9 @@ export interface ManagePositionCallbacks {
  * position (e.g. managing collateral and debt). For read-only operations on the position, use the
  * {@link PositionWithAddress} class.
  */
-export class UserPosition<
-  V extends VaultVersion,
-  T extends SupportedVaultVersionUnderlyingCollateralTokens[V],
-> extends PositionWithRunner {
+export class UserPosition<T extends UnderlyingCollateralToken> extends PositionWithRunner {
   private user: Signer;
   private positionManager: PositionManager;
-  private vaultVersion: V;
 
   /**
    * Fetches the position of a given user or returns null if the user does not have a position. Differs from the
@@ -115,14 +113,13 @@ export class UserPosition<
    * @param user The signer of the position's owner.
    * @returns The position of the user or null.
    */
-  public static async fromUser<C extends SupportedVaultVersionUnderlyingCollateralTokens['v1']>(
-    user: Signer,
-  ): Promise<UserPosition<'v1', C> | null> {
+  public static async fromUser<C extends UnderlyingCollateralToken>(user: Signer): Promise<UserPosition<C> | null> {
     const query = gql`
       query getPosition($positionId: String!) {
         position(id: $positionId) {
           underlyingCollateralToken
           isLeveraged
+          vaultVersion
         }
       }
     `;
@@ -148,13 +145,11 @@ export class UserPosition<
     }
 
     const isLeveraged = response.position?.isLeveraged ?? false;
+    const vaultVersion = response.position?.vaultVersion ?? 'v2';
+    const resolvedUnderlyingCollateralToken =
+      underlyingCollateralToken === 'wstETH' && vaultVersion === 'v1' ? 'wstETH-v1' : underlyingCollateralToken;
 
-    // TODO: support v2 vaults
-    const position = new UserPosition(
-      user,
-      underlyingCollateralToken as SupportedVaultVersionUnderlyingCollateralTokens['v1'],
-      'v1',
-    );
+    const position = new UserPosition(user, resolvedUnderlyingCollateralToken);
     position.setIsLeveraged(isLeveraged);
     await position.fetch();
 
@@ -171,7 +166,6 @@ export class UserPosition<
   public constructor(
     user: Signer,
     underlyingCollateralToken: T,
-    vaultVersion: V = 'v2' as V,
     collateral: Decimal = Decimal.ZERO,
     debt: Decimal = Decimal.ZERO,
   ) {
@@ -179,7 +173,10 @@ export class UserPosition<
 
     this.user = user;
     this.positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, user);
-    this.vaultVersion = vaultVersion;
+  }
+
+  public get isInterestRate(): boolean {
+    return isInterestRateVault(this.underlyingCollateralToken);
   }
 
   /**
@@ -299,9 +296,10 @@ export class UserPosition<
       approvalType = 'permit',
     } = options;
     let { collateralToken = this.underlyingCollateralToken as T } = options;
+    const isInterestRateVaultToken = isInterestRateVault(this.underlyingCollateralToken);
 
     // Only allow depositing more collateral or repaying debt
-    if (this.vaultVersion === 'v1' && debtChange.gt(Decimal.ZERO)) {
+    if (!isInterestRateVaultToken && debtChange.gt(Decimal.ZERO)) {
       throw new Error('Cannot borrow more debt from v1 vaults');
     }
 
@@ -318,13 +316,13 @@ export class UserPosition<
 
     let positionManaging: BasePositionManaging;
 
-    if (this.vaultVersion === 'v2') {
+    if (isInterestRateVaultToken) {
       positionManaging = new InterestRatePositionManaging(this.user);
     } else if (isUnderlyingCollateralToken(collateralToken)) {
       positionManaging = new UnderlyingCollateralTokenPositionManaging(this.user);
     } else if (isWrappableCappedCollateralToken(collateralToken)) {
       positionManaging = new WrappableCappedCollateralTokenPositionManaging(this.user);
-    } else if (this.underlyingCollateralToken === 'wstETH' && collateralToken === 'stETH') {
+    } else if (this.underlyingCollateralToken === 'wstETH-v1' && collateralToken === 'stETH') {
       positionManaging = new StEthPositionManaging(this.user);
     } else {
       throw new Error(

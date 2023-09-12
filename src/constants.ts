@@ -9,8 +9,9 @@ export const SECONDS_PER_YEAR = 60 * 60 * 24 * 365.2425; // One Gregorian year h
 // Protocol constants
 
 export const MIN_COLLATERAL_RATIO: Record<UnderlyingCollateralToken, Decimal> = {
-  wstETH: new Decimal(1.2), // 120%
+  'wstETH-v1': new Decimal(1.2), // 120%
   wcrETH: new Decimal(1.2), // 120%
+  wstETH: new Decimal(1.2), // 120%
   WETH: new Decimal(1.2), // 120%
 };
 export const MIN_NET_DEBT = new Decimal(3000); // 3000 R

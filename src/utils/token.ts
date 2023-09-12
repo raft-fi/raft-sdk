@@ -11,11 +11,13 @@ import {
 import {
   COLLATERAL_TOKENS,
   CollateralToken,
+  InterestRateVault,
   RToken,
   R_TOKEN,
   Token,
   UNDERLYING_COLLATERAL_TOKENS,
   UnderlyingCollateralToken,
+  VAULTS_V1,
   WRAPPABLE_CAPPED_COLLATERAL_TOKENS,
   WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS,
   WrappableCappedCollateralToken,
@@ -30,11 +32,18 @@ const COLLATERAL_TOKEN_SET = new Set<string>(COLLATERAL_TOKENS);
 type TokenContractTypes = {
   stETH: ERC20;
   wstETH: ERC20Permit;
+  'wstETH-v1': ERC20Permit;
   rETH: ERC20;
   WETH: ERC20;
   wcrETH: WrappedCollateralToken;
   R: ERC20Permit;
 };
+
+export function isInterestRateVault(
+  underlyingCollateralToken: UnderlyingCollateralToken,
+): underlyingCollateralToken is InterestRateVault {
+  return !VAULTS_V1.includes(underlyingCollateralToken as never);
+}
 
 export function isWrappableCappedCollateralToken(token: Token): token is WrappableCappedCollateralToken {
   return WRAPPABLE_CAPPED_COLLATERAL_TOKEN_SET.has(token);
