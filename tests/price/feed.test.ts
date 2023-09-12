@@ -36,7 +36,7 @@ describeWhen(process.env.CI === 'true')('PriceFeed', () => {
   describe('getUnderlyingCollateralRate', () => {
     it('should return valid rate for wstETH:stETH', async () => {
       const priceFeed = new PriceFeed(forkProvider);
-      const rate = await priceFeed.getUnderlyingCollateralRate('wstETH', 'stETH');
+      const rate = await priceFeed.getUnderlyingCollateralRate('wstETH-v1', 'stETH');
 
       expect(rate.gt(1)).toBeTruthy();
       expect(rate.lt(2)).toBeTruthy();

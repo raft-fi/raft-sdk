@@ -2,6 +2,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Signer } from 'ethers';
 import { ERC20PermitSignatureStruct, UserPosition, getTokenAllowance } from '../../src';
 import { createPermitSignature, EMPTY_PERMIT_SIGNATURE, getPositionManagerContract } from '../../src/utils';
+import { VaultV1 } from '../../src/types';
 
 jest.mock('../../src/allowance', () => ({
   ...jest.requireActual('../../src/allowance'),
@@ -33,7 +34,7 @@ describe('UserPosition', () => {
 
   describe('getManageSteps', () => {
     it('should fetch whitelist and allowance if they are not passed and required', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v1');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
       const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'stETH' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
@@ -50,7 +51,7 @@ describe('UserPosition', () => {
     });
 
     it('should skip whitelist and allowance fetching if they are passed', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v2');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, {
         isDelegateWhitelisted: false,
         collateralTokenAllowance: Decimal.ONE,
@@ -74,7 +75,7 @@ describe('UserPosition', () => {
     });
 
     it('should generate steps [wstETH permit + manage] for wstETH deposit + R borrowing', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v2');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, { collateralToken: 'wstETH' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
@@ -115,7 +116,7 @@ describe('UserPosition', () => {
     });
 
     it('should generate steps [approve wstETH + manage] for wstETH deposit + R borrowing in case of approval type config', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v2');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, {
         collateralToken: 'wstETH',
         approvalType: 'approve',
@@ -157,8 +158,8 @@ describe('UserPosition', () => {
     });
 
     it('should generate steps [wstETH permit + manage] for wstETH deposit + R repayment', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v1');
-      const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'wstETH' });
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
+      const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'wstETH-v1' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
@@ -174,7 +175,7 @@ describe('UserPosition', () => {
       expect(firstStep.done).toBe(false);
       expect(firstStep.value?.type).toEqual({
         name: 'permit',
-        token: 'wstETH',
+        token: 'wstETH-v1',
       });
       expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
@@ -195,7 +196,7 @@ describe('UserPosition', () => {
     });
 
     it('should generate steps [manage] for wstETH withdrawal + R borrowing', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v2');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(new Decimal(-1), Decimal.ONE, { collateralToken: 'wstETH' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
@@ -223,8 +224,8 @@ describe('UserPosition', () => {
     });
 
     it('should generate steps [manage] for wstETH withdrawal + R repayment', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v1');
-      const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'wstETH' });
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
+      const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'wstETH-v1' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
@@ -248,12 +249,12 @@ describe('UserPosition', () => {
     });
 
     it.each([
-      ['wstETH', 'stETH'],
+      ['wstETH-v1', 'stETH'],
       ['wcrETH', 'rETH'],
-    ] as ['wstETH' | 'wcrETH', 'stETH' | 'rETH'][])(
+    ] as [VaultV1, 'stETH' | 'rETH'][])(
       'should generate steps [whitelist + approve collateral + permit R + manage] for %s deposit + R repayment',
-      async (underlyingCollateralToken: 'wstETH' | 'wcrETH', collateralToken: 'stETH' | 'rETH') => {
-        const userPosition = new UserPosition(mockEoaSigner, underlyingCollateralToken, 'v1');
+      async (underlyingCollateralToken: VaultV1, collateralToken: 'stETH' | 'rETH') => {
+        const userPosition = new UserPosition(mockEoaSigner, underlyingCollateralToken);
         const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), {
           collateralToken,
         });
@@ -313,12 +314,12 @@ describe('UserPosition', () => {
     );
 
     it.each([
-      ['wstETH', 'stETH'],
+      ['wstETH-v1', 'stETH'],
       ['wcrETH', 'rETH'],
-    ] as ['wstETH' | 'wcrETH', 'stETH' | 'rETH'][])(
+    ] as [VaultV1, 'stETH' | 'rETH'][])(
       'should generate steps [whitelist + permit R + manage] for %s withdrawal + R repayment',
-      async (underlyingCollateralToken: 'wstETH' | 'wcrETH', collateralToken: 'stETH' | 'rETH') => {
-        const userPosition = new UserPosition(mockEoaSigner, underlyingCollateralToken, 'v1');
+      async (underlyingCollateralToken: VaultV1, collateralToken: 'stETH' | 'rETH') => {
+        const userPosition = new UserPosition(mockEoaSigner, underlyingCollateralToken);
         const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), {
           collateralToken,
         });
@@ -488,8 +489,8 @@ describe('UserPosition', () => {
     });
 
     it('should skip using delegate if there is no collateral change', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v2');
-      const steps = userPosition.getManageSteps(Decimal.ZERO, Decimal.ONE, { collateralToken: 'stETH' });
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
+      const steps = userPosition.getManageSteps(Decimal.ZERO, new Decimal(-1), { collateralToken: 'stETH' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
@@ -508,7 +509,7 @@ describe('UserPosition', () => {
     });
 
     it('should skip permit step if cached collateral token permit signature is passed', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v2');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, {
         collateralToken: 'wstETH',
         collateralPermitSignature: EMPTY_PERMIT_SIGNATURE,
@@ -540,7 +541,7 @@ describe('UserPosition', () => {
     });
 
     it('should skip permit step if cached R token permit signature is passed', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v1');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
       const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), {
         collateralToken: 'stETH',
         rPermitSignature: EMPTY_PERMIT_SIGNATURE,
@@ -578,7 +579,7 @@ describe('UserPosition', () => {
     });
 
     it('should throw an error if collateral and debt changes are both zero', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v1');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
       const steps = userPosition.getManageSteps(Decimal.ZERO, Decimal.ZERO);
 
       expect(() => steps.next()).rejects.toThrow('Collateral and debt change cannot be both zero');
@@ -600,7 +601,7 @@ describe('UserPosition', () => {
     });
 
     it('should throw an error if R token permit signature is not passed', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v1');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
       const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'stETH' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
@@ -616,15 +617,15 @@ describe('UserPosition', () => {
     });
 
     it('should not allow opening a position for v1 vaults', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v1');
-      const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, { collateralToken: 'wstETH' });
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
+      const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, { collateralToken: 'wstETH-v1' });
 
       await expect(steps.next()).rejects.toThrow('Cannot borrow more debt from v1 vaults');
     });
 
     it('should not allow borrowing more debt from v1 vaults', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH', 'v1', new Decimal(100), new Decimal(3000));
-      const steps = userPosition.getManageSteps(Decimal.ZERO, new Decimal(100), { collateralToken: 'wstETH' });
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1', new Decimal(100), new Decimal(3000));
+      const steps = userPosition.getManageSteps(Decimal.ZERO, new Decimal(100), { collateralToken: 'wstETH-v1' });
 
       await expect(steps.next()).rejects.toThrow('Cannot borrow more debt from v1 vaults');
     });

@@ -2,7 +2,12 @@ import { Decimal } from '@tempusfinance/decimal';
 
 export const WRAPPABLE_CAPPED_COLLATERAL_TOKENS = ['rETH'] as const;
 export const WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS = ['wcrETH'] as const;
-export const UNDERLYING_COLLATERAL_TOKENS = ['wstETH', 'WETH', ...WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS] as const;
+export const UNDERLYING_COLLATERAL_TOKENS = [
+  'wstETH-v1',
+  'wstETH',
+  'WETH',
+  ...WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS,
+] as const;
 export const COLLATERAL_TOKENS = [
   'stETH',
   ...WRAPPABLE_CAPPED_COLLATERAL_TOKENS,
@@ -11,6 +16,9 @@ export const COLLATERAL_TOKENS = [
 export const R_TOKEN = 'R';
 export const TOKENS = [...COLLATERAL_TOKENS, R_TOKEN] as const;
 
+export const VAULT_VERSIONS = ['v1', 'v2'] as const;
+export const VAULTS_V1 = ['wstETH-v1', 'wcrETH'] as const;
+
 export type WrappableCappedCollateralToken = (typeof WRAPPABLE_CAPPED_COLLATERAL_TOKENS)[number];
 export type WrappedCappedUnderlyingCollateralToken = (typeof WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS)[number];
 export type UnderlyingCollateralToken = (typeof UNDERLYING_COLLATERAL_TOKENS)[number];
@@ -18,11 +26,9 @@ export type CollateralToken = (typeof COLLATERAL_TOKENS)[number];
 export type RToken = typeof R_TOKEN;
 export type Token = (typeof TOKENS)[number];
 
-export type VaultVersion = 'v1' | 'v2';
-export type SupportedVaultVersionUnderlyingCollateralTokens = {
-  v1: 'wstETH' | 'wcrETH';
-  v2: Exclude<UnderlyingCollateralToken, 'wcrETH'>;
-};
+export type VaultVersion = (typeof VAULT_VERSIONS)[number];
+export type VaultV1 = (typeof VAULTS_V1)[number];
+export type InterestRateVault = Exclude<UnderlyingCollateralToken, VaultV1>;
 
 /**
  * @param maxFeePercentage Maximum fee percentage to pay for transaction.

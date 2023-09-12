@@ -5,17 +5,17 @@ import { getWstEthToStEthRate } from '../price';
 
 const POSITION_MANAGER_ADDRESS = '0x5f59b322eb3e16a0c78846195af1f588b77403fc';
 const POSITION_MANAGER_STETH_ADDRESS = '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6';
-const POSITION_MANAGER_RETH_ADDRESS = '0x29f8abb4cab4bbb56f617d9a3c0f62d33758e74e';
+const POSITION_MANAGER_WRAPPED_RETH_ADDRESS = '0x29f8abb4cab4bbb56f617d9a3c0f62d33758e74e';
 const INTEREST_RATE_POSITION_MANAGER_ADDRESS = ''; // TODO: use interest rate position manager
 const ONE_INCH_ONE_STEP_LEVERAGE_STETH_ADDRESS = '0xB2Bf4De5a63B2225338CdFdBAd045EA62f158b67';
 
 const underlyingTokensConfig: UnderlyingTokens = {
-  wstETH: {
+  'wstETH-v1': {
     supportedCollateralTokens: {
       stETH: {
         positionManager: POSITION_MANAGER_STETH_ADDRESS,
       },
-      wstETH: {
+      'wstETH-v1': {
         positionManager: POSITION_MANAGER_ADDRESS,
       },
     },
@@ -23,10 +23,17 @@ const underlyingTokensConfig: UnderlyingTokens = {
   wcrETH: {
     supportedCollateralTokens: {
       rETH: {
-        positionManager: POSITION_MANAGER_RETH_ADDRESS,
+        positionManager: POSITION_MANAGER_WRAPPED_RETH_ADDRESS,
       },
       wcrETH: {
         positionManager: POSITION_MANAGER_ADDRESS,
+      },
+    },
+  },
+  wstETH: {
+    supportedCollateralTokens: {
+      wstETH: {
+        positionManager: INTEREST_RATE_POSITION_MANAGER_ADDRESS,
       },
     },
   },
@@ -51,6 +58,12 @@ const tokensConfig: Record<Token, TokenConfig> = {
     },
   },
   wstETH: {
+    address: '0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0',
+    ticker: 'wstETH',
+    supportsPermit: true,
+    priceFeed: 'wstETH',
+  },
+  'wstETH-v1': {
     address: '0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0',
     ticker: 'wstETH',
     supportsPermit: true,
@@ -88,21 +101,24 @@ export const mainnetConfig: NetworkConfig = {
   interestRatePositionManager: INTEREST_RATE_POSITION_MANAGER_ADDRESS,
   oneInchOneStepLeverageStEth: ONE_INCH_ONE_STEP_LEVERAGE_STETH_ADDRESS,
   wrappedCollateralTokenPositionManagers: {
-    wcrETH: POSITION_MANAGER_RETH_ADDRESS,
+    wcrETH: POSITION_MANAGER_WRAPPED_RETH_ADDRESS,
   },
   raftCollateralTokens: {
-    wstETH: '0xa7820009f79687d39f51909a01e7fd4b4d0663f8',
+    'wstETH-v1': '0xa7820009f79687d39f51909a01e7fd4b4d0663f8',
     wcrETH: '0xc38a040faC5769bDed5dDa8Dea1aef609e755363',
+    wstETH: '0xa7820009f79687d39f51909a01e7fd4b4d0663f8', // TODO: add wstETH v2 collateral token
     WETH: '0xc38a040faC5769bDed5dDa8Dea1aef609e755363', // TODO: add WETH collateral token
   },
   raftDebtTokens: {
-    wstETH: '0x1C1D49D8F601f19D2Fa88b14BEf491759aaaF5d8',
+    'wstETH-v1': '0x1C1D49D8F601f19D2Fa88b14BEf491759aaaF5d8',
     wcrETH: '0xF22Cd22B5Cf439825C6B75c816A4daf8fB44375B',
+    wstETH: '0x1C1D49D8F601f19D2Fa88b14BEf491759aaaF5d8', // TODO: add wstETH v2 debt token
     WETH: '0xF22Cd22B5Cf439825C6B75c816A4daf8fB44375B', // TODO: add WETH debt token
   },
   priceFeeds: {
-    wstETH: '0xDB5De0A34b29fFDeEc61E2D8ab4dB63f6641C730',
+    'wstETH-v1': '0xDB5De0A34b29fFDeEc61E2D8ab4dB63f6641C730',
     wcrETH: '0x62ac8d1ebf61636e17d92ec3b24e8e03fb853cda',
+    wstETH: '0xDB5De0A34b29fFDeEc61E2D8ab4dB63f6641C730',
     WETH: '0x62ac8d1ebf61636e17d92ec3b24e8e03fb853cda', // TODO: add WETH price feed
   },
   underlyingTokens: underlyingTokensConfig,

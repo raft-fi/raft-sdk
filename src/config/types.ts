@@ -7,8 +7,9 @@ export type PositionManagerType = 'base' | 'stETH' | 'wrapped' | 'interest-rate'
 export type SubgraphPriceFeedToken = 'ETH' | 'stETH';
 
 export type SupportedCollateralTokens = {
-  wstETH: 'stETH' | 'wstETH';
+  'wstETH-v1': 'stETH' | 'wstETH-v1';
   wcrETH: 'rETH' | 'wcrETH';
+  wstETH: 'wstETH';
   WETH: 'WETH';
 };
 
