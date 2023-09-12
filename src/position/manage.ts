@@ -377,7 +377,7 @@ export class StEthPositionManaging extends BasePositionManaging {
 
     return () =>
       sendTransactionWithGasLimit(
-        getPositionManagerContract('wrapped', positionManagerAddress, this.user).managePosition,
+        getPositionManagerContract('stETH', positionManagerAddress, this.user).managePositionStETH,
         [
           ...this.getAbsValueAndIsIncrease(collateralChange),
           ...this.getAbsValueAndIsIncrease(debtChange),
