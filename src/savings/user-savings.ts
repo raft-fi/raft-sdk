@@ -106,7 +106,7 @@ export class UserSavings extends Savings {
     // In case the R token allowance check is not passed externally, check the allowance
     if (rTokenAllowance === undefined) {
       rTokenAllowance = rTokenAllowanceRequired
-        ? await getTokenAllowance(this.rToken, userAddress, RaftConfig.networkConfig.rSavingsModule)
+        ? await getTokenAllowance(R_TOKEN, this.rToken, userAddress, RaftConfig.networkConfig.rSavingsModule)
         : Decimal.MAX_DECIMAL;
     }
 

@@ -3,6 +3,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Token } from './types';
 import { ERC20, ERC20Permit } from './typechain';
 import { getTokenContract } from './utils';
+import { RaftConfig } from './config';
 
 export class Balance {
   protected readonly token: Token;
@@ -31,7 +32,8 @@ export class Balance {
    */
   public async fetchBalance(): Promise<Decimal | null> {
     if (this.tokenContract) {
-      this.balance = new Decimal(await this.tokenContract.balanceOf(this.walletAddress), Decimal.PRECISION);
+      const tokenConfig = RaftConfig.networkConfig.tokens[this.token];
+      this.balance = new Decimal(await this.tokenContract.balanceOf(this.walletAddress), tokenConfig.decimals);
     } else {
       // In case token is ETH
       this.balance = new Decimal(await this.provider.getBalance(this.walletAddress), Decimal.PRECISION);

@@ -3,6 +3,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Token } from './types';
 import { ERC20, ERC20Permit } from './typechain';
 import { getTokenContract } from './utils';
+import { RaftConfig } from './config';
 
 /**
  * Fetches and returns token allowance. In case of `null` token contract, returns infinity (`Decimal.MAX_DECIMAL`).
@@ -12,12 +13,14 @@ import { getTokenContract } from './utils';
  * @returns Token allowance.
  */
 export async function getTokenAllowance(
+  token: Token,
   tokenContract: ERC20 | ERC20Permit | null,
   walletAddress: string,
   spender: string,
 ): Promise<Decimal> {
+  const tokenConfig = RaftConfig.networkConfig.tokens[token];
   return tokenContract !== null
-    ? new Decimal(await tokenContract.allowance(walletAddress, spender), Decimal.PRECISION)
+    ? new Decimal(await tokenContract.allowance(walletAddress, spender), tokenConfig.decimals)
     : Decimal.MAX_DECIMAL;
 }
 
@@ -50,7 +53,7 @@ export class Allowance {
    * Fetches and returns token allowance.
    */
   public async fetchAllowance(): Promise<Decimal | null> {
-    this.allowance = await getTokenAllowance(this.tokenContract, this.walletAddress, this.spender);
+    this.allowance = await getTokenAllowance(this.token, this.tokenContract, this.walletAddress, this.spender);
 
     return this.allowance;
   }

@@ -247,9 +247,10 @@ export class Protocol {
           return this._collateralSupply;
         }
 
+        const { decimals } = RaftConfig.networkConfig.tokens[collateralToken];
         const contract = ERC20Indexable__factory.connect(collateralTokenAddress, this.provider);
 
-        this._collateralSupply[collateralToken] = new Decimal(await contract.totalSupply(), Decimal.PRECISION);
+        this._collateralSupply[collateralToken] = new Decimal(await contract.totalSupply(), decimals);
       }),
     );
 
@@ -318,9 +319,10 @@ export class Protocol {
           return this._debtSupply;
         }
 
+        const { decimals } = RaftConfig.networkConfig.tokens[collateralToken];
         const contract = ERC20Indexable__factory.connect(debtTokenAddress, this.provider);
 
-        this._debtSupply[collateralToken] = new Decimal(await contract.totalSupply(), Decimal.PRECISION);
+        this._debtSupply[collateralToken] = new Decimal(await contract.totalSupply(), decimals);
       }),
     );
 
@@ -328,8 +330,9 @@ export class Protocol {
   }
 
   public async fetchTokenTotalSupply(token: Exclude<Token, 'ETH'>): Promise<Decimal> {
+    const { decimals } = RaftConfig.networkConfig.tokens[token];
     const contract = getTokenContract(token, this.provider);
-    return new Decimal(await contract.totalSupply(), Decimal.PRECISION);
+    return new Decimal(await contract.totalSupply(), decimals);
   }
 
   /**
@@ -454,13 +457,14 @@ export class Protocol {
    * @returns The maximum amount of collateral that can be deposited or null if there is no limit.
    */
   public async getPositionCollateralCap(collateralToken: CollateralToken): Promise<Decimal | null> {
+    const { decimals } = RaftConfig.networkConfig.tokens[collateralToken];
     const contract = this.getWrappedCappedCollateralTokenContract(collateralToken);
 
     if (!contract) {
       return null;
     }
 
-    return new Decimal(await contract.maxBalance(), Decimal.PRECISION);
+    return new Decimal(await contract.maxBalance(), decimals);
   }
 
   /**
@@ -469,13 +473,14 @@ export class Protocol {
    * @returns The maximum amount of collateral that the protocol can have or null if there is no limit.
    */
   public async getTotalCollateralCap(collateralToken: CollateralToken): Promise<Decimal | null> {
+    const { decimals } = RaftConfig.networkConfig.tokens[collateralToken];
     const contract = this.getWrappedCappedCollateralTokenContract(collateralToken);
 
     if (!contract) {
       return null;
     }
 
-    return new Decimal(await contract.cap(), Decimal.PRECISION);
+    return new Decimal(await contract.cap(), decimals);
   }
 
   private getWrappedCappedCollateralTokenContract(collateralToken: CollateralToken): WrappedCollateralToken | null {
