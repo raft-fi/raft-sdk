@@ -453,6 +453,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     if (collateralTokenAllowance === undefined) {
       if (collateralTokenAllowanceRequired) {
         collateralTokenAllowance = await getTokenAllowance(
+          collateralToken,
           collateralTokenContract,
           userAddress,
           RaftConfig.networkConfig.oneInchOneStepLeverageStEth,

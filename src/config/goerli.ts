@@ -77,6 +77,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
   stETH: {
     address: '0x1643E812aE58766192Cf7D2Cf9567dF2C37e9B7F',
     ticker: 'stETH',
+    decimals: 18,
     supportsPermit: false,
     priceFeed: {
       ticker: 'stETH',
@@ -87,60 +88,70 @@ const tokensConfig: Record<Token, TokenConfig> = {
   wstETH: {
     address: '0x6320cD32aA674d2898A68ec82e869385Fc5f7E2f',
     ticker: 'wstETH',
+    decimals: 18,
     supportsPermit: true,
     priceFeed: 'wstETH',
   },
   'wstETH-v1': {
     address: '0x6320cD32aA674d2898A68ec82e869385Fc5f7E2f',
     ticker: 'wstETH',
+    decimals: 18,
     supportsPermit: true,
     priceFeed: 'wstETH-v1',
   },
   rETH: {
     address: '0x0b26a03413aCca79eE539015f036B7dF79ddD1c5',
     ticker: 'rETH',
+    decimals: 18,
     supportsPermit: false,
     priceFeed: 'wcrETH-v1',
   },
   'rETH-v1': {
     address: '0x0b26a03413aCca79eE539015f036B7dF79ddD1c5',
     ticker: 'rETH',
+    decimals: 18,
     supportsPermit: false,
     priceFeed: 'wcrETH-v1',
   },
   'wcrETH-v1': {
     address: '0x27d7f9921933DfA737B1006E5EFb637cC4b21fc8',
     ticker: 'wcrETH-v1',
+    decimals: 18,
     supportsPermit: true,
     priceFeed: 'wcrETH-v1',
   },
   WETH: {
     address: '0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6',
     ticker: 'WETH',
+    decimals: 18,
     supportsPermit: false,
     priceFeed: 'WETH',
   },
   WBTC: {
     address: '', // TODO - Add address once this collateral is supported on goerli
     ticker: 'WBTC',
+    decimals: 8,
     supportsPermit: false,
     priceFeed: 'WBTC',
   },
   cbETH: {
     address: '', // TODO - Add address once this collateral is supported on goerli
     ticker: 'cbETH',
+    decimals: 18,
     supportsPermit: false,
     priceFeed: 'cbETH',
   },
   swETH: {
     address: '', // TODO - Add address once this collateral is supported on goerli
     ticker: 'swETH',
+    decimals: 18,
     supportsPermit: false,
     priceFeed: 'swETH',
   },
   R: {
     address: '0x9b41fE4EE4F23507953CCA339A4eC27eAc9e02b8',
     ticker: 'R',
+    decimals: 18,
     supportsPermit: true,
     priceFeed: Decimal.ONE,
   },

@@ -45,6 +45,7 @@ export interface SubgraphPriceFeed {
 export type TokenConfig = {
   address: string;
   ticker: Token;
+  decimals: number;
   supportsPermit: boolean;
   priceFeed: Decimal | UnderlyingCollateralToken | SubgraphPriceFeed;
 };

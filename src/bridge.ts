@@ -12,6 +12,7 @@ import {
 import { CCIPOffRamp__factory, CCIPRouter__factory, ERC20__factory } from './typechain';
 import { TransactionWithFeesOptions } from './types';
 import { sendTransactionWithGasLimit } from './utils';
+import { RaftConfig } from './config';
 
 export interface BridgeTokensOptions extends TransactionWithFeesOptions {
   frontendTag?: string;
@@ -47,6 +48,7 @@ interface BridgeNetworkConfig {
   chainSelector: string;
   tokenAddress: string;
   tokenTicker: SupportedBridgeToken;
+  tokenDecimals: number;
 }
 
 export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkConfig } = {
@@ -55,24 +57,28 @@ export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkCo
     chainSelector: '5009297550715157269',
     tokenAddress: '0x183015a9ba6ff60230fdeadc3f43b3d788b13e21',
     tokenTicker: 'R',
+    tokenDecimals: 18,
   },
   ethereumSepolia: {
     routerAddress: '0xd0daae2231e9cb96b94c8512223533293c3693bf',
     chainSelector: '16015286601757825753',
     tokenAddress: '0x466D489b6d36E7E3b824ef491C225F5830E81cC1',
     tokenTicker: 'CCIP-LnM',
+    tokenDecimals: 18,
   },
   base: {
     routerAddress: '', // TODO - Fill in once contracts are deployed
     chainSelector: '',
     tokenAddress: '',
     tokenTicker: 'R',
+    tokenDecimals: 18,
   },
   arbitrumGoerli: {
     routerAddress: '0x88E492127709447A5ABEFdaB8788a15B4567589E',
     chainSelector: '6101244977088475029',
     tokenAddress: '0x0E14dBe2c8e1121902208be173A3fb91Bb125CDB',
     tokenTicker: 'clCCIP-LnM',
+    tokenDecimals: 18,
   },
 };
 
@@ -134,7 +140,7 @@ export class Bridge {
     if (rTokenAllowance === undefined) {
       rTokenAllowance = new Decimal(
         await sourceChainTokenContract.allowance(this.user, sourceChainRouterAddress),
-        Decimal.PRECISION,
+        RaftConfig.networkConfig.tokens.R.decimals,
       );
     }
 
@@ -258,7 +264,7 @@ export class Bridge {
   async fetchBalance(network: SupportedBridgeNetwork, rpc: string) {
     const provider = new JsonRpcProvider(rpc);
 
-    const tokenAddress = BRIDGE_NETWORKS[network].tokenAddress;
+    const { tokenAddress, tokenDecimals } = BRIDGE_NETWORKS[network];
     if (!tokenAddress) {
       console.warn(`Token address for ${network} is not defined!`);
 
@@ -269,25 +275,24 @@ export class Bridge {
 
     const balance = await tokenContract.balanceOf(await this.user.getAddress());
 
-    return new Decimal(balance, Decimal.PRECISION);
+    return new Decimal(balance, tokenDecimals);
   }
 
   async fetchAllowance(network: SupportedBridgeNetwork, rpc: string) {
     const provider = new JsonRpcProvider(rpc);
 
-    const tokenAddress = BRIDGE_NETWORKS[network].tokenAddress;
+    const { routerAddress: spender, tokenAddress, tokenDecimals } = BRIDGE_NETWORKS[network];
     if (!tokenAddress) {
       console.warn(`Token address for ${network} is not defined!`);
 
       return Decimal.ZERO;
     }
-    const spender = BRIDGE_NETWORKS[network].routerAddress;
 
     const tokenContract = ERC20__factory.connect(tokenAddress, provider);
 
     const allowance = await tokenContract.allowance(await this.user.getAddress(), spender);
 
-    return new Decimal(allowance, Decimal.PRECISION);
+    return new Decimal(allowance, tokenDecimals);
   }
 }
 

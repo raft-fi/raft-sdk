@@ -236,14 +236,14 @@ export abstract class BasePositionManaging {
     // In case the collateral token allowance check is not passed externally, check the allowance
     if (collateralTokenAllowance === undefined) {
       collateralTokenAllowance = collateralTokenAllowanceRequired
-        ? await getTokenAllowance(collateralTokenContract, userAddress, positionManagerAddress)
+        ? await getTokenAllowance(collateralToken, collateralTokenContract, userAddress, positionManagerAddress)
         : Decimal.MAX_DECIMAL;
     }
 
     // In case the R token allowance check is not passed externally, check the allowance
     if (rTokenAllowance === undefined) {
       rTokenAllowance = rTokenAllowanceRequired
-        ? await getTokenAllowance(this.rToken, userAddress, positionManagerAddress)
+        ? await getTokenAllowance(R_TOKEN, this.rToken, userAddress, positionManagerAddress)
         : Decimal.MAX_DECIMAL;
     }
 
