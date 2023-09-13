@@ -19,12 +19,12 @@ const underlyingTokensConfig: UnderlyingTokens = {
       },
     },
   },
-  wcrETH: {
+  'wcrETH-v1': {
     supportedCollateralTokens: {
-      rETH: {
+      'rETH-v1': {
         positionManager: POSITION_MANAGER_WRAPPED_RETH_ADDRESS,
       },
-      wcrETH: {
+      'wcrETH-v1': {
         positionManager: POSITION_MANAGER_ADDRESS,
       },
     },
@@ -39,6 +39,34 @@ const underlyingTokensConfig: UnderlyingTokens = {
   WETH: {
     supportedCollateralTokens: {
       WETH: {
+        positionManager: INTEREST_RATE_POSITION_MANAGER_ADDRESS,
+      },
+    },
+  },
+  rETH: {
+    supportedCollateralTokens: {
+      rETH: {
+        positionManager: INTEREST_RATE_POSITION_MANAGER_ADDRESS,
+      },
+    },
+  },
+  WBTC: {
+    supportedCollateralTokens: {
+      WBTC: {
+        positionManager: INTEREST_RATE_POSITION_MANAGER_ADDRESS,
+      },
+    },
+  },
+  cbETH: {
+    supportedCollateralTokens: {
+      cbETH: {
+        positionManager: INTEREST_RATE_POSITION_MANAGER_ADDRESS,
+      },
+    },
+  },
+  swETH: {
+    supportedCollateralTokens: {
+      swETH: {
         positionManager: INTEREST_RATE_POSITION_MANAGER_ADDRESS,
       },
     },
@@ -72,19 +100,43 @@ const tokensConfig: Record<Token, TokenConfig> = {
     address: '0x0b26a03413aCca79eE539015f036B7dF79ddD1c5',
     ticker: 'rETH',
     supportsPermit: false,
-    priceFeed: 'wcrETH',
+    priceFeed: 'wcrETH-v1',
   },
-  wcrETH: {
+  'rETH-v1': {
+    address: '0x0b26a03413aCca79eE539015f036B7dF79ddD1c5',
+    ticker: 'rETH',
+    supportsPermit: false,
+    priceFeed: 'wcrETH-v1',
+  },
+  'wcrETH-v1': {
     address: '0x27d7f9921933DfA737B1006E5EFb637cC4b21fc8',
-    ticker: 'wcrETH',
+    ticker: 'wcrETH-v1',
     supportsPermit: true,
-    priceFeed: 'wcrETH',
+    priceFeed: 'wcrETH-v1',
   },
   WETH: {
     address: '0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6',
     ticker: 'WETH',
     supportsPermit: false,
     priceFeed: 'WETH',
+  },
+  WBTC: {
+    address: '', // TODO - Add address once this collateral is supported on goerli
+    ticker: 'WBTC',
+    supportsPermit: false,
+    priceFeed: 'WBTC',
+  },
+  cbETH: {
+    address: '', // TODO - Add address once this collateral is supported on goerli
+    ticker: 'cbETH',
+    supportsPermit: false,
+    priceFeed: 'cbETH',
+  },
+  swETH: {
+    address: '', // TODO - Add address once this collateral is supported on goerli
+    ticker: 'swETH',
+    supportsPermit: false,
+    priceFeed: 'swETH',
   },
   R: {
     address: '0x9b41fE4EE4F23507953CCA339A4eC27eAc9e02b8',
@@ -100,25 +152,37 @@ export const goerliConfig: NetworkConfig = {
   interestRatePositionManager: INTEREST_RATE_POSITION_MANAGER_ADDRESS,
   oneInchOneStepLeverageStEth: '', // Add address if we ever deploy one step leverage on goerli
   wrappedCollateralTokenPositionManagers: {
-    wcrETH: POSITION_MANAGER_WRAPPED_RETH_ADDRESS,
+    'wcrETH-v1': POSITION_MANAGER_WRAPPED_RETH_ADDRESS,
   },
   raftCollateralTokens: {
     'wstETH-v1': '0x86695745Ce31FBd45Db7F6866d5d3Abe048ce033',
-    wcrETH: '0x1678f15179dF5608786561A8d56E498449dF2f28',
+    'wcrETH-v1': '0x1678f15179dF5608786561A8d56E498449dF2f28',
     wstETH: '0xBF2b30825759EdC6eF771CC071af38DF8f321b9B',
-    WETH: '0x798671e454935c9Dd326289113aF1c91cAcCe4fE',
+    WETH: '', // TODO - Add address once deployed
+    rETH: '', // TODO - Add address once deployed
+    WBTC: '', // TODO - Add address once deployed
+    cbETH: '', // TODO - Add address once deployed
+    swETH: '', // TODO - Add address once deployed
   },
   raftDebtTokens: {
     'wstETH-v1': '0xAABF1f5e5C9b559aaCD3c97B41B0B1ae593e31A8',
-    wcrETH: '0xB9F64d21b776abCA4aD2d04846D65cB0d072925F',
+    'wcrETH-v1': '0xB9F64d21b776abCA4aD2d04846D65cB0d072925F',
     wstETH: '0x7b485Fd7eDab0D354649Af4d73778FA26BE43369',
-    WETH: '0xe001CD1C9C611A8B7631eA66495465db7e54348e',
+    WETH: '', // TODO - Add address once deployed
+    rETH: '', // TODO - Add address once deployed
+    WBTC: '', // TODO - Add address once deployed
+    cbETH: '', // TODO - Add address once deployed
+    swETH: '', // TODO - Add address once deployed
   },
   priceFeeds: {
     'wstETH-v1': '0x0341b185e55A0860D6a7e853fd44D1f4fe37dB37',
-    wcrETH: '0xfd7970eE3eF2E717346016f439A691Ea3DFd71BA',
+    'wcrETH-v1': '0xfd7970eE3eF2E717346016f439A691Ea3DFd71BA',
     wstETH: '0x93Fc3ef17A627913f9aD6507E07f28736286134D',
-    WETH: '0x93Fc3ef17A627913f9aD6507E07f28736286134D',
+    WETH: '', // TODO - Add address once deployed
+    rETH: '', // TODO - Add address once deployed
+    WBTC: '', // TODO - Add address once deployed
+    cbETH: '', // TODO - Add address once deployed
+    swETH: '', // TODO - Add address once deployed
   },
   underlyingTokens: underlyingTokensConfig,
   tokens: tokensConfig,

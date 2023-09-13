@@ -250,10 +250,10 @@ describe('UserPosition', () => {
 
     it.each([
       ['wstETH-v1', 'stETH'],
-      ['wcrETH', 'rETH'],
-    ] as [VaultV1, 'stETH' | 'rETH'][])(
+      ['wcrETH-v1', 'rETH-v1'],
+    ] as [VaultV1, 'stETH' | 'rETH-v1'][])(
       'should generate steps [whitelist + approve collateral + permit R + manage] for %s deposit + R repayment',
-      async (underlyingCollateralToken: VaultV1, collateralToken: 'stETH' | 'rETH') => {
+      async (underlyingCollateralToken: VaultV1, collateralToken: 'stETH' | 'rETH-v1') => {
         const userPosition = new UserPosition(mockEoaSigner, underlyingCollateralToken);
         const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), {
           collateralToken,
@@ -315,10 +315,10 @@ describe('UserPosition', () => {
 
     it.each([
       ['wstETH-v1', 'stETH'],
-      ['wcrETH', 'rETH'],
-    ] as [VaultV1, 'stETH' | 'rETH'][])(
+      ['wcrETH-v1', 'rETH-v1'],
+    ] as [VaultV1, 'stETH' | 'rETH-v1'][])(
       'should generate steps [whitelist + permit R + manage] for %s withdrawal + R repayment',
-      async (underlyingCollateralToken: VaultV1, collateralToken: 'stETH' | 'rETH') => {
+      async (underlyingCollateralToken: VaultV1, collateralToken: 'stETH' | 'rETH-v1') => {
         const userPosition = new UserPosition(mockEoaSigner, underlyingCollateralToken);
         const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), {
           collateralToken,

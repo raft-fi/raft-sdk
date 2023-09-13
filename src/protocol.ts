@@ -51,11 +51,16 @@ interface PsmTvlData {
 }
 
 const BETA = new Decimal(2);
+// Redemptions are disabled, all deviations set to 100%
 const ORACLE_DEVIATION: Record<UnderlyingCollateralToken, Decimal> = {
-  'wstETH-v1': new Decimal(0.01), // 1%
-  wcrETH: new Decimal(0.015), // 1.5%
-  wstETH: new Decimal(0.01), // 1%
-  WETH: new Decimal(0.005), // TODO: add oracle deviation for WETH
+  'wstETH-v1': new Decimal(1),
+  'wcrETH-v1': new Decimal(1),
+  wstETH: new Decimal(1),
+  WETH: new Decimal(1),
+  rETH: new Decimal(1),
+  WBTC: new Decimal(1),
+  cbETH: new Decimal(1),
+  swETH: new Decimal(1),
 };
 
 const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)
@@ -69,25 +74,41 @@ export class Protocol {
 
   private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
     'wstETH-v1': null,
-    wcrETH: null,
+    'wcrETH-v1': null,
     wstETH: null,
     WETH: null,
+    rETH: null,
+    WBTC: null,
+    cbETH: null,
+    swETH: null,
   };
   private _debtSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
     'wstETH-v1': null,
-    wcrETH: null,
+    'wcrETH-v1': null,
     wstETH: null,
     WETH: null,
+    rETH: null,
+    WBTC: null,
+    cbETH: null,
+    swETH: null,
   };
   private _borrowingRate: Record<UnderlyingCollateralToken, Decimal | null> = {
     'wstETH-v1': null,
-    wcrETH: null,
+    'wcrETH-v1': null,
     wstETH: null,
     WETH: null,
+    rETH: null,
+    WBTC: null,
+    cbETH: null,
+    swETH: null,
   };
   private _interestRate: Record<InterestRateVault, Decimal | null> = {
     wstETH: null,
     WETH: null,
+    rETH: null,
+    WBTC: null,
+    cbETH: null,
+    swETH: null,
   };
   private _redemptionRate: Decimal | null = null;
   private _openPositionCount: number | null = null;

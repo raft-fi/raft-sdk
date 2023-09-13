@@ -10,9 +10,13 @@ export const SECONDS_PER_YEAR = 60 * 60 * 24 * 365.2425; // One Gregorian year h
 
 export const MIN_COLLATERAL_RATIO: Record<UnderlyingCollateralToken, Decimal> = {
   'wstETH-v1': new Decimal(1.2), // 120%
-  wcrETH: new Decimal(1.2), // 120%
+  'wcrETH-v1': new Decimal(1.2), // 120%
   wstETH: new Decimal(1.2), // 120%
   WETH: new Decimal(1.2), // 120%
+  rETH: new Decimal(1.2), // 120%
+  WBTC: new Decimal(1.2), // 120%
+  cbETH: new Decimal(1.3), // 130%
+  swETH: new Decimal(1.5), // 150%
 };
 export const MIN_NET_DEBT = new Decimal(3000); // 3000 R
 export const FLASH_MINT_FEE = new Decimal(0.0001); // default flash mint fee
