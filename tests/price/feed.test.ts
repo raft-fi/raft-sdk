@@ -18,6 +18,7 @@ describeWhen(process.env.CI === 'true')('PriceFeed', () => {
       (request as jest.Mock).mockRejectedValue(new Error('Failed to fetch price'));
 
       for (const token of TOKENS) {
+        console.log(token);
         const priceFeed = new PriceFeed(forkProvider);
         const price = await priceFeed.getPrice(token);
         expect(price.gt(0)).toBeTruthy();
