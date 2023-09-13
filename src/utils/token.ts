@@ -5,6 +5,7 @@ import {
   ERC20Permit,
   ERC20Permit__factory,
   ERC20__factory,
+  InterestRateDebtToken__factory,
   WrappedCollateralToken,
   WrappedCollateralToken__factory,
 } from '../typechain';
@@ -86,4 +87,8 @@ export function getTokenContract<T extends Token>(collateralToken: T, runner: Co
   }
 
   return ERC20__factory.connect(tokenAddress, runner) as TokenContractTypes[T];
+}
+
+export function getInterestRateDebtTokenContract(debtToken: string, runner: ContractRunner) {
+  return InterestRateDebtToken__factory.connect(debtToken, runner);
 }

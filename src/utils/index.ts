@@ -10,4 +10,5 @@ export {
   isRToken,
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
+  getInterestRateDebtTokenContract,
 } from './token';

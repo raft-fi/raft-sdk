@@ -18,6 +18,7 @@ export const TOKENS = [...COLLATERAL_TOKENS, R_TOKEN] as const;
 
 export const VAULT_VERSIONS = ['v1', 'v2'] as const;
 export const VAULTS_V1 = ['wstETH-v1', 'wcrETH'] as const;
+export const VAULTS_V2 = ['wstETH', 'WETH'] as const;
 
 export type WrappableCappedCollateralToken = (typeof WRAPPABLE_CAPPED_COLLATERAL_TOKENS)[number];
 export type WrappedCappedUnderlyingCollateralToken = (typeof WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS)[number];

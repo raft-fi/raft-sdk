@@ -42,6 +42,7 @@ export {
   type WrappedCappedUnderlyingCollateralToken,
   type SwapRouter,
   type VaultVersion,
+  type InterestRateVault,
 } from './types';
 export type { ERC20PermitSignatureStruct } from './typechain/PositionManager';
 export {
