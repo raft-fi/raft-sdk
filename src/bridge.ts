@@ -271,6 +271,24 @@ export class Bridge {
 
     return new Decimal(balance, Decimal.PRECISION);
   }
+
+  async fetchAllowance(network: SupportedBridgeNetwork, rpc: string) {
+    const provider = new JsonRpcProvider(rpc);
+
+    const tokenAddress = BRIDGE_NETWORKS[network].tokenAddress;
+    if (!tokenAddress) {
+      console.warn(`Token address for ${network} is not defined!`);
+
+      return Decimal.ZERO;
+    }
+    const spender = BRIDGE_NETWORKS[network].routerAddress;
+
+    const tokenContract = ERC20__factory.connect(tokenAddress, provider);
+
+    const allowance = await tokenContract.allowance(await this.user.getAddress(), spender);
+
+    return new Decimal(allowance, Decimal.PRECISION);
+  }
 }
 
 type ExecutionState = 'UNTOUCHED' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILURE';
