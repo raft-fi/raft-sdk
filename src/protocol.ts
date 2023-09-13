@@ -13,11 +13,13 @@ import {
 } from './typechain';
 import {
   CollateralToken,
+  InterestRateVault,
   R_TOKEN,
   Token,
   TransactionWithFeesOptions,
   UNDERLYING_COLLATERAL_TOKENS,
   UnderlyingCollateralToken,
+  VAULTS_V2,
 } from './types';
 import {
   createPermitSignature,
@@ -27,6 +29,7 @@ import {
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
   sendTransactionWithGasLimit,
+  getInterestRateDebtTokenContract,
 } from './utils';
 import {
   CHAINLINK_DAI_USD_AGGREGATOR,
@@ -35,6 +38,7 @@ import {
   FLASH_MINT_FEE,
   R_CHAI_PSM_ADDRESS,
   SECONDS_IN_MINUTE,
+  SECONDS_PER_YEAR,
 } from './constants';
 
 interface OpenPositionsResponse {
@@ -78,6 +82,10 @@ export class Protocol {
   private _borrowingRate: Record<UnderlyingCollateralToken, Decimal | null> = {
     'wstETH-v1': null,
     wcrETH: null,
+    wstETH: null,
+    WETH: null,
+  };
+  private _interestRate: Record<InterestRateVault, Decimal | null> = {
     wstETH: null,
     WETH: null,
   };
@@ -172,6 +180,10 @@ export class Protocol {
    */
   get borrowingRate(): Record<UnderlyingCollateralToken, Decimal | null> {
     return this._borrowingRate;
+  }
+
+  get interestRate(): Record<InterestRateVault, Decimal | null> {
+    return this._interestRate;
   }
 
   /**
@@ -317,6 +329,25 @@ export class Protocol {
     );
 
     return this._borrowingRate;
+  }
+
+  async fetchInterestRate(): Promise<Record<InterestRateVault, Decimal | null>> {
+    await Promise.all(
+      VAULTS_V2.map(async collateralToken => {
+        const interestRateDebtTokenAddress = RaftConfig.networkConfig.raftDebtTokens[collateralToken];
+
+        const interestRateDebtToken = getInterestRateDebtTokenContract(interestRateDebtTokenAddress, this.provider);
+
+        const indexIncreasePerSecond = new Decimal(
+          await interestRateDebtToken.indexIncreasePerSecond(),
+          Decimal.PRECISION,
+        );
+
+        this._interestRate[collateralToken] = indexIncreasePerSecond.mul(SECONDS_PER_YEAR);
+      }),
+    );
+
+    return this._interestRate;
   }
 
   /**
