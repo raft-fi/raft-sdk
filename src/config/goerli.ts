@@ -158,7 +158,7 @@ export const goerliConfig: NetworkConfig = {
     'wstETH-v1': '0x86695745Ce31FBd45Db7F6866d5d3Abe048ce033',
     'wcrETH-v1': '0x1678f15179dF5608786561A8d56E498449dF2f28',
     wstETH: '0xBF2b30825759EdC6eF771CC071af38DF8f321b9B',
-    WETH: '0x798671e454935c9Dd326289113aF1c91cAcCe4fE',
+    WETH: '', // TODO - Add address once deployed
     rETH: '', // TODO - Add address once deployed
     WBTC: '', // TODO - Add address once deployed
     cbETH: '', // TODO - Add address once deployed
@@ -168,7 +168,7 @@ export const goerliConfig: NetworkConfig = {
     'wstETH-v1': '0xAABF1f5e5C9b559aaCD3c97B41B0B1ae593e31A8',
     'wcrETH-v1': '0xB9F64d21b776abCA4aD2d04846D65cB0d072925F',
     wstETH: '0x7b485Fd7eDab0D354649Af4d73778FA26BE43369',
-    WETH: '0xe001CD1C9C611A8B7631eA66495465db7e54348e',
+    WETH: '', // TODO - Add address once deployed
     rETH: '', // TODO - Add address once deployed
     WBTC: '', // TODO - Add address once deployed
     cbETH: '', // TODO - Add address once deployed
@@ -178,7 +178,7 @@ export const goerliConfig: NetworkConfig = {
     'wstETH-v1': '0x0341b185e55A0860D6a7e853fd44D1f4fe37dB37',
     'wcrETH-v1': '0xfd7970eE3eF2E717346016f439A691Ea3DFd71BA',
     wstETH: '0x93Fc3ef17A627913f9aD6507E07f28736286134D',
-    WETH: '0x93Fc3ef17A627913f9aD6507E07f28736286134D',
+    WETH: '', // TODO - Add address once deployed
     rETH: '', // TODO - Add address once deployed
     WBTC: '', // TODO - Add address once deployed
     cbETH: '', // TODO - Add address once deployed
