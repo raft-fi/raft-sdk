@@ -8,9 +8,13 @@ export type SubgraphPriceFeedToken = 'ETH' | 'stETH';
 
 export type SupportedCollateralTokens = {
   'wstETH-v1': 'stETH' | 'wstETH-v1';
-  wcrETH: 'rETH' | 'wcrETH';
+  'wcrETH-v1': 'rETH-v1' | 'wcrETH-v1';
   wstETH: 'wstETH';
   WETH: 'WETH';
+  rETH: 'rETH';
+  WBTC: 'WBTC';
+  swETH: 'swETH';
+  cbETH: 'cbETH';
 };
 
 export type UnderlyingCollateralTokenConfig<U extends UnderlyingCollateralToken> = {

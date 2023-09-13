@@ -35,8 +35,12 @@ type TokenContractTypes = {
   wstETH: ERC20Permit;
   'wstETH-v1': ERC20Permit;
   rETH: ERC20;
+  'rETH-v1': ERC20;
   WETH: ERC20;
-  wcrETH: WrappedCollateralToken;
+  'wcrETH-v1': WrappedCollateralToken;
+  WBTC: ERC20;
+  cbETH: ERC20;
+  swETH: ERC20;
   R: ERC20Permit;
 };
 

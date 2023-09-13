@@ -44,7 +44,7 @@ describeWhen(process.env.CI === 'true')('PriceFeed', () => {
 
     it('should return 1:1 rate for wcrETH:rETH', async () => {
       const priceFeed = new PriceFeed(forkProvider);
-      const rate = await priceFeed.getUnderlyingCollateralRate('wcrETH', 'rETH');
+      const rate = await priceFeed.getUnderlyingCollateralRate('wcrETH-v1', 'rETH-v1');
 
       expect(rate.equals(Decimal.ONE)).toBeTruthy();
     });
