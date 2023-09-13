@@ -11,7 +11,7 @@ import {
 } from 'ethers';
 import { CCIPOffRamp__factory, CCIPRouter__factory, ERC20__factory } from './typechain';
 import { TransactionWithFeesOptions } from './types';
-import { sendTransactionWithGasLimit } from './utils';
+import { buildTransactionWithGasLimit } from './utils';
 import { RaftConfig } from './config';
 
 export interface BridgeTokensOptions extends TransactionWithFeesOptions {
@@ -30,6 +30,8 @@ export interface BridgeTokensStep {
   type: BridgeTokensStepType;
   stepNumber: number;
   numberOfSteps: number;
+  gasEstimate: Decimal;
+  ccipFee: Decimal;
   action: () => Promise<TransactionResponse>;
 }
 
@@ -133,7 +135,8 @@ export class Bridge {
       extraArgs: encodedExtraArgs,
     };
 
-    const fees = await sourceChainRouter.getFee(destinationChainSelector, message);
+    const ccipFeeBigInt = await sourceChainRouter.getFee(destinationChainSelector, message);
+    const ccipFee = new Decimal(ccipFeeBigInt, Decimal.PRECISION);
 
     const sourceChainTokenContract = ERC20__factory.connect(sourceChainTokenAddress, this.user);
 
@@ -150,15 +153,31 @@ export class Bridge {
     let stepCounter = 1;
 
     if (tokenApprovalNeeded) {
+      const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(sourceChainTokenContract.approve, [
+        sourceChainRouterAddress,
+        amountToBridge.toBigInt(),
+      ]);
+
       yield {
         type: {
           name: 'approve',
         },
         stepNumber: stepCounter++,
         numberOfSteps,
-        action: () => sourceChainTokenContract.approve(sourceChainRouterAddress, amountToBridge.toBigInt()),
+        gasEstimate,
+        ccipFee,
+        action: sendTransaction,
       };
     }
+
+    const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
+      sourceChainRouter.ccipSend,
+      [destinationChainSelector, message],
+      gasLimitMultiplier,
+      frontendTag,
+      this.user,
+      ccipFeeBigInt,
+    );
 
     yield {
       type: {
@@ -166,15 +185,9 @@ export class Bridge {
       },
       stepNumber: stepCounter++,
       numberOfSteps,
-      action: () =>
-        sendTransactionWithGasLimit(
-          sourceChainRouter.ccipSend,
-          [destinationChainSelector, message],
-          gasLimitMultiplier,
-          frontendTag,
-          this.user,
-          fees,
-        ),
+      gasEstimate,
+      ccipFee,
+      action: sendTransaction,
     };
   }
 

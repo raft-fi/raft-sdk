@@ -2,6 +2,12 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Overrides, StateMutability, TypedContractMethod } from '../typechain/common';
 import { Signer, TransactionResponse, hexlify } from 'ethers';
 
+interface BuiltTransactionData {
+  sendTransaction: () => Promise<TransactionResponse>;
+  gasEstimate: Decimal;
+  gasLimit: Decimal;
+}
+
 /**
  * Sends a transaction with a gas limit that is a multiple of the estimated gas cost.
  * @param method The contract's method to call.
@@ -12,6 +18,42 @@ import { Signer, TransactionResponse, hexlify } from 'ethers';
  * @param gasLimitMultiplier The multiplier to apply to estimated gas cost.
  * @returns Transaction response.
  */
+export async function buildTransactionWithGasLimit<
+  A extends Array<unknown>,
+  R,
+  S extends Exclude<StateMutability, 'view'>,
+>(
+  method: TypedContractMethod<A, R, S>,
+  args: { [I in keyof A]-?: A[I] },
+  gasLimitMultiplier: Decimal = Decimal.ONE,
+  tag?: string,
+  signer?: Signer,
+  value?: bigint,
+): Promise<BuiltTransactionData> {
+  const gasEstimate = new Decimal(await method.estimateGas(...args, { value } as Overrides<S>), Decimal.PRECISION);
+  const gasLimit = gasEstimate.mul(gasLimitMultiplier);
+  const overrides = { value, gasLimit: gasLimit.toBigInt() } as Overrides<S>;
+
+  if (!signer || !tag) {
+    return {
+      sendTransaction: () => method(...args, overrides),
+      gasEstimate,
+      gasLimit,
+    };
+  }
+
+  const hexTag = hexlify(Uint8Array.from(tag.split('').map(letter => letter.charCodeAt(0))));
+  const transactionRequest = await method.populateTransaction(...args, overrides);
+  transactionRequest.data = `${transactionRequest.data}${hexTag.slice(2)}`;
+
+  return {
+    sendTransaction: () => signer.sendTransaction(transactionRequest),
+    gasEstimate,
+    gasLimit,
+  };
+}
+
+// TODO: keep this since there are consumers for sendTransactionWithGasLimit(), should change them one by one later
 export async function sendTransactionWithGasLimit<
   A extends Array<unknown>,
   R,
@@ -24,17 +66,6 @@ export async function sendTransactionWithGasLimit<
   signer?: Signer,
   value?: bigint,
 ): Promise<TransactionResponse> {
-  const gasEstimate = await method.estimateGas(...args, { value } as Overrides<S>);
-  const gasLimit = new Decimal(gasEstimate, Decimal.PRECISION).mul(gasLimitMultiplier).toBigInt();
-  const overrides = { value, gasLimit } as Overrides<S>;
-
-  if (!signer || !tag) {
-    return await method(...args, overrides);
-  }
-
-  const hexTag = tag ? hexlify(Uint8Array.from(tag.split('').map(letter => letter.charCodeAt(0)))) : undefined;
-  const transactionRequest = await method.populateTransaction(...args, overrides);
-  transactionRequest.data = `${transactionRequest.data}${hexTag?.slice(2) ?? ''}`;
-
-  return signer.sendTransaction(transactionRequest);
+  const { sendTransaction } = await buildTransactionWithGasLimit(method, args, gasLimitMultiplier, tag, signer, value);
+  return sendTransaction();
 }
