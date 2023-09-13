@@ -51,15 +51,16 @@ interface PsmTvlData {
 }
 
 const BETA = new Decimal(2);
+// Redemptions are disabled, all deviations set to 100%
 const ORACLE_DEVIATION: Record<UnderlyingCollateralToken, Decimal> = {
-  'wstETH-v1': new Decimal(0.01), // 1%
-  'wcrETH-v1': new Decimal(0.015), // 1.5%
-  wstETH: new Decimal(0.01), // 1%
-  WETH: new Decimal(0.005), // TODO: add oracle deviation for WETH
-  rETH: new Decimal(0.005), // TODO: add oracle deviation for rETH
-  WBTC: new Decimal(0.005), // TODO: add oracle deviation for WBTC
-  cbETH: new Decimal(0.005), // TODO: add oracle deviation for cbETH
-  swETH: new Decimal(0.005), // TODO: add oracle deviation for swETH
+  'wstETH-v1': new Decimal(1),
+  'wcrETH-v1': new Decimal(1),
+  wstETH: new Decimal(1),
+  WETH: new Decimal(1),
+  rETH: new Decimal(1),
+  WBTC: new Decimal(1),
+  cbETH: new Decimal(1),
+  swETH: new Decimal(1),
 };
 
 const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)

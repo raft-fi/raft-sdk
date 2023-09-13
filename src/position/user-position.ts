@@ -146,8 +146,13 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     const isLeveraged = response.position?.isLeveraged ?? false;
     const vaultVersion = response.position?.vaultVersion ?? 'v2';
-    const resolvedUnderlyingCollateralToken =
+    let resolvedUnderlyingCollateralToken =
       underlyingCollateralToken === 'wstETH' && vaultVersion === 'v1' ? 'wstETH-v1' : underlyingCollateralToken;
+
+    resolvedUnderlyingCollateralToken =
+      underlyingCollateralToken === ('wcrETH' as Token) && vaultVersion === 'v1'
+        ? 'wcrETH-v1'
+        : underlyingCollateralToken;
 
     const position = new UserPosition(user, resolvedUnderlyingCollateralToken);
     position.setIsLeveraged(isLeveraged);
