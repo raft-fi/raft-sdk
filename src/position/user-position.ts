@@ -604,6 +604,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(underlyingCollateralPrice);
       }
 
+      const collateralDecimals = RaftConfig.networkConfig.tokens[collateralToken].decimals;
+
       yield {
         type: {
           name: 'leverage',
@@ -622,7 +624,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
               principalCollateralChange.abs().toBigInt(RAFT_COLLATERAL_TOKEN_PRECISION),
               isPrincipalCollateralIncrease,
               oneInchDataAmmData,
-              isDebtIncrease ? minReturn.toBigInt() : collateralToSwap.toBigInt(), // TODO - Check which precisions contract needs here
+              isDebtIncrease ? minReturn.toBigInt(collateralDecimals) : collateralToSwap.toBigInt(collateralDecimals),
               maxFeePercentage.toBigInt(MAX_FEE_PERCENTAGE_PRECISION),
             ],
             gasLimitMultiplier,
