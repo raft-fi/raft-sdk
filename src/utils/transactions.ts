@@ -33,7 +33,7 @@ export async function buildTransactionWithGasLimit<
 ): Promise<BuiltTransactionData> {
   const gasEstimate = new Decimal(await method.estimateGas(...args, { value } as Overrides<S>), ETH_PRECISION);
   const gasLimit = gasEstimate.mul(gasLimitMultiplier);
-  const overrides = { value, gasLimit: gasLimit.toBigInt() } as Overrides<S>;
+  const overrides = { value, gasLimit: gasLimit.toBigInt(ETH_PRECISION) } as Overrides<S>;
 
   if (!signer || !tag) {
     return {

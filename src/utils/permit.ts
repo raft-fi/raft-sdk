@@ -47,10 +47,11 @@ export async function createPermitSignature(
   tokenContract: ERC20Permit,
 ): Promise<ERC20PermitSignatureStruct> {
   const signerAddress = await signer.getAddress();
-  const [nonce, tokenAddress, tokenName] = await Promise.all([
+  const [nonce, tokenAddress, tokenName, decimals] = await Promise.all([
     tokenContract.nonces(signerAddress),
     tokenContract.getAddress(),
     tokenContract.name(),
+    tokenContract.decimals(),
   ]);
 
   const deadline = Math.floor(Date.now() / 1000) + PERMIT_DEADLINE_SHIFT;
@@ -64,7 +65,7 @@ export async function createPermitSignature(
   const values = {
     owner: signerAddress,
     spender: spenderAddress,
-    value: amount.toBigInt(Decimal.PRECISION),
+    value: amount.toBigInt(Number(decimals)),
     nonce,
     deadline,
   };
@@ -74,7 +75,7 @@ export async function createPermitSignature(
 
   return {
     token: tokenAddress,
-    value: amount.toBigInt(Decimal.PRECISION),
+    value: amount.toBigInt(Number(decimals)),
     deadline,
     v,
     r,

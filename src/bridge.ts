@@ -109,6 +109,7 @@ export class Bridge {
 
     let { rTokenAllowance } = options;
 
+    const sourceTokenPrecision = BRIDGE_NETWORKS[sourceChainName].tokenDecimals;
     const sourceChainTokenAddress = BRIDGE_NETWORKS[sourceChainName].tokenAddress;
     const sourceChainRouterAddress = BRIDGE_NETWORKS[sourceChainName].routerAddress;
     const destinationChainSelector = BRIDGE_NETWORKS[destinationChainName].chainSelector;
@@ -118,7 +119,7 @@ export class Bridge {
     const tokenAmounts = [
       {
         token: sourceChainTokenAddress,
-        amount: amountToBridge.toBigInt().toString(),
+        amount: amountToBridge.toBigInt(sourceTokenPrecision).toString(),
       },
     ];
 
@@ -157,7 +158,7 @@ export class Bridge {
     if (tokenApprovalNeeded) {
       const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(sourceChainTokenContract.approve, [
         sourceChainRouterAddress,
-        amountToBridge.toBigInt(),
+        amountToBridge.toBigInt(sourceTokenPrecision),
       ]);
 
       yield {

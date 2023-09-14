@@ -137,7 +137,7 @@ export class UserSavings extends Savings {
         action = () =>
           sendTransactionWithGasLimit(
             this.rSavingsModuleContract.depositWithPermit,
-            [amount.abs().toBigInt(Decimal.PRECISION), userAddress, rPermitSignature],
+            [amount.abs().toBigInt(RR_PRECISION), userAddress, rPermitSignature],
             gasLimitMultiplier,
             frontendTag,
             this.user,
@@ -146,7 +146,7 @@ export class UserSavings extends Savings {
         action = () =>
           sendTransactionWithGasLimit(
             this.rSavingsModuleContract.deposit,
-            [amount.abs().toBigInt(Decimal.PRECISION), userAddress],
+            [amount.abs().toBigInt(RR_PRECISION), userAddress],
             gasLimitMultiplier,
             frontendTag,
             this.user,
@@ -156,7 +156,7 @@ export class UserSavings extends Savings {
       action = () =>
         sendTransactionWithGasLimit(
           this.rSavingsModuleContract.withdraw,
-          [amount.abs().toBigInt(Decimal.PRECISION), userAddress, userAddress],
+          [amount.abs().toBigInt(RaftConfig.networkConfig.tokens.R.decimals), userAddress, userAddress],
           gasLimitMultiplier,
           frontendTag,
           this.user,
@@ -262,7 +262,9 @@ export class UserSavings extends Savings {
       },
       stepNumber: getStepNumber(),
       numberOfSteps,
-      action: () => tokenContract.approve(spenderAddress, approveAmount.toBigInt(Decimal.PRECISION)),
+      action: () =>
+        // We are approving only R token for R Savings Module
+        tokenContract.approve(spenderAddress, approveAmount.toBigInt(RaftConfig.networkConfig.tokens.R.decimals)),
     };
   }
 

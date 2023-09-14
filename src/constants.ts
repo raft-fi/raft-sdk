@@ -34,6 +34,7 @@ export const STETH_RATE_PRECISION = 18;
 export const RR_PRECISION = 18;
 export const RAFT_DEBT_TOKEN_PRECISION = 18;
 export const RAFT_COLLATERAL_TOKEN_PRECISION = 18;
+export const MAX_FEE_PERCENTAGE_PRECISION = 18;
 export const CHAINLINK_DAI_USD_AGGREGATOR = '0xaed0c38402a5d19df6e4c03f4e2dced6e29c1ee9';
 
 export const SWAP_ROUTER_MAX_SLIPPAGE: Record<SwapRouter, Decimal> = {
