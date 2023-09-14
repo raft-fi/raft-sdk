@@ -13,6 +13,7 @@ import { CCIPOffRamp__factory, CCIPRouter__factory, ERC20__factory } from './typ
 import { TransactionWithFeesOptions } from './types';
 import { buildTransactionWithGasLimit } from './utils';
 import { RaftConfig } from './config';
+import { ETH_PRECISION } from './constants';
 
 export interface BridgeTokensOptions extends TransactionWithFeesOptions {
   frontendTag?: string;
@@ -136,7 +137,8 @@ export class Bridge {
     };
 
     const ccipFeeBigInt = await sourceChainRouter.getFee(destinationChainSelector, message);
-    const ccipFee = new Decimal(ccipFeeBigInt, Decimal.PRECISION);
+    // Fee is paid in native token (ETH) so we use ETH_PRECISION here.
+    const ccipFee = new Decimal(ccipFeeBigInt, ETH_PRECISION);
 
     const sourceChainTokenContract = ERC20__factory.connect(sourceChainTokenAddress, this.user);
 

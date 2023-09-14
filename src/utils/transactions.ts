@@ -1,6 +1,7 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Overrides, StateMutability, TypedContractMethod } from '../typechain/common';
 import { Signer, TransactionResponse, hexlify } from 'ethers';
+import { ETH_PRECISION } from '../constants';
 
 interface BuiltTransactionData {
   sendTransaction: () => Promise<TransactionResponse>;
@@ -30,7 +31,7 @@ export async function buildTransactionWithGasLimit<
   signer?: Signer,
   value?: bigint,
 ): Promise<BuiltTransactionData> {
-  const gasEstimate = new Decimal(await method.estimateGas(...args, { value } as Overrides<S>), Decimal.PRECISION);
+  const gasEstimate = new Decimal(await method.estimateGas(...args, { value } as Overrides<S>), ETH_PRECISION);
   const gasLimit = gasEstimate.mul(gasLimitMultiplier);
   const overrides = { value, gasLimit: gasLimit.toBigInt() } as Overrides<S>;
 

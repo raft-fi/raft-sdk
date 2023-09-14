@@ -8,6 +8,7 @@ import { ERC20, ERC20Permit, ERC20Permit__factory } from '../typechain';
 import { RaftConfig } from '../config';
 import { getTokenAllowance } from '../allowance';
 import { Savings } from './savings';
+import { RR_PRECISION } from '../constants';
 
 export interface ManageSavingsStepType {
   name: 'approve' | 'permit' | 'manageSavings';
@@ -189,7 +190,7 @@ export class UserSavings extends Savings {
 
     const userSavings = await this.rSavingsModuleContract.maxWithdraw(userAddress);
 
-    return new Decimal(userSavings, Decimal.PRECISION);
+    return new Decimal(userSavings, RR_PRECISION);
   }
 
   async getSavingsTransactions(): Promise<SavingsTransaction[]> {
