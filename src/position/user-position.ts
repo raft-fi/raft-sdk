@@ -16,8 +16,10 @@ import {
   VaultVersion,
 } from '../types';
 import {
+  getPermitOrApproveTokenStep,
   getPositionManagerContract,
   getTokenContract,
+  getWhitelistStep,
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
   sendTransactionWithGasLimit,
@@ -40,7 +42,6 @@ import {
   UnderlyingCollateralTokenPositionManaging,
   WrappableCappedCollateralTokenPositionManaging,
 } from './manage';
-import { getPermitOrApproveTokenStep, getWhitelistStep } from './steps';
 import { isInterestRateVault } from '../utils/token';
 
 export interface LeveragePositionStepType {

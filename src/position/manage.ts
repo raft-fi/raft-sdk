@@ -3,17 +3,18 @@ import { Decimal } from '@tempusfinance/decimal';
 import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
 import {
   EMPTY_PERMIT_SIGNATURE,
+  getPermitOrApproveTokenStep,
   getPositionManagerContract,
   getTokenContract,
+  getWhitelistStep,
   isEoaAddress,
+  isInterestRateVault,
   sendTransactionWithGasLimit,
 } from '../utils';
 import { RaftConfig, SupportedCollateralTokens } from '../config';
 import { getTokenAllowance } from '../allowance';
 import { ERC20PermitSignatureStruct, PositionManager } from '../typechain/PositionManager';
 import { ERC20, ERC20Permit } from '../typechain';
-import { getPermitOrApproveTokenStep, getWhitelistStep } from './steps';
-import { isInterestRateVault } from '../utils/token';
 
 export interface ManagePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'manage';

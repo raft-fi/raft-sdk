@@ -2,9 +2,19 @@ import { Signer, TransactionResponse } from 'ethers';
 import request, { gql } from 'graphql-request';
 import { Decimal } from '@tempusfinance/decimal';
 import { ERC20PermitSignatureStruct } from '../typechain/RSavingsModule';
-import { R_TOKEN, Token, TransactionWithFeesOptions } from '../types';
-import { createPermitSignature, EMPTY_PERMIT_SIGNATURE, isEoaAddress, sendTransactionWithGasLimit } from '../utils';
-import { ERC20, ERC20Permit, ERC20Permit__factory } from '../typechain';
+import { RToken, R_TOKEN, TransactionWithFeesOptions } from '../types';
+import {
+  ApproveStep,
+  BaseStep,
+  BuiltTransactionData,
+  EMPTY_PERMIT_SIGNATURE,
+  PermitStep,
+  buildTransactionWithGasLimit,
+  getPermitOrApproveTokenStep,
+  getTokenContract,
+  isEoaAddress,
+} from '../utils';
+import { ERC20Permit } from '../typechain';
 import { RaftConfig } from '../config';
 import { getTokenAllowance } from '../allowance';
 import { Savings } from './savings';
@@ -19,35 +29,18 @@ export interface ManageSavingsOptions extends TransactionWithFeesOptions {
   approvalType?: 'permit' | 'approve';
 }
 
-export interface ManageSavingsStep {
-  type: ManageSavingsStepType;
-  stepNumber: number;
-  numberOfSteps: number;
-  action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
-}
+type ManageSavingsStep = BaseStep<
+  {
+    name: 'manageSavings';
+  },
+  TransactionResponse
+>;
+export type SavingsStep = ApproveStep<RToken> | PermitStep<RToken> | ManageSavingsStep;
 
 interface ManageSavingsStepsPrefetch {
   rTokenAllowance?: Decimal;
   rPermitSignature?: ERC20PermitSignatureStruct;
 }
-
-type PermitStep = {
-  type: {
-    name: 'permit';
-  };
-  stepNumber: number;
-  numberOfSteps: number;
-  action: () => Promise<ERC20PermitSignatureStruct>;
-};
-
-type ApproveStep = {
-  type: {
-    name: 'approve';
-  };
-  stepNumber: number;
-  numberOfSteps: number;
-  action: () => Promise<TransactionResponse>;
-};
 
 export type SavingsTransactionType = 'DEPOSIT' | 'WITHDRAW';
 
@@ -81,14 +74,13 @@ export class UserSavings extends Savings {
 
     this.user = user;
     this.userAddress = '';
-
-    this.rToken = ERC20Permit__factory.connect(RaftConfig.networkConfig.tokens[R_TOKEN].address, this.user);
+    this.rToken = getTokenContract(R_TOKEN, this.user);
   }
 
   public async *getManageSavingsSteps(
     amount: Decimal,
     options: ManageSavingsOptions & ManageSavingsStepsPrefetch = {},
-  ): AsyncGenerator<ManageSavingsStep, void, ERC20PermitSignatureStruct | undefined> {
+  ): AsyncGenerator<SavingsStep, void, ERC20PermitSignatureStruct | undefined> {
     const {
       gasLimitMultiplier = Decimal.ONE,
       rPermitSignature: cachedRPermitSignature,
@@ -119,50 +111,51 @@ export class UserSavings extends Savings {
 
     let rPermitSignature = EMPTY_PERMIT_SIGNATURE;
     if (rTokenApprovalStepNeeded) {
-      rPermitSignature = yield* this.getApproveOrPermitStep(
+      rPermitSignature = yield* getPermitOrApproveTokenStep(
+        this.user,
         R_TOKEN,
         this.rToken,
         amount,
         RaftConfig.networkConfig.rSavingsModule,
-        () => stepCounter++,
+        stepCounter++,
         numberOfSteps,
         canUsePermit,
         cachedRPermitSignature,
       );
     }
 
+    let builtTransactionData: BuiltTransactionData;
+
     // If amount is greater then zero, user wants to deposit, otherwise call withdraw
-    let action;
     if (isSavingsIncrease) {
       if (canUsePermit) {
-        action = () =>
-          sendTransactionWithGasLimit(
-            this.rSavingsModuleContract.depositWithPermit,
-            [amount.abs().toBigInt(RR_PRECISION), userAddress, rPermitSignature],
-            gasLimitMultiplier,
-            frontendTag,
-            this.user,
-          );
-      } else {
-        action = () =>
-          sendTransactionWithGasLimit(
-            this.rSavingsModuleContract.deposit,
-            [amount.abs().toBigInt(RR_PRECISION), userAddress],
-            gasLimitMultiplier,
-            frontendTag,
-            this.user,
-          );
-      }
-    } else {
-      action = () =>
-        sendTransactionWithGasLimit(
-          this.rSavingsModuleContract.withdraw,
-          [amount.abs().toBigInt(RaftConfig.networkConfig.tokens.R.decimals), userAddress, userAddress],
+        builtTransactionData = await buildTransactionWithGasLimit(
+          this.rSavingsModuleContract.depositWithPermit,
+          [amount.abs().toBigInt(RR_PRECISION), userAddress, rPermitSignature],
           gasLimitMultiplier,
           frontendTag,
           this.user,
         );
+      } else {
+        builtTransactionData = await buildTransactionWithGasLimit(
+          this.rSavingsModuleContract.deposit,
+          [amount.abs().toBigInt(RR_PRECISION), userAddress],
+          gasLimitMultiplier,
+          frontendTag,
+          this.user,
+        );
+      }
+    } else {
+      builtTransactionData = await buildTransactionWithGasLimit(
+        this.rSavingsModuleContract.withdraw,
+        [amount.abs().toBigInt(RaftConfig.networkConfig.tokens.R.decimals), userAddress, userAddress],
+        gasLimitMultiplier,
+        frontendTag,
+        this.user,
+      );
     }
+
+    const { sendTransaction: action, gasEstimate } = builtTransactionData;
 
     yield {
       type: {
@@ -170,7 +163,8 @@ export class UserSavings extends Savings {
       },
       stepNumber: stepCounter++,
       numberOfSteps,
-      action: action,
+      gasEstimate,
+      action,
     };
   }
 
@@ -222,80 +216,5 @@ export class UserSavings extends Savings {
       amount: Decimal.parse(BigInt(savingsTransaction.amount), 0n, Decimal.PRECISION),
       timestamp: new Date(Number(savingsTransaction.timestamp) * 1000),
     }));
-  }
-
-  private *getSignTokenPermitStep(
-    token: Token,
-    tokenContract: ERC20Permit,
-    approveAmount: Decimal,
-    spenderAddress: string,
-    getStepNumber: () => number,
-    numberOfSteps: number,
-    cachedSignature?: ERC20PermitSignatureStruct,
-  ): Generator<PermitStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
-    const signature =
-      cachedSignature ??
-      (yield {
-        type: {
-          name: 'permit',
-        },
-        stepNumber: getStepNumber(),
-        numberOfSteps,
-        action: () => createPermitSignature(token, this.user, approveAmount, spenderAddress, tokenContract),
-      });
-
-    if (!signature) {
-      throw new Error('R token permit signature is required');
-    }
-
-    return signature;
-  }
-
-  private *getApproveTokenStep(
-    tokenContract: ERC20 | ERC20Permit,
-    approveAmount: Decimal,
-    spenderAddress: string,
-    getStepNumber: () => number,
-    numberOfSteps: number,
-  ): Generator<ApproveStep, void, unknown> {
-    yield {
-      type: {
-        name: 'approve',
-      },
-      stepNumber: getStepNumber(),
-      numberOfSteps,
-      action: () =>
-        // We are approving only R token for R Savings Rate
-        tokenContract.approve(spenderAddress, approveAmount.toBigInt(RaftConfig.networkConfig.tokens.R.decimals)),
-    };
-  }
-
-  private *getApproveOrPermitStep(
-    token: Token,
-    tokenContract: ERC20 | ERC20Permit,
-    approveAmount: Decimal,
-    spenderAddress: string,
-    getStepNumber: () => number,
-    numberOfSteps: number,
-    canUsePermit: boolean,
-    cachedPermitSignature?: ERC20PermitSignatureStruct,
-  ): Generator<PermitStep | ApproveStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
-    let permitSignature = EMPTY_PERMIT_SIGNATURE;
-
-    if (canUsePermit) {
-      permitSignature = yield* this.getSignTokenPermitStep(
-        token,
-        tokenContract,
-        approveAmount,
-        spenderAddress,
-        getStepNumber,
-        numberOfSteps,
-        cachedPermitSignature,
-      );
-    } else {
-      yield* this.getApproveTokenStep(tokenContract, approveAmount, spenderAddress, getStepNumber, numberOfSteps);
-    }
-
-    return permitSignature;
   }
 }

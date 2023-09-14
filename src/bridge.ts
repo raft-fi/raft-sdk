@@ -10,10 +10,10 @@ import {
   ethers,
 } from 'ethers';
 import { CCIPOffRamp__factory, CCIPRouter__factory, ERC20__factory } from './typechain';
-import { TransactionWithFeesOptions } from './types';
-import { buildTransactionWithGasLimit } from './utils';
-import { RaftConfig } from './config';
+import { RToken, R_TOKEN, TransactionWithFeesOptions } from './types';
+import { ApproveStep, BaseStep, buildTransactionWithGasLimit, getApproveTokenStep } from './utils';
 import { ETH_PRECISION } from './constants';
+import { getTokenAllowance } from './allowance';
 
 export interface BridgeTokensOptions extends TransactionWithFeesOptions {
   frontendTag?: string;
@@ -27,14 +27,16 @@ export interface BridgeTokensStepType {
   name: 'approve' | 'bridgeTokens';
 }
 
-export interface BridgeTokensStep {
-  type: BridgeTokensStepType;
-  stepNumber: number;
-  numberOfSteps: number;
-  gasEstimate: Decimal;
-  ccipFee: Decimal;
-  action: () => Promise<TransactionResponse>;
+export interface BridgeStep
+  extends BaseStep<
+    {
+      name: 'bridge';
+    },
+    TransactionResponse
+  > {
+  bridgeFee: Decimal;
 }
+export type BridgeTokensStep = ApproveStep<RToken> | BridgeStep;
 
 export type SupportedBridgeNetwork = 'ethereum' | 'ethereumSepolia' | 'base' | 'arbitrumGoerli';
 export type SupportedBridgeToken = 'R' | 'CCIP-LnM' | 'clCCIP-LnM';
@@ -144,10 +146,7 @@ export class Bridge {
     const sourceChainTokenContract = ERC20__factory.connect(sourceChainTokenAddress, this.user);
 
     if (rTokenAllowance === undefined) {
-      rTokenAllowance = new Decimal(
-        await sourceChainTokenContract.allowance(this.user, sourceChainRouterAddress),
-        RaftConfig.networkConfig.tokens.R.decimals,
-      );
+      rTokenAllowance = await getTokenAllowance(R_TOKEN, sourceChainTokenContract, this.user, sourceChainRouterAddress);
     }
 
     const tokenApprovalNeeded = amountToBridge.gt(rTokenAllowance);
@@ -156,21 +155,14 @@ export class Bridge {
     let stepCounter = 1;
 
     if (tokenApprovalNeeded) {
-      const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(sourceChainTokenContract.approve, [
+      yield* getApproveTokenStep(
+        R_TOKEN,
+        sourceChainTokenContract,
+        amountToBridge,
         sourceChainRouterAddress,
-        amountToBridge.toBigInt(sourceTokenPrecision),
-      ]);
-
-      yield {
-        type: {
-          name: 'approve',
-        },
-        stepNumber: stepCounter++,
+        stepCounter++,
         numberOfSteps,
-        gasEstimate,
-        ccipFee,
-        action: sendTransaction,
-      };
+      );
     }
 
     const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
@@ -184,12 +176,12 @@ export class Bridge {
 
     yield {
       type: {
-        name: 'bridgeTokens',
+        name: 'bridge',
       },
       stepNumber: stepCounter++,
       numberOfSteps,
       gasEstimate,
-      ccipFee,
+      bridgeFee: ccipFee,
       action: sendTransaction,
     };
   }
