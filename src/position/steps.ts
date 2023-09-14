@@ -4,6 +4,7 @@ import { ERC20, ERC20Permit } from '../typechain';
 import { Token } from '../types';
 import { ERC20PermitSignatureStruct, PositionManager } from '../typechain/PositionManager';
 import { createPermitSignature, EMPTY_PERMIT_SIGNATURE, sendTransactionWithGasLimit } from '../utils';
+import { RaftConfig } from '../config';
 
 export type BaseStep = {
   stepNumber: number;
@@ -68,7 +69,7 @@ export function* getSignTokenPermitStep<T extends Token>(
       },
       stepNumber,
       numberOfSteps,
-      action: () => createPermitSignature(signer, approveAmount, spenderAddress, tokenContract),
+      action: () => createPermitSignature(token, signer, approveAmount, spenderAddress, tokenContract),
     });
 
   if (!signature) {
@@ -86,6 +87,8 @@ export async function* getApproveTokenStep<T extends Token>(
   stepNumber: number,
   numberOfSteps: number,
 ): AsyncGenerator<ApproveStep<T>, void, unknown> {
+  const tokenDecimals = RaftConfig.networkConfig.tokens[token].decimals;
+
   yield {
     type: {
       name: 'approve' as const,
@@ -94,7 +97,7 @@ export async function* getApproveTokenStep<T extends Token>(
     stepNumber,
     numberOfSteps,
     action: () =>
-      sendTransactionWithGasLimit(tokenContract.approve, [spenderAddress, approveAmount.toBigInt(Decimal.PRECISION)]),
+      sendTransactionWithGasLimit(tokenContract.approve, [spenderAddress, approveAmount.toBigInt(tokenDecimals)]),
   };
 }
 

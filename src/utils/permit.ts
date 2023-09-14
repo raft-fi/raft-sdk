@@ -3,6 +3,7 @@ import { Signature, Signer, ZeroAddress } from 'ethers';
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
 import { ERC20Permit } from '../typechain';
 import { RaftConfig } from '../config';
+import { Token } from '../types';
 
 const PERMIT_DEADLINE_SHIFT = 30 * 60; // 30 minutes
 
@@ -41,6 +42,7 @@ export const EMPTY_PERMIT_SIGNATURE: ERC20PermitSignatureStruct = {
 };
 
 export async function createPermitSignature(
+  token: Token,
   signer: Signer,
   amount: Decimal,
   spenderAddress: string,
@@ -55,6 +57,8 @@ export async function createPermitSignature(
 
   const deadline = Math.floor(Date.now() / 1000) + PERMIT_DEADLINE_SHIFT;
 
+  const decimals = RaftConfig.networkConfig.tokens[token].decimals;
+
   const domain = {
     name: tokenName,
     chainId: RaftConfig.networkId,
@@ -64,7 +68,7 @@ export async function createPermitSignature(
   const values = {
     owner: signerAddress,
     spender: spenderAddress,
-    value: amount.toBigInt(Decimal.PRECISION),
+    value: amount.toBigInt(Number(decimals)),
     nonce,
     deadline,
   };
@@ -74,7 +78,7 @@ export async function createPermitSignature(
 
   return {
     token: tokenAddress,
-    value: amount.toBigInt(Decimal.PRECISION),
+    value: amount.toBigInt(Number(decimals)),
     deadline,
     v,
     r,

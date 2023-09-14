@@ -26,6 +26,14 @@ export const DAI_TOKEN_ADDRESS = '0x6B175474E89094C44Da98b954EedeAC495271d0F';
 export const CHAI_TOKEN_ADDRESS = '0x06af07097c9eeb7fd685c692751d5c66db49c215';
 export const R_CHAI_PSM_ADDRESS = '0xa03342feb2e1d4690b60ef556509ec3b76c97ee7';
 export const CHAI_RATE_PRECISION = 27;
+export const CHAI_PRECISION = 18;
+export const BORROWING_RATE_PRECISION = 18;
+export const INDEX_INCREASE_PRECISION = 18;
+export const ETH_PRECISION = 18;
+export const RR_PRECISION = 18;
+export const RAFT_DEBT_TOKEN_PRECISION = 18;
+export const RAFT_COLLATERAL_TOKEN_PRECISION = 18;
+export const MAX_FEE_PERCENTAGE_PRECISION = 18;
 export const CHAINLINK_DAI_USD_AGGREGATOR = '0xaed0c38402a5d19df6e4c03f4e2dced6e29c1ee9';
 
 export const SWAP_ROUTER_MAX_SLIPPAGE: Record<SwapRouter, Decimal> = {

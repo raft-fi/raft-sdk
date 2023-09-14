@@ -15,7 +15,7 @@ describe('createPermitSignature', () => {
     jest.spyOn(token, 'getAddress').mockResolvedValue('0x456');
     jest.spyOn(token, 'nonces').mockResolvedValue(0n);
 
-    const signature = createPermitSignature(signer, Decimal.ONE, '0x789', token);
+    const signature = createPermitSignature('wstETH-v1', signer, Decimal.ONE, '0x789', token);
 
     expect(signature).resolves.toEqual({
       token: '0x456',

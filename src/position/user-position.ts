@@ -23,7 +23,12 @@ import {
   sendTransactionWithGasLimit,
 } from '../utils';
 import { PositionWithRunner } from './base';
-import { SWAP_ROUTER_MAX_SLIPPAGE } from '../constants';
+import {
+  MAX_FEE_PERCENTAGE_PRECISION,
+  RAFT_COLLATERAL_TOKEN_PRECISION,
+  RAFT_DEBT_TOKEN_PRECISION,
+  SWAP_ROUTER_MAX_SLIPPAGE,
+} from '../constants';
 import { Protocol } from '../protocol';
 import {
   BasePositionManaging,
@@ -599,6 +604,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(underlyingCollateralPrice);
       }
 
+      const collateralDecimals = RaftConfig.networkConfig.tokens[collateralToken].decimals;
+
       yield {
         type: {
           name: 'leverage',
@@ -612,13 +619,13 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
               ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
               : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH, // used to stETH
             [
-              debtChange.abs().toBigInt(),
+              debtChange.abs().toBigInt(RAFT_DEBT_TOKEN_PRECISION),
               isDebtIncrease,
-              principalCollateralChange.abs().toBigInt(),
+              principalCollateralChange.abs().toBigInt(RAFT_COLLATERAL_TOKEN_PRECISION),
               isPrincipalCollateralIncrease,
               oneInchDataAmmData,
-              isDebtIncrease ? minReturn.toBigInt() : collateralToSwap.toBigInt(),
-              maxFeePercentage.toBigInt(),
+              isDebtIncrease ? minReturn.toBigInt(collateralDecimals) : collateralToSwap.toBigInt(collateralDecimals),
+              maxFeePercentage.toBigInt(MAX_FEE_PERCENTAGE_PRECISION),
             ],
             gasLimitMultiplier,
             frontendTag,
@@ -653,7 +660,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             absolutePrincipalCollateralChangeValue,
             isPrincipalCollateralIncrease,
             leverage,
-            maxFeePercentage.toBigInt(),
+            maxFeePercentage.toBigInt(MAX_FEE_PERCENTAGE_PRECISION),
             gasLimitMultiplier,
             frontendTag,
           );

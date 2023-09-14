@@ -13,6 +13,7 @@ import { CCIPOffRamp__factory, CCIPRouter__factory, ERC20__factory } from './typ
 import { TransactionWithFeesOptions } from './types';
 import { buildTransactionWithGasLimit } from './utils';
 import { RaftConfig } from './config';
+import { ETH_PRECISION } from './constants';
 
 export interface BridgeTokensOptions extends TransactionWithFeesOptions {
   frontendTag?: string;
@@ -108,6 +109,7 @@ export class Bridge {
 
     let { rTokenAllowance } = options;
 
+    const sourceTokenPrecision = BRIDGE_NETWORKS[sourceChainName].tokenDecimals;
     const sourceChainTokenAddress = BRIDGE_NETWORKS[sourceChainName].tokenAddress;
     const sourceChainRouterAddress = BRIDGE_NETWORKS[sourceChainName].routerAddress;
     const destinationChainSelector = BRIDGE_NETWORKS[destinationChainName].chainSelector;
@@ -117,7 +119,7 @@ export class Bridge {
     const tokenAmounts = [
       {
         token: sourceChainTokenAddress,
-        amount: amountToBridge.toBigInt().toString(),
+        amount: amountToBridge.toBigInt(sourceTokenPrecision).toString(),
       },
     ];
 
@@ -136,7 +138,8 @@ export class Bridge {
     };
 
     const ccipFeeBigInt = await sourceChainRouter.getFee(destinationChainSelector, message);
-    const ccipFee = new Decimal(ccipFeeBigInt, Decimal.PRECISION);
+    // Fee is paid in native token (ETH) so we use ETH_PRECISION here.
+    const ccipFee = new Decimal(ccipFeeBigInt, ETH_PRECISION);
 
     const sourceChainTokenContract = ERC20__factory.connect(sourceChainTokenAddress, this.user);
 
@@ -155,7 +158,7 @@ export class Bridge {
     if (tokenApprovalNeeded) {
       const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(sourceChainTokenContract.approve, [
         sourceChainRouterAddress,
-        amountToBridge.toBigInt(),
+        amountToBridge.toBigInt(sourceTokenPrecision),
       ]);
 
       yield {

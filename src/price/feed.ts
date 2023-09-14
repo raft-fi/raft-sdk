@@ -64,6 +64,7 @@ export class PriceFeed {
   private async fetchPriceFromPriceFeed(token: UnderlyingCollateralToken): Promise<Decimal> {
     const priceFeed = await this.loadPriceFeed(token);
 
+    // Price feed is always 18 decimals
     if (RaftConfig.isTestNetwork) {
       return new Decimal(await priceFeed.getPrice.staticCall());
     } else {

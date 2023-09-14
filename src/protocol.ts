@@ -1,5 +1,5 @@
 import { request, gql } from 'graphql-request';
-import { Provider, Signer, TransactionResponse } from 'ethers';
+import { Provider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { RaftConfig } from './config';
 import {
@@ -16,28 +16,27 @@ import {
   InterestRateVault,
   R_TOKEN,
   Token,
-  TransactionWithFeesOptions,
   UNDERLYING_COLLATERAL_TOKENS,
   UnderlyingCollateralToken,
   VAULTS_V2,
 } from './types';
 import {
-  createPermitSignature,
   getPositionManagerContract,
   getTokenContract,
   getWrappedCappedCollateralToken,
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
-  sendTransactionWithGasLimit,
   getInterestRateDebtTokenContract,
 } from './utils';
 import {
+  BORROWING_RATE_PRECISION,
   CHAINLINK_DAI_USD_AGGREGATOR,
+  CHAI_PRECISION,
   CHAI_RATE_PRECISION,
   CHAI_TOKEN_ADDRESS,
   FLASH_MINT_FEE,
+  INDEX_INCREASE_PRECISION,
   R_CHAI_PSM_ADDRESS,
-  SECONDS_IN_MINUTE,
   SECONDS_PER_YEAR,
 } from './constants';
 
@@ -49,21 +48,6 @@ interface PsmTvlData {
   usdValue: Decimal;
   daiLocked: Decimal;
 }
-
-const BETA = new Decimal(2);
-// Redemptions are disabled, all deviations set to 100%
-const ORACLE_DEVIATION: Record<UnderlyingCollateralToken, Decimal> = {
-  'wstETH-v1': new Decimal(1),
-  'wcrETH-v1': new Decimal(1),
-  wstETH: new Decimal(1),
-  WETH: new Decimal(1),
-  rETH: new Decimal(1),
-  WBTC: new Decimal(1),
-  cbETH: new Decimal(1),
-  swETH: new Decimal(1),
-};
-
-const MINUTE_DECAY_FACTOR = new Decimal(999037758833783000n, Decimal.PRECISION); // (1/2)^(1/720)
 
 export class Protocol {
   private static instance: Protocol;
@@ -110,7 +94,6 @@ export class Protocol {
     cbETH: null,
     swETH: null,
   };
-  private _redemptionRate: Decimal | null = null;
   private _openPositionCount: number | null = null;
   private _flashMintFee: Decimal = FLASH_MINT_FEE;
   private _psmTvl: PsmTvlData | null = null;
@@ -140,49 +123,6 @@ export class Protocol {
   }
 
   /**
-   * Redeems collateral from all positions in exchange for amount in R.
-   * @notice Redemption of R at peg will result in significant financial loss.
-   * @param collateralToken The collateral token to redeem.
-   * @param debtAmount The amount of debt in R to burn.
-   * @param redeemer The account to redeem collateral for.
-   * @param options.maxFeePercentage The maximum fee percentage to pay for redemption.
-   * @returns The dispatched redemption transaction.
-   */
-  public async redeemCollateral(
-    collateralToken: UnderlyingCollateralToken,
-    debtAmount: Decimal,
-    redeemer: Signer,
-    options: TransactionWithFeesOptions = {},
-  ): Promise<TransactionResponse> {
-    const { maxFeePercentage = Decimal.ONE, gasLimitMultiplier = Decimal.ONE } = options;
-
-    if (isWrappedCappedUnderlyingCollateralToken(collateralToken)) {
-      // TODO: Needs `getRedeemCollateralSteps` for more granular control
-      const positionManagerAddress = RaftConfig.networkConfig.wrappedCollateralTokenPositionManagers[collateralToken];
-      const positionManager = getPositionManagerContract('wrapped', positionManagerAddress, redeemer);
-      const rPermitSignature = await createPermitSignature(redeemer, debtAmount, positionManagerAddress, this.rToken);
-
-      return sendTransactionWithGasLimit(
-        positionManager.redeemCollateral,
-        [debtAmount.toBigInt(Decimal.PRECISION), maxFeePercentage.toBigInt(Decimal.PRECISION), rPermitSignature],
-        gasLimitMultiplier,
-      );
-    }
-
-    const positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, redeemer);
-
-    return sendTransactionWithGasLimit(
-      positionManager.redeemCollateral,
-      [
-        RaftConfig.getTokenAddress(collateralToken),
-        debtAmount.toBigInt(Decimal.PRECISION),
-        maxFeePercentage.toBigInt(Decimal.PRECISION),
-      ],
-      gasLimitMultiplier,
-    );
-  }
-
-  /**
    * Raft protocol collateral supply denominated in wstETH token.
    */
   get collateralSupply(): Record<UnderlyingCollateralToken, Decimal | null> {
@@ -205,13 +145,6 @@ export class Protocol {
 
   get interestRate(): Record<InterestRateVault, Decimal | null> {
     return this._interestRate;
-  }
-
-  /**
-   * Raft protocol current redemption rate.
-   */
-  get redemptionRate(): Decimal | null {
-    return this._redemptionRate;
   }
 
   /**
@@ -282,7 +215,7 @@ export class Protocol {
     const chaiRateParsed = new Decimal(chaiRate, CHAI_RATE_PRECISION);
 
     const chaiPsmBalance = await chaiToken.balanceOf(R_CHAI_PSM_ADDRESS);
-    const chaiPsmBalanceParsed = new Decimal(chaiPsmBalance, Decimal.PRECISION);
+    const chaiPsmBalanceParsed = new Decimal(chaiPsmBalance, CHAI_PRECISION);
 
     const psmDaiBalance = chaiRateParsed.mul(chaiPsmBalanceParsed);
 
@@ -347,7 +280,7 @@ export class Protocol {
 
         this._borrowingRate[collateralToken] = new Decimal(
           await this.positionManager.getBorrowingRate(collateralTokenAddress),
-          Decimal.PRECISION,
+          BORROWING_RATE_PRECISION,
         );
       }),
     );
@@ -364,7 +297,7 @@ export class Protocol {
 
         const indexIncreasePerSecond = new Decimal(
           await interestRateDebtToken.indexIncreasePerSecond(),
-          Decimal.PRECISION,
+          INDEX_INCREASE_PRECISION,
         );
 
         this._interestRate[collateralToken] = indexIncreasePerSecond.mul(SECONDS_PER_YEAR);
@@ -372,54 +305,6 @@ export class Protocol {
     );
 
     return this._interestRate;
-  }
-
-  /**
-   * Calculates fee for redeem tx based on user input.
-   * @param collateralToken Collateral token user wants to receive from redeem
-   * @param rToRedeem Amount of R tokens user wants to redeem
-   * @param collateralPrice Current price of collateral user wants to receive from redeem
-   * @param totalDebtSupply Total debt supply of R token
-   * @returns Fee percentage for redeem transaction.
-   */
-  public async fetchRedemptionRate(
-    collateralToken: UnderlyingCollateralToken,
-    rToRedeem: Decimal,
-    collateralPrice: Decimal,
-    totalDebtSupply: Decimal,
-  ): Promise<Decimal> {
-    if (collateralPrice.isZero()) {
-      throw new Error('Collateral price is zero!');
-    }
-
-    const collateralAmount = rToRedeem.div(collateralPrice);
-    const redeemedFraction = collateralAmount.mul(collateralPrice).div(totalDebtSupply);
-
-    const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
-    const [collateralInfo, lastBlock] = await Promise.all([
-      this.positionManager.collateralInfo(collateralTokenAddress),
-      this.provider.getBlock('latest'),
-    ]);
-    if (!lastBlock) {
-      throw new Error('Failed to fetch latest block');
-    }
-
-    const lastFeeOperationTime = new Decimal(collateralInfo.lastFeeOperationTime, 0);
-    const baseRate = new Decimal(collateralInfo.baseRate, Decimal.PRECISION);
-    const redemptionSpreadDecimal = new Decimal(collateralInfo.redemptionSpread, Decimal.PRECISION);
-    const latestBlockTimestampDecimal = new Decimal(lastBlock.timestamp);
-    const minutesPassed = latestBlockTimestampDecimal.sub(lastFeeOperationTime).div(SECONDS_IN_MINUTE);
-
-    // Using floor here because fractional number cannot be converted to BigInt
-    const decayFactor = MINUTE_DECAY_FACTOR.pow(Math.floor(Number(minutesPassed.toString())));
-    const decayedBaseRate = baseRate.mul(decayFactor);
-
-    const newBaseRate = Decimal.min(decayedBaseRate.add(redeemedFraction.div(BETA)), Decimal.ONE);
-    if (newBaseRate.lte(Decimal.ZERO)) {
-      throw new Error('Calculated base rate cannot be zero or less!');
-    }
-
-    return Decimal.min(newBaseRate.add(redemptionSpreadDecimal).add(ORACLE_DEVIATION[collateralToken]), Decimal.ONE);
   }
 
   /**

@@ -2,12 +2,13 @@ import { Signer, TransactionResponse } from 'ethers';
 import request, { gql } from 'graphql-request';
 import { Decimal } from '@tempusfinance/decimal';
 import { ERC20PermitSignatureStruct } from '../typechain/RSavingsModule';
-import { R_TOKEN, TransactionWithFeesOptions } from '../types';
+import { R_TOKEN, Token, TransactionWithFeesOptions } from '../types';
 import { createPermitSignature, EMPTY_PERMIT_SIGNATURE, isEoaAddress, sendTransactionWithGasLimit } from '../utils';
 import { ERC20, ERC20Permit, ERC20Permit__factory } from '../typechain';
 import { RaftConfig } from '../config';
 import { getTokenAllowance } from '../allowance';
 import { Savings } from './savings';
+import { RR_PRECISION } from '../constants';
 
 export interface ManageSavingsStepType {
   name: 'approve' | 'permit' | 'manageSavings';
@@ -119,6 +120,7 @@ export class UserSavings extends Savings {
     let rPermitSignature = EMPTY_PERMIT_SIGNATURE;
     if (rTokenApprovalStepNeeded) {
       rPermitSignature = yield* this.getApproveOrPermitStep(
+        R_TOKEN,
         this.rToken,
         amount,
         RaftConfig.networkConfig.rSavingsModule,
@@ -136,7 +138,7 @@ export class UserSavings extends Savings {
         action = () =>
           sendTransactionWithGasLimit(
             this.rSavingsModuleContract.depositWithPermit,
-            [amount.abs().toBigInt(Decimal.PRECISION), userAddress, rPermitSignature],
+            [amount.abs().toBigInt(RR_PRECISION), userAddress, rPermitSignature],
             gasLimitMultiplier,
             frontendTag,
             this.user,
@@ -145,7 +147,7 @@ export class UserSavings extends Savings {
         action = () =>
           sendTransactionWithGasLimit(
             this.rSavingsModuleContract.deposit,
-            [amount.abs().toBigInt(Decimal.PRECISION), userAddress],
+            [amount.abs().toBigInt(RR_PRECISION), userAddress],
             gasLimitMultiplier,
             frontendTag,
             this.user,
@@ -155,7 +157,7 @@ export class UserSavings extends Savings {
       action = () =>
         sendTransactionWithGasLimit(
           this.rSavingsModuleContract.withdraw,
-          [amount.abs().toBigInt(Decimal.PRECISION), userAddress, userAddress],
+          [amount.abs().toBigInt(RaftConfig.networkConfig.tokens.R.decimals), userAddress, userAddress],
           gasLimitMultiplier,
           frontendTag,
           this.user,
@@ -189,7 +191,7 @@ export class UserSavings extends Savings {
 
     const userSavings = await this.rSavingsModuleContract.maxWithdraw(userAddress);
 
-    return new Decimal(userSavings, Decimal.PRECISION);
+    return new Decimal(userSavings, RR_PRECISION);
   }
 
   async getSavingsTransactions(): Promise<SavingsTransaction[]> {
@@ -223,6 +225,7 @@ export class UserSavings extends Savings {
   }
 
   private *getSignTokenPermitStep(
+    token: Token,
     tokenContract: ERC20Permit,
     approveAmount: Decimal,
     spenderAddress: string,
@@ -238,7 +241,7 @@ export class UserSavings extends Savings {
         },
         stepNumber: getStepNumber(),
         numberOfSteps,
-        action: () => createPermitSignature(this.user, approveAmount, spenderAddress, tokenContract),
+        action: () => createPermitSignature(token, this.user, approveAmount, spenderAddress, tokenContract),
       });
 
     if (!signature) {
@@ -261,11 +264,14 @@ export class UserSavings extends Savings {
       },
       stepNumber: getStepNumber(),
       numberOfSteps,
-      action: () => tokenContract.approve(spenderAddress, approveAmount.toBigInt(Decimal.PRECISION)),
+      action: () =>
+        // We are approving only R token for R Savings Rate
+        tokenContract.approve(spenderAddress, approveAmount.toBigInt(RaftConfig.networkConfig.tokens.R.decimals)),
     };
   }
 
   private *getApproveOrPermitStep(
+    token: Token,
     tokenContract: ERC20 | ERC20Permit,
     approveAmount: Decimal,
     spenderAddress: string,
@@ -278,6 +284,7 @@ export class UserSavings extends Savings {
 
     if (canUsePermit) {
       permitSignature = yield* this.getSignTokenPermitStep(
+        token,
         tokenContract,
         approveAmount,
         spenderAddress,
