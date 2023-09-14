@@ -3,36 +3,40 @@ import { Signer, TransactionResponse } from 'ethers';
 import { ERC20, ERC20Permit } from '../typechain';
 import { Token } from '../types';
 import { ERC20PermitSignatureStruct, PositionManager } from '../typechain/PositionManager';
-import { createPermitSignature, EMPTY_PERMIT_SIGNATURE, sendTransactionWithGasLimit } from '../utils';
 import { RaftConfig } from '../config';
+import { EMPTY_PERMIT_SIGNATURE, createPermitSignature } from './permit';
+import { buildTransactionWithGasLimit } from './transactions';
 
-export type BaseStep = {
+export type BaseStep<T, A extends TransactionResponse | ERC20PermitSignatureStruct> = {
+  type: T;
   stepNumber: number;
   numberOfSteps: number;
+  gasEstimate: Decimal;
+  action: () => Promise<A>;
 };
 
-type WhitelistStep = {
-  type: {
+export type WhitelistStep = BaseStep<
+  {
     name: 'whitelist';
-  };
-  action: () => Promise<TransactionResponse>;
-} & BaseStep;
+  },
+  TransactionResponse
+>;
 
-type PermitStep<T extends Token> = {
-  type: {
+export type PermitStep<T extends Token> = BaseStep<
+  {
     name: 'permit';
     token: T;
-  };
-  action: () => Promise<ERC20PermitSignatureStruct>;
-} & BaseStep;
+  },
+  ERC20PermitSignatureStruct
+>;
 
-type ApproveStep<T extends Token> = {
-  type: {
+export type ApproveStep<T extends Token> = BaseStep<
+  {
     name: 'approve';
     token: T;
-  };
-  action: () => Promise<TransactionResponse>;
-} & BaseStep;
+  },
+  TransactionResponse
+>;
 
 export async function* getWhitelistStep(
   positionManager: PositionManager,
@@ -40,13 +44,19 @@ export async function* getWhitelistStep(
   stepNumber: number,
   numberOfSteps: number,
 ): AsyncGenerator<WhitelistStep, void, unknown> {
+  const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(positionManager.whitelistDelegate, [
+    delegatorAddress,
+    true,
+  ]);
+
   yield {
     type: {
       name: 'whitelist',
     },
     stepNumber,
     numberOfSteps,
-    action: () => sendTransactionWithGasLimit(positionManager.whitelistDelegate, [delegatorAddress, true]),
+    gasEstimate,
+    action: sendTransaction,
   };
 }
 
@@ -69,6 +79,7 @@ export function* getSignTokenPermitStep<T extends Token>(
       },
       stepNumber,
       numberOfSteps,
+      gasEstimate: Decimal.ZERO,
       action: () => createPermitSignature(token, signer, approveAmount, spenderAddress, tokenContract),
     });
 
@@ -88,6 +99,10 @@ export async function* getApproveTokenStep<T extends Token>(
   numberOfSteps: number,
 ): AsyncGenerator<ApproveStep<T>, void, unknown> {
   const tokenDecimals = RaftConfig.networkConfig.tokens[token].decimals;
+  const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(tokenContract.approve, [
+    spenderAddress,
+    approveAmount.toBigInt(tokenDecimals),
+  ]);
 
   yield {
     type: {
@@ -96,8 +111,8 @@ export async function* getApproveTokenStep<T extends Token>(
     },
     stepNumber,
     numberOfSteps,
-    action: () =>
-      sendTransactionWithGasLimit(tokenContract.approve, [spenderAddress, approveAmount.toBigInt(tokenDecimals)]),
+    gasEstimate,
+    action: sendTransaction,
   };
 }
 

@@ -3,7 +3,7 @@ import { Overrides, StateMutability, TypedContractMethod } from '../typechain/co
 import { Signer, TransactionResponse, hexlify } from 'ethers';
 import { ETH_PRECISION } from '../constants';
 
-interface BuiltTransactionData {
+export interface BuiltTransactionData {
   sendTransaction: () => Promise<TransactionResponse>;
   gasEstimate: Decimal;
   gasLimit: Decimal;

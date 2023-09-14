@@ -18,7 +18,7 @@ export {
   type PositionTransactionType,
 } from './position';
 export {
-  type ManageSavingsStep,
+  type SavingsStep,
   type SavingsTransaction,
   type SavingsTransactionType,
   UserSavings,
