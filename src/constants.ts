@@ -30,7 +30,6 @@ export const CHAI_PRECISION = 18;
 export const BORROWING_RATE_PRECISION = 18;
 export const INDEX_INCREASE_PRECISION = 18;
 export const ETH_PRECISION = 18;
-export const STETH_RATE_PRECISION = 18;
 export const RR_PRECISION = 18;
 export const RAFT_DEBT_TOKEN_PRECISION = 18;
 export const RAFT_COLLATERAL_TOKEN_PRECISION = 18;

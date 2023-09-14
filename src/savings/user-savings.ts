@@ -2,7 +2,7 @@ import { Signer, TransactionResponse } from 'ethers';
 import request, { gql } from 'graphql-request';
 import { Decimal } from '@tempusfinance/decimal';
 import { ERC20PermitSignatureStruct } from '../typechain/RSavingsModule';
-import { R_TOKEN, TransactionWithFeesOptions } from '../types';
+import { R_TOKEN, Token, TransactionWithFeesOptions } from '../types';
 import { createPermitSignature, EMPTY_PERMIT_SIGNATURE, isEoaAddress, sendTransactionWithGasLimit } from '../utils';
 import { ERC20, ERC20Permit, ERC20Permit__factory } from '../typechain';
 import { RaftConfig } from '../config';
@@ -120,6 +120,7 @@ export class UserSavings extends Savings {
     let rPermitSignature = EMPTY_PERMIT_SIGNATURE;
     if (rTokenApprovalStepNeeded) {
       rPermitSignature = yield* this.getApproveOrPermitStep(
+        R_TOKEN,
         this.rToken,
         amount,
         RaftConfig.networkConfig.rSavingsModule,
@@ -224,6 +225,7 @@ export class UserSavings extends Savings {
   }
 
   private *getSignTokenPermitStep(
+    token: Token,
     tokenContract: ERC20Permit,
     approveAmount: Decimal,
     spenderAddress: string,
@@ -239,7 +241,7 @@ export class UserSavings extends Savings {
         },
         stepNumber: getStepNumber(),
         numberOfSteps,
-        action: () => createPermitSignature(this.user, approveAmount, spenderAddress, tokenContract),
+        action: () => createPermitSignature(token, this.user, approveAmount, spenderAddress, tokenContract),
       });
 
     if (!signature) {
@@ -263,12 +265,13 @@ export class UserSavings extends Savings {
       stepNumber: getStepNumber(),
       numberOfSteps,
       action: () =>
-        // We are approving only R token for R Savings Module
+        // We are approving only R token for R Savings Rate
         tokenContract.approve(spenderAddress, approveAmount.toBigInt(RaftConfig.networkConfig.tokens.R.decimals)),
     };
   }
 
   private *getApproveOrPermitStep(
+    token: Token,
     tokenContract: ERC20 | ERC20Permit,
     approveAmount: Decimal,
     spenderAddress: string,
@@ -281,6 +284,7 @@ export class UserSavings extends Savings {
 
     if (canUsePermit) {
       permitSignature = yield* this.getSignTokenPermitStep(
+        token,
         tokenContract,
         approveAmount,
         spenderAddress,

@@ -69,7 +69,7 @@ export function* getSignTokenPermitStep<T extends Token>(
       },
       stepNumber,
       numberOfSteps,
-      action: () => createPermitSignature(signer, approveAmount, spenderAddress, tokenContract),
+      action: () => createPermitSignature(token, signer, approveAmount, spenderAddress, tokenContract),
     });
 
   if (!signature) {
