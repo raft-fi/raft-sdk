@@ -1,5 +1,5 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { Signer, ContractTransactionResponse, TransactionResponse, ethers } from 'ethers';
+import { Signer, ContractTransactionResponse, TransactionResponse, ethers, AddressLike } from 'ethers';
 import { request, gql } from 'graphql-request';
 import { getTokenAllowance } from '../allowance';
 import { RaftConfig, SupportedCollateralTokens } from '../config';
@@ -416,7 +416,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     const isClosePosition = leverage.equals(1) && actualPrincipalCollateralChange.isZero();
     const collateralTokenContract = getTokenContract(collateralToken, this.user);
     const collateralTokenAllowanceRequired = collateralTokenContract !== null && isPrincipalCollateralIncrease;
-    const userAddress = await this.getUserAddress();
 
     if (slippage.gt(SWAP_ROUTER_MAX_SLIPPAGE[swapRouter])) {
       throw new Error(
@@ -444,10 +443,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
     if (isDelegateWhitelisted === undefined) {
-      isDelegateWhitelisted = await this.isDelegateWhitelisted(
-        RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
-        userAddress,
-      );
+      isDelegateWhitelisted = await this.isDelegateWhitelisted(RaftConfig.networkConfig.oneInchOneStepLeverageStEth);
     }
 
     // In case the collateral token allowance check is not passed externally, check the allowance
@@ -456,7 +452,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         collateralTokenAllowance = await getTokenAllowance(
           collateralToken,
           collateralTokenContract,
-          userAddress,
+          this.user,
           RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
         );
       } else {
@@ -677,12 +673,12 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
   /**
    * Checks if delegate for a given collateral token is whitelisted for the position owner.
-   * @param collateralToken Collateral token to check the whitelist for.
+   * @param delegate The delegate to check.
    * @returns True if the delegate is whitelisted or the collateral token is the position's underlying collateral token,
    * otherwise false.
    */
-  public async isDelegateWhitelisted(delegateAddress: string, userAddress: string): Promise<boolean> {
-    return await this.positionManager.isDelegateWhitelisted(userAddress, delegateAddress);
+  public async isDelegateWhitelisted(delegate: AddressLike): Promise<boolean> {
+    return await this.positionManager.isDelegateWhitelisted(this.user, delegate);
   }
 
   /**

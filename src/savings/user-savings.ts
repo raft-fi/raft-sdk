@@ -65,7 +65,6 @@ export interface SavingsTransaction {
 }
 
 export class UserSavings extends Savings {
-  private userAddress: string;
   private user: Signer;
   private rToken: ERC20Permit;
 
@@ -73,7 +72,6 @@ export class UserSavings extends Savings {
     super(user);
 
     this.user = user;
-    this.userAddress = '';
     this.rToken = getTokenContract(R_TOKEN, this.user);
   }
 
@@ -90,8 +88,7 @@ export class UserSavings extends Savings {
 
     let { rTokenAllowance } = options;
 
-    const userAddress = await this.getUserAddress();
-    const isEoaSavingsOwner = await isEoaAddress(userAddress, this.user);
+    const isEoaSavingsOwner = await isEoaAddress(this.user, this.user);
     const isSavingsIncrease = amount.gt(Decimal.ZERO);
     const rTokenAllowanceRequired = isSavingsIncrease;
     const canUsePermit = isEoaSavingsOwner && approvalType === 'permit';
@@ -99,7 +96,7 @@ export class UserSavings extends Savings {
     // In case the R token allowance check is not passed externally, check the allowance
     if (rTokenAllowance === undefined) {
       rTokenAllowance = rTokenAllowanceRequired
-        ? await getTokenAllowance(R_TOKEN, this.rToken, userAddress, RaftConfig.networkConfig.rSavingsModule)
+        ? await getTokenAllowance(R_TOKEN, this.rToken, this.user, RaftConfig.networkConfig.rSavingsModule)
         : Decimal.MAX_DECIMAL;
     }
 
@@ -131,7 +128,7 @@ export class UserSavings extends Savings {
       if (canUsePermit) {
         builtTransactionData = await buildTransactionWithGasLimit(
           this.rSavingsModuleContract.depositWithPermit,
-          [amount.abs().toBigInt(RR_PRECISION), userAddress, rPermitSignature],
+          [amount.abs().toBigInt(RR_PRECISION), this.user, rPermitSignature],
           gasLimitMultiplier,
           frontendTag,
           this.user,
@@ -139,7 +136,7 @@ export class UserSavings extends Savings {
       } else {
         builtTransactionData = await buildTransactionWithGasLimit(
           this.rSavingsModuleContract.deposit,
-          [amount.abs().toBigInt(RR_PRECISION), userAddress],
+          [amount.abs().toBigInt(RR_PRECISION), this.user],
           gasLimitMultiplier,
           frontendTag,
           this.user,
@@ -148,7 +145,7 @@ export class UserSavings extends Savings {
     } else {
       builtTransactionData = await buildTransactionWithGasLimit(
         this.rSavingsModuleContract.withdraw,
-        [amount.abs().toBigInt(RaftConfig.networkConfig.tokens.R.decimals), userAddress, userAddress],
+        [amount.abs().toBigInt(RaftConfig.networkConfig.tokens.R.decimals), this.user, this.user],
         gasLimitMultiplier,
         frontendTag,
         this.user,
@@ -173,11 +170,7 @@ export class UserSavings extends Savings {
    * @returns The address of the owner.
    */
   public async getUserAddress(): Promise<string> {
-    if (this.userAddress === '') {
-      this.userAddress = await this.user.getAddress();
-    }
-
-    return this.userAddress;
+    return this.user.getAddress();
   }
 
   public async currentSavings(): Promise<Decimal> {
