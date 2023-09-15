@@ -70,11 +70,14 @@ export class PriceFeed {
 
     const priceFeed = await this.loadPriceFeed(token);
 
-    // Price feed is always 18 decimals
+    // In case of tokens that don't have 18-decimal precision, we need to adjust the precision of the
+    // price feed result.
+    const decimals = 2 * Decimal.PRECISION - RaftConfig.networkConfig.tokens[token].decimals;
+
     if (RaftConfig.isTestNetwork) {
-      return new Decimal(await priceFeed.getPrice.staticCall());
+      return new Decimal(await priceFeed.getPrice.staticCall(), decimals);
     } else {
-      return new Decimal(await priceFeed.lastGoodPrice.staticCall());
+      return new Decimal(await priceFeed.lastGoodPrice.staticCall(), decimals);
     }
   }
 
