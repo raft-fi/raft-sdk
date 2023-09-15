@@ -1,4 +1,4 @@
-import { Signer, TransactionResponse } from 'ethers';
+import { AddressLike, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
 import {
@@ -97,7 +97,7 @@ export abstract class BasePositionManaging {
     collateralChange: Decimal,
     debtChange: Decimal,
     underlyingCollateralToken: U,
-    checkIfDelegateWhitelisted: (delegate: string, user: string) => Promise<boolean>,
+    checkIfDelegateWhitelisted: (delegate: AddressLike) => Promise<boolean>,
     options: Required<ManagePositionOptions<SupportedCollateralTokens[U]>> & ManagePositionStepsPrefetch,
   ): AsyncGenerator<ManagePositionStep, void, ERC20PermitSignatureStruct | undefined> {
     const {
@@ -192,7 +192,7 @@ export abstract class BasePositionManaging {
     options: Required<ManagePositionOptions<SupportedCollateralTokens[U]>> & ManagePositionStepsPrefetch,
   ): Promise<PermitChecks> {
     const { collateralToken, approvalType = 'permit' } = options;
-    const isEoaPositionOwner = await isEoaAddress(await this.user.getAddress(), this.user);
+    const isEoaPositionOwner = await isEoaAddress(this.user, this.user);
     const collateralTokenConfig = RaftConfig.networkConfig.tokens[collateralToken as Token];
 
     return {
@@ -207,7 +207,7 @@ export abstract class BasePositionManaging {
     collateralTokenContract: ERC20 | ERC20Permit,
     underlyingCollateralToken: U,
     positionManagerAddress: string,
-    checkIfDelegateWhitelisted: (delegate: string, user: string) => Promise<boolean>,
+    checkIfDelegateWhitelisted: (delegate: AddressLike) => Promise<boolean>,
     permitChecks: PermitChecks,
     options: Required<ManagePositionOptions<SupportedCollateralTokens[U] | U>> & ManagePositionStepsPrefetch,
   ): Promise<NeededSteps> {
@@ -225,26 +225,23 @@ export abstract class BasePositionManaging {
     const collateralTokenAllowanceRequired = collateralTokenContract !== null && isCollateralIncrease;
     const rTokenAllowanceRequired =
       (!interestRateVault && !isDebtIncrease && !isUnderlyingToken) || (interestRateVault && !isDebtIncrease);
-    const userAddress = await this.user.getAddress();
 
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
     if (isDelegateWhitelisted === undefined) {
-      isDelegateWhitelisted = whitelistingRequired
-        ? await checkIfDelegateWhitelisted(positionManagerAddress, userAddress)
-        : false;
+      isDelegateWhitelisted = whitelistingRequired ? await checkIfDelegateWhitelisted(positionManagerAddress) : false;
     }
 
     // In case the collateral token allowance check is not passed externally, check the allowance
     if (collateralTokenAllowance === undefined) {
       collateralTokenAllowance = collateralTokenAllowanceRequired
-        ? await getTokenAllowance(collateralToken, collateralTokenContract, userAddress, positionManagerAddress)
+        ? await getTokenAllowance(collateralToken, collateralTokenContract, this.user, positionManagerAddress)
         : Decimal.MAX_DECIMAL;
     }
 
     // In case the R token allowance check is not passed externally, check the allowance
     if (rTokenAllowance === undefined) {
       rTokenAllowance = rTokenAllowanceRequired
-        ? await getTokenAllowance(R_TOKEN, this.rToken, userAddress, positionManagerAddress)
+        ? await getTokenAllowance(R_TOKEN, this.rToken, this.user, positionManagerAddress)
         : Decimal.MAX_DECIMAL;
     }
 
@@ -290,14 +287,13 @@ export class InterestRatePositionManaging extends BasePositionManaging {
       RaftConfig.networkConfig.interestRatePositionManager,
       this.user,
     ).managePosition;
-    const userAddress = await this.user.getAddress();
 
     return () =>
       sendTransactionWithGasLimit(
         method,
         [
           RaftConfig.getTokenAddress(collateralToken),
-          userAddress,
+          this.user,
           ...this.getAbsValueAndIsIncrease(collateralChange),
           ...this.getAbsValueAndIsIncrease(debtChange),
           maxFeePercentage.value,
@@ -321,14 +317,13 @@ export class UnderlyingCollateralTokenPositionManaging extends BasePositionManag
       gasLimitMultiplier,
       frontendTag,
     } = args;
-    const userAddress = await this.user.getAddress();
 
     return () =>
       sendTransactionWithGasLimit(
         this.positionManager.managePosition,
         [
           RaftConfig.getTokenAddress(collateralToken),
-          userAddress,
+          this.user,
           ...this.getAbsValueAndIsIncrease(collateralChange),
           ...this.getAbsValueAndIsIncrease(debtChange),
           maxFeePercentage.value,

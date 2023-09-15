@@ -1,5 +1,5 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { Signature, Signer, ZeroAddress } from 'ethers';
+import { AddressLike, Signature, Signer, ZeroAddress } from 'ethers';
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
 import { ERC20Permit } from '../typechain';
 import { RaftConfig } from '../config';
@@ -45,12 +45,14 @@ export async function createPermitSignature(
   token: Token,
   signer: Signer,
   amount: Decimal,
-  spenderAddress: string,
+  spender: AddressLike,
   tokenContract: ERC20Permit,
 ): Promise<ERC20PermitSignatureStruct> {
-  const signerAddress = await signer.getAddress();
-  const [nonce, tokenAddress, tokenName] = await Promise.all([
-    tokenContract.nonces(signerAddress),
+  const resolvedSpender = await Promise.resolve(spender);
+  const [signerAddress, spenderAddress, nonce, tokenAddress, tokenName] = await Promise.all([
+    signer.getAddress(),
+    typeof resolvedSpender === 'string' ? resolvedSpender : resolvedSpender.getAddress(),
+    tokenContract.nonces(signer),
     tokenContract.getAddress(),
     tokenContract.name(),
   ]);

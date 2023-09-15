@@ -113,10 +113,9 @@ export class Bridge {
 
     const sourceTokenPrecision = BRIDGE_NETWORKS[sourceChainName].tokenDecimals;
     const sourceChainTokenAddress = BRIDGE_NETWORKS[sourceChainName].tokenAddress;
-    const sourceChainRouterAddress = BRIDGE_NETWORKS[sourceChainName].routerAddress;
     const destinationChainSelector = BRIDGE_NETWORKS[destinationChainName].chainSelector;
 
-    const sourceChainRouter = CCIPRouter__factory.connect(sourceChainRouterAddress, this.user);
+    const sourceChainRouter = CCIPRouter__factory.connect(BRIDGE_NETWORKS[sourceChainName].routerAddress, this.user);
 
     const tokenAmounts = [
       {
@@ -146,7 +145,7 @@ export class Bridge {
     const sourceChainTokenContract = ERC20__factory.connect(sourceChainTokenAddress, this.user);
 
     if (rTokenAllowance === undefined) {
-      rTokenAllowance = await getTokenAllowance(R_TOKEN, sourceChainTokenContract, this.user, sourceChainRouterAddress);
+      rTokenAllowance = await getTokenAllowance(R_TOKEN, sourceChainTokenContract, this.user, sourceChainRouter);
     }
 
     const tokenApprovalNeeded = amountToBridge.gt(rTokenAllowance);
@@ -159,7 +158,7 @@ export class Bridge {
         R_TOKEN,
         sourceChainTokenContract,
         amountToBridge,
-        sourceChainRouterAddress,
+        sourceChainRouter,
         stepCounter++,
         numberOfSteps,
       );
@@ -281,7 +280,7 @@ export class Bridge {
 
     const tokenContract = ERC20__factory.connect(tokenAddress, provider);
 
-    const balance = await tokenContract.balanceOf(await this.user.getAddress());
+    const balance = await tokenContract.balanceOf(this.user);
 
     return new Decimal(balance, tokenDecimals);
   }
@@ -298,7 +297,7 @@ export class Bridge {
 
     const tokenContract = ERC20__factory.connect(tokenAddress, provider);
 
-    const allowance = await tokenContract.allowance(await this.user.getAddress(), spender);
+    const allowance = await tokenContract.allowance(this.user, spender);
 
     return new Decimal(allowance, tokenDecimals);
   }

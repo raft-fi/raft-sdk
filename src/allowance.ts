@@ -16,7 +16,7 @@ export async function getTokenAllowance(
   token: Token,
   tokenContract: ERC20 | ERC20Permit | null,
   owner: AddressLike,
-  spender: string,
+  spender: AddressLike,
 ): Promise<Decimal> {
   const tokenConfig = RaftConfig.networkConfig.tokens[token];
   return tokenContract !== null
@@ -28,21 +28,21 @@ export class Allowance {
   protected readonly token: Token;
 
   private allowance: Decimal | null = null;
-  private walletAddress: string;
-  private spender: string;
+  private owner: AddressLike;
+  private spender: AddressLike;
   private provider: JsonRpcProvider;
   private tokenContract: ERC20Permit | ERC20 | null;
 
   /**
    * Creates a new representation of an allowance.
    * @param token The token for the allowance.
-   * @param walletAddress Wallet to check allowance for.
+   * @param owner Wallet to check allowance for.
    * @param spender Address to which allowance belongs.
    * @param provider: Provider to use for data fetching.
    */
-  public constructor(token: Token, walletAddress: string, spender: string, provider: JsonRpcProvider) {
+  public constructor(token: Token, owner: AddressLike, spender: AddressLike, provider: JsonRpcProvider) {
     this.token = token;
-    this.walletAddress = walletAddress;
+    this.owner = owner;
     this.spender = spender;
     this.provider = provider;
 
@@ -53,7 +53,7 @@ export class Allowance {
    * Fetches and returns token allowance.
    */
   public async fetchAllowance(): Promise<Decimal | null> {
-    this.allowance = await getTokenAllowance(this.token, this.tokenContract, this.walletAddress, this.spender);
+    this.allowance = await getTokenAllowance(this.token, this.tokenContract, this.owner, this.spender);
 
     return this.allowance;
   }

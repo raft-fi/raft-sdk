@@ -1,4 +1,4 @@
-import { ContractRunner } from 'ethers';
+import { AddressLike, ContractRunner } from 'ethers';
 
 /**
  * Check if the address is an EOA address.
@@ -6,7 +6,7 @@ import { ContractRunner } from 'ethers';
  * @param contractRunner The contract runner.
  * @returns True if the address is an EOA address.
  */
-export async function isEoaAddress(address: string, contractRunner: ContractRunner) {
+export async function isEoaAddress(address: AddressLike, contractRunner: ContractRunner) {
   const code = await contractRunner.provider?.getCode(address);
   return code === '0x';
 }

@@ -1,5 +1,5 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { Signer, TransactionResponse } from 'ethers';
+import { AddressLike, Signer, TransactionResponse } from 'ethers';
 import { ERC20, ERC20Permit } from '../typechain';
 import { Token } from '../types';
 import { ERC20PermitSignatureStruct, PositionManager } from '../typechain/PositionManager';
@@ -65,7 +65,7 @@ export function* getSignTokenPermitStep<T extends Token>(
   token: T,
   tokenContract: ERC20Permit,
   approveAmount: Decimal,
-  spenderAddress: string,
+  spender: AddressLike,
   stepNumber: number,
   numberOfSteps: number,
   cachedSignature?: ERC20PermitSignatureStruct,
@@ -80,7 +80,7 @@ export function* getSignTokenPermitStep<T extends Token>(
       stepNumber,
       numberOfSteps,
       gasEstimate: Decimal.ZERO,
-      action: () => createPermitSignature(token, signer, approveAmount, spenderAddress, tokenContract),
+      action: () => createPermitSignature(token, signer, approveAmount, spender, tokenContract),
     });
 
   if (!signature) {
@@ -94,13 +94,13 @@ export async function* getApproveTokenStep<T extends Token>(
   token: T,
   tokenContract: ERC20 | ERC20Permit,
   approveAmount: Decimal,
-  spenderAddress: string,
+  spender: AddressLike,
   stepNumber: number,
   numberOfSteps: number,
 ): AsyncGenerator<ApproveStep<T>, void, unknown> {
   const tokenDecimals = RaftConfig.networkConfig.tokens[token].decimals;
   const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(tokenContract.approve, [
-    spenderAddress,
+    spender,
     approveAmount.toBigInt(tokenDecimals),
   ]);
 
@@ -121,7 +121,7 @@ export async function* getPermitOrApproveTokenStep<T extends Token>(
   token: T,
   tokenContract: ERC20 | ERC20Permit,
   approveAmount: Decimal,
-  spenderAddress: string,
+  spender: AddressLike,
   stepNumber: number,
   numberOfSteps: number,
   canUsePermit: boolean,
@@ -135,13 +135,13 @@ export async function* getPermitOrApproveTokenStep<T extends Token>(
       token,
       tokenContract,
       approveAmount,
-      spenderAddress,
+      spender,
       stepNumber,
       numberOfSteps,
       cachedPermitSignature,
     );
   } else {
-    yield* getApproveTokenStep(token, tokenContract, approveAmount, spenderAddress, stepNumber, numberOfSteps);
+    yield* getApproveTokenStep(token, tokenContract, approveAmount, spender, stepNumber, numberOfSteps);
   }
 
   return permitSignature;
