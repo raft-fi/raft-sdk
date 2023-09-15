@@ -57,7 +57,7 @@ export class RaftConfig {
       return 'rETH';
     }
     if (tokenTicker === 'wcrETH-v1') {
-      return 'wcrETH' as Token;
+      return 'wcrETH-v1';
     }
 
     return tokenTicker ?? null;
