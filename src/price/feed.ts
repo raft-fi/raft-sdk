@@ -62,6 +62,12 @@ export class PriceFeed {
   }
 
   private async fetchPriceFromPriceFeed(token: UnderlyingCollateralToken): Promise<Decimal> {
+    const priceFeedAddress = RaftConfig.networkConfig.priceFeeds[token];
+    if (priceFeedAddress === '') {
+      console.warn(`Price feed for collateral token ${token} is not set in config!`);
+      return Decimal.ZERO;
+    }
+
     const priceFeed = await this.loadPriceFeed(token);
 
     // Price feed is always 18 decimals
