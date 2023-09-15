@@ -277,6 +277,10 @@ export class Protocol {
     await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
         const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
+        if (!collateralTokenAddress) {
+          console.warn(`Collateral token ${collateralToken} does not have address defined in config!`);
+          return;
+        }
 
         this._borrowingRate[collateralToken] = new Decimal(
           await this.positionManager.getBorrowingRate(collateralTokenAddress),
@@ -292,6 +296,12 @@ export class Protocol {
     await Promise.all(
       VAULTS_V2.map(async collateralToken => {
         const interestRateDebtTokenAddress = RaftConfig.networkConfig.raftDebtTokens[collateralToken];
+        if (!interestRateDebtTokenAddress) {
+          console.warn(
+            `Collateral token ${collateralToken} does not have interest rate debt token address defined in config!`,
+          );
+          return;
+        }
 
         const interestRateDebtToken = getInterestRateDebtTokenContract(interestRateDebtTokenAddress, this.provider);
 
