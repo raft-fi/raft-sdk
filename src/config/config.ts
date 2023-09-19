@@ -16,6 +16,7 @@ const networkIds: Record<SupportedNetwork, number> = {
 export class RaftConfig {
   private static _network: SupportedNetwork = 'mainnet';
   private static _subgraphEndpoint = '';
+  private static _balancerSubgraphEndpoint = '';
 
   public static setNetwork(network: SupportedNetwork) {
     this._network = network;
@@ -23,6 +24,10 @@ export class RaftConfig {
 
   public static setSubgraphEndpoint(subgraphEndpoint: string) {
     this._subgraphEndpoint = subgraphEndpoint;
+  }
+
+  public static setBalancerSubgraphEndpoint(balancerSubgraphEndpoint: string) {
+    this._balancerSubgraphEndpoint = balancerSubgraphEndpoint;
   }
 
   static get networkId(): number {
@@ -39,6 +44,10 @@ export class RaftConfig {
 
   static get subgraphEndpoint(): string {
     return this._subgraphEndpoint;
+  }
+
+  static get balancerSubgraphEndpoint(): string {
+    return this._balancerSubgraphEndpoint;
   }
 
   static getTokenAddress(token: Token): string {
@@ -62,9 +71,10 @@ export class RaftConfig {
 
   static getPositionManagerAddress<U extends UnderlyingCollateralToken>(
     underlyingCollateralToken: U,
-    collateralToken: SupportedCollateralTokens[U],
+    collateralToken?: U | SupportedCollateralTokens[U],
   ): string {
-    return this.networkConfig.underlyingTokens[underlyingCollateralToken].supportedCollateralTokens[collateralToken]
+    const usedCollateralToken = collateralToken ?? underlyingCollateralToken;
+    return this.networkConfig.underlyingTokens[underlyingCollateralToken].supportedCollateralTokens[usedCollateralToken]
       .positionManager;
   }
 }

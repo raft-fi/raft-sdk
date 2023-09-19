@@ -1,7 +1,7 @@
-import { JsonRpcProvider } from 'ethers';
+import { Provider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { Token } from './types';
-import { ERC20, ERC20Permit } from './typechain';
+import { ERC20, ERC20Permit, WstETH } from './typechain';
 import { getTokenContract } from './utils';
 import { RaftConfig } from './config';
 import { ETH_PRECISION } from './constants';
@@ -11,8 +11,8 @@ export class Balance {
 
   private balance: Decimal | null = null;
   private walletAddress: string;
-  private provider: JsonRpcProvider;
-  private tokenContract: ERC20Permit | ERC20 | null;
+  private provider: Provider;
+  private tokenContract: ERC20Permit | ERC20 | WstETH;
 
   /**
    * Creates a new representation of a balance.
@@ -20,11 +20,10 @@ export class Balance {
    * @param walletAddress Wallet to which balance belongs.
    * @param provider: Provider to use for data fetching.
    */
-  public constructor(token: Token, walletAddress: string, provider: JsonRpcProvider) {
+  public constructor(token: Token, walletAddress: string, provider: Provider) {
     this.token = token;
     this.walletAddress = walletAddress;
     this.provider = provider;
-
     this.tokenContract = getTokenContract(this.token, this.provider);
   }
 

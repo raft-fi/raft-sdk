@@ -148,12 +148,26 @@ const tokensConfig: Record<Token, TokenConfig> = {
     supportsPermit: false,
     priceFeed: 'swETH',
   },
+  RAFT: {
+    address: '0xfa8449189744799ad2ace7e0ebac8bb7575eff47', // TODO: update address
+    ticker: 'RAFT',
+    decimals: 18,
+    supportsPermit: true,
+    priceFeed: Decimal.ONE, // TODO: update price feed
+  },
   R: {
     address: '0x9b41fE4EE4F23507953CCA339A4eC27eAc9e02b8',
     ticker: 'R',
     decimals: 18,
     supportsPermit: true,
     priceFeed: Decimal.ONE,
+  },
+  'B-80RAFT-20R': {
+    address: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00', // TODO: update address
+    ticker: 'B-80RAFT-20R',
+    decimals: 18,
+    supportsPermit: true,
+    priceFeed: Decimal.ONE, // TODO: update price feed
   },
 };
 
@@ -200,4 +214,11 @@ export const goerliConfig: NetworkConfig = {
   daiAddress: '', // Add address if we ever deploy one step leverage on goerli
   testNetwork: true,
   rSavingsModule: '0xDeEae93bf4bdA40529Fe5769Dd817996e86eb4Dd',
+  // deploy merkle-distributor everytime
+  raftAirdropAddress: '0x552e7271Dd11502BfaAD488140F3de9ca15bEd84',
+  claimRaftStakeVeRaftAddress: '0x2b1ad5011846D737fc13F2D3ed238C62942e4410',
+  // this is veBAL
+  veRaftAddress: '0x33A99Dcc4C85C014cf12626959111D5898bbCAbF',
+  // this is veBAL/WETH pool
+  balancerWeightedPoolId: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00000200000000000000000060',
 };

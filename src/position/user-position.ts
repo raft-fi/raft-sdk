@@ -9,6 +9,7 @@ import OneInchOneStepLeverageStETHABI from './../abi/OneInchOneStepLeverageStETH
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
 import {
   CollateralToken,
+  R_TOKEN,
   SwapRouter,
   Token,
   TransactionWithFeesOptions,
@@ -419,7 +420,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     if (slippage.gt(SWAP_ROUTER_MAX_SLIPPAGE[swapRouter])) {
       throw new Error(
-        `Slippage (${slippage.toTruncated(4)}) should not be greater than ${SWAP_ROUTER_MAX_SLIPPAGE[swapRouter]}`,
+        `Slippage (${slippage.toTruncated(4)}) should not be greater than ${SWAP_ROUTER_MAX_SLIPPAGE[
+          swapRouter
+        ].toTruncated(4)}`,
       );
     }
 
@@ -493,7 +496,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
 
     const underlyingCollateralTokenAddress = RaftConfig.getTokenAddress(this.underlyingCollateralToken);
-    const rAddress = RaftConfig.networkConfig.tokens['R'].address;
+    const rAddress = RaftConfig.getTokenAddress(R_TOKEN);
 
     if (collateralToken === 'wstETH' || collateralToken === 'stETH') {
       if (!underlyingCollateralPrice) {
@@ -602,6 +605,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       }
 
       const collateralDecimals = RaftConfig.networkConfig.tokens[collateralToken].decimals;
+      const method =
+        collateralToken === 'wstETH'
+          ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
+          : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH; // used to stETH
 
       yield {
         type: {
@@ -612,9 +619,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         // TODO: implement the actual leverage function
         action: () =>
           sendTransactionWithGasLimit(
-            collateralToken === 'wstETH'
-              ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
-              : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH, // used to stETH
+            method,
             [
               debtChange.abs().toBigInt(RAFT_DEBT_TOKEN_PRECISION),
               isDebtIncrease,

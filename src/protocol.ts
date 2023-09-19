@@ -7,8 +7,6 @@ import {
   ChaiToken__factory,
   ChainlinkDaiUsdAggregator__factory,
   ERC20Indexable__factory,
-  ERC20Permit,
-  PositionManager,
   WrappedCollateralToken,
 } from './typechain';
 import {
@@ -27,6 +25,8 @@ import {
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
   getInterestRateDebtTokenContract,
+  getRaftDebtToken,
+  getRaftCollateralToken,
 } from './utils';
 import {
   BORROWING_RATE_PRECISION,
@@ -34,7 +34,6 @@ import {
   CHAI_PRECISION,
   CHAI_RATE_PRECISION,
   CHAI_TOKEN_ADDRESS,
-  FLASH_MINT_FEE,
   INDEX_INCREASE_PRECISION,
   R_CHAI_PSM_ADDRESS,
   SECONDS_PER_YEAR,
@@ -48,14 +47,12 @@ interface PsmTvlData {
   usdValue: Decimal;
   daiLocked: Decimal;
 }
+const FLASH_MINT_FEE_PERCENTAGE_BASE = 10_000;
 
 export class Protocol {
   private static instance: Protocol;
 
   private provider: Provider;
-  private positionManager: PositionManager;
-  private rToken: ERC20Permit;
-
   private _collateralSupply: Record<UnderlyingCollateralToken, Decimal | null> = {
     'wstETH-v1': null,
     'wcrETH-v1': null,
@@ -95,8 +92,8 @@ export class Protocol {
     swETH: null,
   };
   private _openPositionCount: number | null = null;
-  private _flashMintFee: Decimal = FLASH_MINT_FEE;
   private _psmTvl: PsmTvlData | null = null;
+  private _flashMintFee: Decimal | null = null;
 
   /**
    * Creates a new representation of a stats class. Stats is a singleton, so constructor is set to private.
@@ -105,8 +102,6 @@ export class Protocol {
    */
   private constructor(provider: Provider) {
     this.provider = provider;
-    this.positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, this.provider);
-    this.rToken = getTokenContract(R_TOKEN, this.provider);
   }
 
   /**
@@ -172,16 +167,8 @@ export class Protocol {
   async fetchCollateralSupply(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
     await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
-        const collateralTokenAddress = RaftConfig.networkConfig.raftCollateralTokens[collateralToken];
-
-        // Return zero if address is not defined in config
-        if (!collateralTokenAddress) {
-          this._collateralSupply[collateralToken] = Decimal.ZERO;
-          return this._collateralSupply;
-        }
-
         const { decimals } = RaftConfig.networkConfig.tokens[collateralToken];
-        const contract = ERC20Indexable__factory.connect(collateralTokenAddress, this.provider);
+        const contract = getTokenContract(getRaftCollateralToken(collateralToken), this.provider);
 
         this._collateralSupply[collateralToken] = new Decimal(await contract.totalSupply(), decimals);
       }),
@@ -244,16 +231,8 @@ export class Protocol {
   async fetchDebtSupply(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
     await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
-        const debtTokenAddress = RaftConfig.networkConfig.raftDebtTokens[collateralToken];
-
-        // Return zero if address is not defined in config
-        if (!debtTokenAddress) {
-          this._debtSupply[collateralToken] = Decimal.ZERO;
-          return this._debtSupply;
-        }
-
         const { decimals } = RaftConfig.networkConfig.tokens[collateralToken];
-        const contract = ERC20Indexable__factory.connect(debtTokenAddress, this.provider);
+        const contract = getTokenContract(getRaftDebtToken(collateralToken), this.provider);
 
         this._debtSupply[collateralToken] = new Decimal(await contract.totalSupply(), decimals);
       }),
@@ -274,6 +253,8 @@ export class Protocol {
    * @returns Fetched borrowing rate.
    */
   async fetchBorrowingRate(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
+    const positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, this.provider);
+
     await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
         const collateralTokenAddress = RaftConfig.getTokenAddress(collateralToken);
@@ -283,7 +264,7 @@ export class Protocol {
         }
 
         this._borrowingRate[collateralToken] = new Decimal(
-          await this.positionManager.getBorrowingRate(collateralTokenAddress),
+          await positionManager.getBorrowingRate(collateralTokenAddress),
           BORROWING_RATE_PRECISION,
         );
       }),
@@ -338,11 +319,12 @@ export class Protocol {
   }
 
   /**
-   * Fetches flash mint fee for token R.
+   * Fetches flash mint fee for the R token.
    * @returns Fetched flash mint fee.
    */
-  async fetchFlashMintFee(): Promise<Decimal> {
-    // TODO: we should fetch this value from R token contract
+  public async fetchFlashMintFee(): Promise<Decimal> {
+    const rToken = getTokenContract(R_TOKEN, this.provider);
+    this._flashMintFee = new Decimal(await rToken.flashMintFeePercentage(), 0).div(FLASH_MINT_FEE_PERCENTAGE_BASE);
     return this._flashMintFee;
   }
 

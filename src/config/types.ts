@@ -18,7 +18,7 @@ export type SupportedCollateralTokens = {
 };
 
 export type UnderlyingCollateralTokenConfig<U extends UnderlyingCollateralToken> = {
-  supportedCollateralTokens: Record<SupportedCollateralTokens[U], CollateralTokenConfig>;
+  supportedCollateralTokens: Record<U | SupportedCollateralTokens[U], CollateralTokenConfig>;
 };
 
 export type UnderlyingTokens = {
@@ -39,7 +39,7 @@ export type CollateralTokenConfig = {
 export interface SubgraphPriceFeed {
   ticker: SubgraphPriceFeedToken;
   fallbackToken: UnderlyingCollateralToken;
-  getFallbackRate: (address: string, runner: ContractRunner) => Promise<Decimal>;
+  getFallbackRate: (runner: ContractRunner) => Promise<Decimal>;
 }
 
 export type TokenConfig = {
@@ -64,4 +64,10 @@ export interface NetworkConfig {
   testNetwork: boolean;
   daiAddress: string;
   rSavingsModule: string;
+  raftAirdropAddress: string;
+  claimRaftStakeVeRaftAddress: string;
+  // https://docs.balancer.fi/concepts/governance/veBAL/
+  veRaftAddress: string;
+  // 80/20 balancer weighted pool for RAFT/R
+  balancerWeightedPoolId: string;
 }

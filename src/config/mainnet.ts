@@ -1,7 +1,7 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { NetworkConfig, TokenConfig, UnderlyingTokens } from './types';
-import { Token } from '../types';
 import { getWstEthToStEthRate } from '../price';
+import { Token } from '../types';
 
 const POSITION_MANAGER_ADDRESS = '0x5f59b322eb3e16a0c78846195af1f588b77403fc';
 const POSITION_MANAGER_STETH_ADDRESS = '0x839d6833cee34ffab6fa9057b39f02bd3091a1d6';
@@ -149,12 +149,26 @@ const tokensConfig: Record<Token, TokenConfig> = {
     supportsPermit: false,
     priceFeed: 'swETH',
   },
+  RAFT: {
+    address: '0x0000000000000000000000000000000000000000', // TODO: update address
+    ticker: 'RAFT',
+    decimals: 18,
+    supportsPermit: true,
+    priceFeed: Decimal.ONE, // TODO: update price feed
+  },
   R: {
     address: '0x183015a9ba6ff60230fdeadc3f43b3d788b13e21',
     ticker: 'R',
     decimals: 18,
     supportsPermit: true,
     priceFeed: Decimal.ONE,
+  },
+  'B-80RAFT-20R': {
+    address: '0x0000000000000000000000000000000000000000', // TODO: update address
+    ticker: 'B-80RAFT-20R',
+    decimals: 18,
+    supportsPermit: true,
+    priceFeed: Decimal.ONE, // TODO: update price feed
   },
 };
 
@@ -201,4 +215,11 @@ export const mainnetConfig: NetworkConfig = {
   daiAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   testNetwork: false,
   rSavingsModule: '0x2ba26bae6df1153e29813d7f926143f9c94402f3',
+  // TODO: wait for deployment
+  raftAirdropAddress: '0x0000000000000000000000000000000000000000',
+  claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
+  // TODO: update this to veRAFT
+  veRaftAddress: '0xC128a9954e6c874eA3d62ce62B468bA073093F25',
+  // TODO: update this to RAFT/R pool
+  balancerWeightedPoolId: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014',
 };

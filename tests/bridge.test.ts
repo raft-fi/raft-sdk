@@ -1,5 +1,6 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { AbiCoder, Signer } from 'ethers';
+import { describe, expect, it, Mock, vi } from 'vitest';
 import { Bridge, getTokenAllowance } from '../src';
 import { CCIPRouter__factory } from '../src/typechain';
 import { buildTransactionWithGasLimit } from '../src/utils';
@@ -11,31 +12,31 @@ const mockEoaSigner = {
   getAddress: () => Promise.resolve('0x123'),
 } as unknown as Signer;
 
-jest.mock('../src/allowance', () => ({
-  ...jest.requireActual('../src/allowance'),
-  getTokenAllowance: jest.fn(),
+vi.mock('../src/allowance', async () => ({
+  ...(await vi.importActual<typeof import('../src/allowance')>('../src/allowance')),
+  getTokenAllowance: vi.fn(),
 }));
 
-jest.mock('../src/bridge', () => ({
-  ...jest.requireActual('../src/bridge'),
-  getSourceChainRouterContract: jest.fn(),
+vi.mock('../src/bridge', async () => ({
+  ...(await vi.importActual<typeof import('../src/bridge')>('../src/bridge')),
+  getSourceChainRouterContract: vi.fn(),
 }));
 
-jest.mock('../src/utils/transactions', () => ({
-  ...jest.requireActual('../src/utils/transactions'),
-  buildTransactionWithGasLimit: jest.fn(),
+vi.mock('../src/utils/transactions', async () => ({
+  ...(await vi.importActual<typeof import('../src/utils/transactions')>('../src/utils/transactions')),
+  buildTransactionWithGasLimit: vi.fn(),
 }));
 
 describe('Bridge', () => {
   describe('getBridgeRSteps', () => {
     it('should generate steps [approve R + bridge] for bridging', async () => {
-      jest.spyOn(AbiCoder.defaultAbiCoder(), 'encode').mockReturnValue('0x');
-      jest.spyOn(CCIPRouter__factory, 'connect').mockReturnValue({
-        getFee: jest.fn().mockResolvedValue(0n),
+      vi.spyOn(AbiCoder.defaultAbiCoder(), 'encode').mockReturnValue('0x');
+      vi.spyOn(CCIPRouter__factory, 'connect').mockReturnValue({
+        getFee: vi.fn().mockResolvedValue(0n),
       } as never);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
-        sendTransaction: jest.fn(),
+      (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
       });
 

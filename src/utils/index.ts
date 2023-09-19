@@ -13,13 +13,18 @@ export {
 } from './steps';
 export { sendTransactionWithGasLimit, buildTransactionWithGasLimit, type BuiltTransactionData } from './transactions';
 export {
+  getRaftCollateralToken,
+  getRaftDebtToken,
   getTokenContract,
   getWrappedCappedCollateralToken,
   isCollateralToken,
   isInterestRateVault,
-  isUnderlyingCollateralToken,
+  isRaftCollateralToken,
+  isRaftDebtToken,
   isRToken,
+  isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
   getInterestRateDebtTokenContract,
 } from './token';
+export { getApproval } from './approve';

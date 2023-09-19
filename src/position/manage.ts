@@ -14,7 +14,7 @@ import {
 import { RaftConfig, SupportedCollateralTokens } from '../config';
 import { getTokenAllowance } from '../allowance';
 import { ERC20PermitSignatureStruct, PositionManager } from '../typechain/PositionManager';
-import { ERC20, ERC20Permit } from '../typechain';
+import { ERC20, ERC20Permit, WstETH } from '../typechain';
 
 export interface ManagePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'manage';
@@ -204,7 +204,7 @@ export abstract class BasePositionManaging {
   private async getNeededSteps<U extends UnderlyingCollateralToken>(
     collateralChange: Decimal,
     debtChange: Decimal,
-    collateralTokenContract: ERC20 | ERC20Permit,
+    collateralTokenContract: ERC20 | ERC20Permit | WstETH,
     underlyingCollateralToken: U,
     positionManagerAddress: string,
     checkIfDelegateWhitelisted: (delegate: AddressLike) => Promise<boolean>,
