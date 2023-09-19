@@ -1,6 +1,6 @@
 {
   "name": "@raft-fi/sdk",
-  "version": "0.5.5",
+  "version": "0.6.0",
   "type": "module",
   "main": "./dist/raft-sdk.umd.cjs",
   "module": "./dist/raft-sdk.js",
@@ -23,6 +23,7 @@
     }
   },
   "scripts": {
+    "anvil": "anvil --fork-url $ANVIL_FORK_URL --fork-block-number $ANVIL_BLOCK_NUMBER",
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",

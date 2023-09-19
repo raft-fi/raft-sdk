@@ -1,5 +1,10 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { MIN_COLLATERAL_RATIO, MIN_NET_DEBT } from '../constants';
+import {
+  MIN_COLLATERAL_RATIO,
+  MIN_NET_DEBT,
+  RAFT_COLLATERAL_TOKEN_PRECISION,
+  RAFT_DEBT_TOKEN_PRECISION,
+} from '../constants';
 import { ContractRunner } from 'ethers';
 import { CollateralToken, SwapRouter, Token, UnderlyingCollateralToken } from '../types';
 import { ERC20Indexable, ERC20Indexable__factory } from '../typechain';
@@ -309,7 +314,7 @@ export class PositionWithRunner extends Position {
   public async fetchCollateral(): Promise<Decimal> {
     const userAddress = await this.getUserAddress();
     const collateral = await this.indexCollateralToken.balanceOf(userAddress);
-    this.setCollateral(new Decimal(collateral, Decimal.PRECISION));
+    this.setCollateral(new Decimal(collateral, RAFT_COLLATERAL_TOKEN_PRECISION));
 
     return this.getCollateral();
   }
@@ -317,7 +322,7 @@ export class PositionWithRunner extends Position {
   public async fetchDebt(): Promise<Decimal> {
     const userAddress = await this.getUserAddress();
     const debt = await this.indexDebtToken.balanceOf(userAddress);
-    this.setDebt(new Decimal(debt, Decimal.PRECISION));
+    this.setDebt(new Decimal(debt, RAFT_DEBT_TOKEN_PRECISION));
 
     return this.getDebt();
   }

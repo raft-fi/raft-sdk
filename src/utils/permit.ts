@@ -1,8 +1,9 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { Signature, Signer, ZeroAddress } from 'ethers';
+import { AddressLike, Signature, Signer, ZeroAddress } from 'ethers';
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
 import { ERC20Permit } from '../typechain';
 import { RaftConfig } from '../config';
+import { Token } from '../types';
 
 const PERMIT_DEADLINE_SHIFT = 30 * 60; // 30 minutes
 
@@ -31,31 +32,34 @@ const TYPES = {
   ],
 };
 
-export function createEmptyPermitSignature(): ERC20PermitSignatureStruct {
-  return {
-    token: ZeroAddress,
-    value: 0,
-    deadline: 0,
-    v: 0,
-    r: '0x0000000000000000000000000000000000000000000000000000000000000000',
-    s: '0x0000000000000000000000000000000000000000000000000000000000000000',
-  };
-}
+export const EMPTY_PERMIT_SIGNATURE: ERC20PermitSignatureStruct = {
+  token: ZeroAddress,
+  value: 0,
+  deadline: 0,
+  v: 0,
+  r: '0x0000000000000000000000000000000000000000000000000000000000000000',
+  s: '0x0000000000000000000000000000000000000000000000000000000000000000',
+};
 
 export async function createPermitSignature(
+  token: Token,
   signer: Signer,
   amount: Decimal,
-  spenderAddress: string,
+  spender: AddressLike,
   tokenContract: ERC20Permit,
 ): Promise<ERC20PermitSignatureStruct> {
-  const signerAddress = await signer.getAddress();
-  const [nonce, tokenAddress, tokenName] = await Promise.all([
-    tokenContract.nonces(signerAddress),
+  const resolvedSpender = await Promise.resolve(spender);
+  const [signerAddress, spenderAddress, nonce, tokenAddress, tokenName] = await Promise.all([
+    signer.getAddress(),
+    typeof resolvedSpender === 'string' ? resolvedSpender : resolvedSpender.getAddress(),
+    tokenContract.nonces(signer),
     tokenContract.getAddress(),
     tokenContract.name(),
   ]);
 
   const deadline = Math.floor(Date.now() / 1000) + PERMIT_DEADLINE_SHIFT;
+
+  const decimals = RaftConfig.networkConfig.tokens[token].decimals;
 
   const domain = {
     name: tokenName,
@@ -66,7 +70,7 @@ export async function createPermitSignature(
   const values = {
     owner: signerAddress,
     spender: spenderAddress,
-    value: amount.toBigInt(Decimal.PRECISION),
+    value: amount.toBigInt(Number(decimals)),
     nonce,
     deadline,
   };
@@ -76,7 +80,7 @@ export async function createPermitSignature(
 
   return {
     token: tokenAddress,
-    value: amount.toBigInt(Decimal.PRECISION),
+    value: amount.toBigInt(Number(decimals)),
     deadline,
     v,
     r,

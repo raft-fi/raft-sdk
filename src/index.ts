@@ -18,7 +18,7 @@ export {
   type PositionTransactionType,
 } from './position';
 export {
-  type ManageSavingsStep,
+  type SavingsStep,
   type SavingsTransaction,
   type SavingsTransactionType,
   UserSavings,
@@ -41,5 +41,16 @@ export {
   type WrappableCappedCollateralToken,
   type WrappedCappedUnderlyingCollateralToken,
   type SwapRouter,
+  type VaultVersion,
+  type InterestRateVault,
 } from './types';
 export type { ERC20PermitSignatureStruct } from './typechain/PositionManager';
+export {
+  Bridge,
+  SUPPORTED_BRIDGE_NETWORKS,
+  BRIDGE_NETWORK_LANES,
+  BRIDGE_NETWORKS,
+  type BridgeTokensStep,
+  type BridgeTokensStepType,
+  type SupportedBridgeNetwork,
+} from './bridge';

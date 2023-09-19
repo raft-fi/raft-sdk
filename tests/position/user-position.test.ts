@@ -1,7 +1,13 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Signer } from 'ethers';
 import { ERC20PermitSignatureStruct, UserPosition, getTokenAllowance } from '../../src';
-import { createEmptyPermitSignature, createPermitSignature } from '../../src/utils';
+import {
+  buildTransactionWithGasLimit,
+  createPermitSignature,
+  EMPTY_PERMIT_SIGNATURE,
+  getPositionManagerContract,
+} from '../../src/utils';
+import { VaultV1 } from '../../src/types';
 
 jest.mock('../../src/allowance', () => ({
   ...jest.requireActual('../../src/allowance'),
@@ -13,14 +19,22 @@ jest.mock('../../src/utils/permit', () => ({
   createPermitSignature: jest.fn(),
 }));
 
+jest.mock('../../src/utils/position-manager', () => ({
+  ...jest.requireActual('../../src/utils/position-manager'),
+  getPositionManagerContract: jest.fn(),
+}));
+
+jest.mock('../../src/utils/transactions', () => ({
+  ...jest.requireActual('../../src/utils/transactions'),
+  buildTransactionWithGasLimit: jest.fn(),
+}));
+
 const mockEoaSigner = {
   provider: {
     getCode: () => Promise.resolve('0x'),
   },
   getAddress: () => Promise.resolve('0x123'),
 } as unknown as Signer;
-
-const EMPTY_SIGNATURE = createEmptyPermitSignature();
 
 describe('UserPosition', () => {
   beforeEach(() => {
@@ -30,13 +44,21 @@ describe('UserPosition', () => {
 
   describe('getManageSteps', () => {
     it('should fetch whitelist and allowance if they are not passed and required', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
       const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'stETH' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (getPositionManagerContract as jest.Mock).mockReturnValue({
+        managePosition: null,
+        whitelistDelegate: null,
+      });
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+      });
 
       const firstStep = await steps.next();
 
@@ -58,6 +80,9 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (getPositionManagerContract as jest.Mock).mockResolvedValue({
+        managePosition: null,
+      });
 
       const firstStep = await steps.next();
 
@@ -75,7 +100,10 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
+      (getPositionManagerContract as jest.Mock).mockResolvedValue({
+        managePosition: null,
+      });
 
       const numberOfSteps = 2;
 
@@ -89,7 +117,7 @@ describe('UserPosition', () => {
       });
       expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
-      expect(signature).toEqual(EMPTY_SIGNATURE);
+      expect(signature).toEqual(EMPTY_PERMIT_SIGNATURE);
 
       const secondStep = await steps.next(signature as ERC20PermitSignatureStruct);
 
@@ -116,7 +144,15 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
+      (getPositionManagerContract as jest.Mock).mockReturnValue({
+        managePosition: null,
+        whitelistDelegate: null,
+      });
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+      });
 
       const numberOfSteps = 2;
 
@@ -145,14 +181,14 @@ describe('UserPosition', () => {
     });
 
     it('should generate steps [wstETH permit + manage] for wstETH deposit + R repayment', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
-      const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'wstETH' });
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
+      const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'wstETH-v1' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
 
       const numberOfSteps = 2;
 
@@ -162,11 +198,11 @@ describe('UserPosition', () => {
       expect(firstStep.done).toBe(false);
       expect(firstStep.value?.type).toEqual({
         name: 'permit',
-        token: 'wstETH',
+        token: 'wstETH-v1',
       });
       expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
-      expect(signature).toEqual(EMPTY_SIGNATURE);
+      expect(signature).toEqual(EMPTY_PERMIT_SIGNATURE);
 
       const secondStep = await steps.next(signature as ERC20PermitSignatureStruct);
 
@@ -190,6 +226,9 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (getPositionManagerContract as jest.Mock).mockResolvedValue({
+        managePosition: null,
+      });
 
       const numberOfSteps = 1;
 
@@ -208,8 +247,8 @@ describe('UserPosition', () => {
     });
 
     it('should generate steps [manage] for wstETH withdrawal + R repayment', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
-      const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'wstETH' });
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
+      const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'wstETH-v1' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
@@ -232,115 +271,155 @@ describe('UserPosition', () => {
       expect(termination.done).toBe(true);
     });
 
-    it('should generate steps [whitelist + approve stETH + manage] for stETH deposit + R borrowing', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
-      const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, { collateralToken: 'stETH' });
+    it.each([
+      ['wstETH-v1', 'stETH'],
+      ['wcrETH-v1', 'rETH-v1'],
+    ] as [VaultV1, 'stETH' | 'rETH-v1'][])(
+      'should generate steps [whitelist + approve collateral + permit R + manage] for %s deposit + R repayment',
+      async (underlyingCollateralToken: VaultV1, collateralToken: 'stETH' | 'rETH-v1') => {
+        const userPosition = new UserPosition(mockEoaSigner, underlyingCollateralToken);
+        const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), {
+          collateralToken,
+        });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+        const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+        jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+        (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+        (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
+        (getPositionManagerContract as jest.Mock).mockReturnValue({
+          managePosition: null,
+          whitelistDelegate: null,
+        });
+        (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+          sendTransaction: jest.fn(),
+          gasEstimate: Decimal.ZERO,
+        });
+
+        const numberOfSteps = 4;
+
+        const firstStep = await steps.next();
+
+        expect(firstStep.done).toBe(false);
+        expect(firstStep.value?.type).toEqual({
+          name: 'whitelist',
+        });
+        expect(firstStep.value?.stepNumber).toEqual(1);
+        expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+        const secondStep = await steps.next();
+
+        expect(secondStep.done).toBe(false);
+        expect(secondStep.value?.type).toEqual({
+          name: 'approve',
+          token: collateralToken,
+        });
+        expect(secondStep.value?.stepNumber);
+        expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+        const thirdStep = await steps.next();
+        const signature = await thirdStep.value?.action?.();
+
+        expect(thirdStep.done).toBe(false);
+        expect(thirdStep.value?.type).toEqual({
+          name: 'permit',
+          token: 'R',
+        });
+        expect(thirdStep.value?.stepNumber).toEqual(3);
+        expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
+        expect(signature).toEqual(EMPTY_PERMIT_SIGNATURE);
+
+        const fourthStep = await steps.next(signature as ERC20PermitSignatureStruct);
+
+        expect(fourthStep.done).toBe(false);
+        expect(fourthStep.value?.type).toEqual({
+          name: 'manage',
+        });
+        expect(fourthStep.value?.stepNumber).toEqual(4);
+        expect(fourthStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+        const termination = await steps.next();
+
+        expect(termination.done).toBe(true);
+      },
+    );
+
+    it.each([
+      ['wstETH-v1', 'stETH'],
+      ['wcrETH-v1', 'rETH-v1'],
+    ] as [VaultV1, 'stETH' | 'rETH-v1'][])(
+      'should generate steps [whitelist + permit R + manage] for %s withdrawal + R repayment',
+      async (underlyingCollateralToken: VaultV1, collateralToken: 'stETH' | 'rETH-v1') => {
+        const userPosition = new UserPosition(mockEoaSigner, underlyingCollateralToken);
+        const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), {
+          collateralToken,
+        });
+
+        const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
+
+        jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
+        (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+        (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
+        (getPositionManagerContract as jest.Mock).mockReturnValue({
+          managePosition: null,
+          whitelistDelegate: null,
+        });
+        (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+          sendTransaction: jest.fn(),
+          gasEstimate: Decimal.ZERO,
+        });
+
+        const numberOfSteps = 3;
+
+        const firstStep = await steps.next();
+
+        expect(firstStep.done).toBe(false);
+        expect(firstStep.value?.type).toEqual({
+          name: 'whitelist',
+        });
+        expect(firstStep.value?.stepNumber).toEqual(1);
+        expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+        const secondStep = await steps.next();
+        const signature = await secondStep.value?.action?.();
+
+        expect(secondStep.done).toBe(false);
+        expect(secondStep.value?.type).toEqual({
+          name: 'permit',
+          token: 'R',
+        });
+        expect(secondStep.value?.stepNumber);
+        expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
+        expect(signature).toEqual(EMPTY_PERMIT_SIGNATURE);
+
+        const thirdStep = await steps.next(signature as ERC20PermitSignatureStruct);
+
+        expect(thirdStep.done).toBe(false);
+        expect(thirdStep.value?.type).toEqual({
+          name: 'manage',
+        });
+        expect(thirdStep.value?.stepNumber).toEqual(3);
+        expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+        const termination = await steps.next();
+
+        expect(termination.done).toBe(true);
+      },
+    );
+
+    it('should generate steps [approve collateral + manage] for WETH deposit + R borrowing', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'WETH');
+      const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, { collateralToken: 'WETH' });
+
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-
-      const numberOfSteps = 3;
-
-      const firstStep = await steps.next();
-
-      expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).toEqual({
-        name: 'whitelist',
+      (getPositionManagerContract as jest.Mock).mockReturnValue({
+        managePosition: null,
+        whitelistDelegate: null,
       });
-      expect(firstStep.value?.stepNumber).toEqual(1);
-      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
-
-      const secondStep = await steps.next();
-
-      expect(secondStep.done).toBe(false);
-      expect(secondStep.value?.type).toEqual({
-        name: 'approve',
-        token: 'stETH',
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
       });
-      expect(secondStep.value?.stepNumber);
-      expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
-
-      const thirdStep = await steps.next();
-
-      expect(thirdStep.done).toBe(false);
-      expect(thirdStep.value?.type).toEqual({
-        name: 'manage',
-      });
-      expect(thirdStep.value?.stepNumber).toEqual(3);
-      expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
-
-      const termination = await steps.next();
-
-      expect(termination.done).toBe(true);
-    });
-
-    it('should generate steps [whitelist + approve stETH + permit R + manage] for stETH deposit + R repayment', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
-      const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'stETH' });
-
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
-
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
-
-      const numberOfSteps = 4;
-
-      const firstStep = await steps.next();
-
-      expect(firstStep.done).toBe(false);
-      expect(firstStep.value?.type).toEqual({
-        name: 'whitelist',
-      });
-      expect(firstStep.value?.stepNumber).toEqual(1);
-      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
-
-      const secondStep = await steps.next();
-
-      expect(secondStep.done).toBe(false);
-      expect(secondStep.value?.type).toEqual({
-        name: 'approve',
-        token: 'stETH',
-      });
-      expect(secondStep.value?.stepNumber);
-      expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
-
-      const thirdStep = await steps.next();
-      const signature = await thirdStep.value?.action?.();
-
-      expect(thirdStep.done).toBe(false);
-      expect(thirdStep.value?.type).toEqual({
-        name: 'permit',
-        token: 'R',
-      });
-      expect(thirdStep.value?.stepNumber).toEqual(3);
-      expect(thirdStep.value?.numberOfSteps).toEqual(numberOfSteps);
-      expect(signature).toEqual(EMPTY_SIGNATURE);
-
-      const fourthStep = await steps.next(signature as ERC20PermitSignatureStruct);
-
-      expect(fourthStep.done).toBe(false);
-      expect(fourthStep.value?.type).toEqual({
-        name: 'manage',
-      });
-      expect(fourthStep.value?.stepNumber).toEqual(4);
-      expect(fourthStep.value?.numberOfSteps).toEqual(numberOfSteps);
-
-      const termination = await steps.next();
-
-      expect(termination.done).toBe(true);
-    });
-
-    it('should generate steps [whitelist + manage] for stETH withdrawal + R borrowing', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
-      const steps = userPosition.getManageSteps(new Decimal(-1), Decimal.ONE, { collateralToken: 'stETH' });
-
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
-
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
 
       const numberOfSteps = 2;
 
@@ -348,7 +427,8 @@ describe('UserPosition', () => {
 
       expect(firstStep.done).toBe(false);
       expect(firstStep.value?.type).toEqual({
-        name: 'whitelist',
+        name: 'approve',
+        token: 'WETH',
       });
       expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
@@ -359,7 +439,7 @@ describe('UserPosition', () => {
       expect(secondStep.value?.type).toEqual({
         name: 'manage',
       });
-      expect(secondStep.value?.stepNumber);
+      expect(secondStep.value?.stepNumber).toEqual(2);
       expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
       const termination = await steps.next();
@@ -367,15 +447,19 @@ describe('UserPosition', () => {
       expect(termination.done).toBe(true);
     });
 
-    it('should generate steps [whitelist + permit R + manage] for stETH withdrawal + R repayment', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
-      const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'stETH' });
+    it('should generate steps [approve collateral + approve R + manage] for WETH deposit + R repayment', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'WETH');
+      const steps = userPosition.getManageSteps(Decimal.ONE, new Decimal(-1), { collateralToken: 'WETH' });
 
-      const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
-
-      jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (getPositionManagerContract as jest.Mock).mockReturnValue({
+        managePosition: null,
+        whitelistDelegate: null,
+      });
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+      });
 
       const numberOfSteps = 3;
 
@@ -383,24 +467,23 @@ describe('UserPosition', () => {
 
       expect(firstStep.done).toBe(false);
       expect(firstStep.value?.type).toEqual({
-        name: 'whitelist',
+        name: 'approve',
+        token: 'WETH',
       });
       expect(firstStep.value?.stepNumber).toEqual(1);
       expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
-      const secondStep = await steps.next();
-      const signature = await secondStep.value?.action?.();
+      const secondsStep = await steps.next();
 
-      expect(secondStep.done).toBe(false);
-      expect(secondStep.value?.type).toEqual({
-        name: 'permit',
+      expect(secondsStep.done).toBe(false);
+      expect(secondsStep.value?.type).toEqual({
+        name: 'approve',
         token: 'R',
       });
-      expect(secondStep.value?.stepNumber);
-      expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
-      expect(signature).toEqual(EMPTY_SIGNATURE);
+      expect(secondsStep.value?.stepNumber).toEqual(2);
+      expect(secondsStep.value?.numberOfSteps).toEqual(numberOfSteps);
 
-      const thirdStep = await steps.next(signature as ERC20PermitSignatureStruct);
+      const thirdStep = await steps.next();
 
       expect(thirdStep.done).toBe(false);
       expect(thirdStep.value?.type).toEqual({
@@ -414,14 +497,82 @@ describe('UserPosition', () => {
       expect(termination.done).toBe(true);
     });
 
+    it('should generate steps [manage] for WETH withdrawal + R borrowing', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'WETH');
+      const steps = userPosition.getManageSteps(new Decimal(-1), Decimal.ONE, { collateralToken: 'WETH' });
+
+      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (getPositionManagerContract as jest.Mock).mockResolvedValue({
+        managePosition: null,
+      });
+
+      const numberOfSteps = 1;
+
+      const firstStep = await steps.next();
+
+      expect(firstStep.done).toBe(false);
+      expect(firstStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
+      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const termination = await steps.next();
+
+      expect(termination.done).toBe(true);
+    });
+
+    it('should generate steps [approve, manage] for WETH withdrawal + R repayment', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'WETH');
+      const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'WETH' });
+
+      (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (getPositionManagerContract as jest.Mock).mockReturnValue({
+        managePosition: null,
+        whitelistDelegate: null,
+      });
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+      });
+
+      const numberOfSteps = 2;
+
+      const firstStep = await steps.next();
+
+      expect(firstStep.done).toBe(false);
+      expect(firstStep.value?.type).toEqual({
+        name: 'approve',
+        token: 'R',
+      });
+      expect(firstStep.value?.stepNumber).toEqual(1);
+      expect(firstStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const secondStep = await steps.next();
+
+      expect(secondStep.done).toBe(false);
+      expect(secondStep.value?.type).toEqual({
+        name: 'manage',
+      });
+      expect(secondStep.value?.stepNumber).toEqual(2);
+      expect(secondStep.value?.numberOfSteps).toEqual(numberOfSteps);
+
+      const termination = await steps.next();
+
+      expect(termination.done).toBe(true);
+    });
+
     it('should skip using delegate if there is no collateral change', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
-      const steps = userPosition.getManageSteps(Decimal.ZERO, Decimal.ONE, { collateralToken: 'stETH' });
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
+      const steps = userPosition.getManageSteps(Decimal.ZERO, new Decimal(-1), { collateralToken: 'stETH' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
+      (getPositionManagerContract as jest.Mock).mockResolvedValue({
+        managePosition: null,
+      });
 
       const firstStep = await steps.next();
 
@@ -435,14 +586,17 @@ describe('UserPosition', () => {
       const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
       const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, {
         collateralToken: 'wstETH',
-        collateralPermitSignature: EMPTY_SIGNATURE,
+        collateralPermitSignature: EMPTY_PERMIT_SIGNATURE,
       });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
+      (getPositionManagerContract as jest.Mock).mockResolvedValue({
+        managePosition: null,
+      });
 
       const numberOfSteps = 1;
 
@@ -461,17 +615,25 @@ describe('UserPosition', () => {
     });
 
     it('should skip permit step if cached R token permit signature is passed', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
       const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), {
         collateralToken: 'stETH',
-        rPermitSignature: EMPTY_SIGNATURE,
+        rPermitSignature: EMPTY_PERMIT_SIGNATURE,
       });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
+      (getPositionManagerContract as jest.Mock).mockReturnValue({
+        managePosition: null,
+        whitelistDelegate: null,
+      });
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+      });
 
       const numberOfSteps = 2;
 
@@ -499,7 +661,7 @@ describe('UserPosition', () => {
     });
 
     it('should throw an error if collateral and debt changes are both zero', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
       const steps = userPosition.getManageSteps(Decimal.ZERO, Decimal.ZERO);
 
       expect(() => steps.next()).rejects.toThrow('Collateral and debt change cannot be both zero');
@@ -513,7 +675,7 @@ describe('UserPosition', () => {
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
 
       await steps.next();
 
@@ -521,19 +683,41 @@ describe('UserPosition', () => {
     });
 
     it('should throw an error if R token permit signature is not passed', async () => {
-      const userPosition = new UserPosition(mockEoaSigner, 'wstETH');
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
       const steps = userPosition.getManageSteps(new Decimal(-1), new Decimal(-1), { collateralToken: 'stETH' });
 
       const isDelegateWhitelistedMock = jest.fn().mockResolvedValue(false);
 
       jest.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as jest.Mock).mockResolvedValue(Decimal.ZERO);
-      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_SIGNATURE);
+      (createPermitSignature as jest.Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
+      (getPositionManagerContract as jest.Mock).mockReturnValue({
+        managePosition: null,
+        whitelistDelegate: null,
+      });
+      (buildTransactionWithGasLimit as jest.Mock).mockResolvedValue({
+        sendTransaction: jest.fn(),
+        gasEstimate: Decimal.ZERO,
+      });
 
       await steps.next();
       await steps.next();
 
       expect(() => steps.next()).rejects.toThrow('R permit signature is required');
+    });
+
+    it('should not allow opening a position for v1 vaults', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1');
+      const steps = userPosition.getManageSteps(Decimal.ONE, Decimal.ONE, { collateralToken: 'wstETH-v1' });
+
+      await expect(steps.next()).rejects.toThrow('Cannot borrow more debt from v1 vaults');
+    });
+
+    it('should not allow borrowing more debt from v1 vaults', async () => {
+      const userPosition = new UserPosition(mockEoaSigner, 'wstETH-v1', new Decimal(100), new Decimal(3000));
+      const steps = userPosition.getManageSteps(Decimal.ZERO, new Decimal(100), { collateralToken: 'wstETH-v1' });
+
+      await expect(steps.next()).rejects.toThrow('Cannot borrow more debt from v1 vaults');
     });
   });
 });

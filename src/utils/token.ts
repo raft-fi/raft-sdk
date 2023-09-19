@@ -1,21 +1,24 @@
-import { ContractRunner, ZeroAddress } from 'ethers';
+import { ContractRunner } from 'ethers';
 import { RaftConfig } from '../config';
 import {
   ERC20,
   ERC20Permit,
   ERC20Permit__factory,
   ERC20__factory,
+  InterestRateDebtToken__factory,
   WrappedCollateralToken,
   WrappedCollateralToken__factory,
 } from '../typechain';
 import {
   COLLATERAL_TOKENS,
   CollateralToken,
+  InterestRateVault,
   RToken,
   R_TOKEN,
   Token,
   UNDERLYING_COLLATERAL_TOKENS,
   UnderlyingCollateralToken,
+  VAULTS_V1,
   WRAPPABLE_CAPPED_COLLATERAL_TOKENS,
   WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS,
   WrappableCappedCollateralToken,
@@ -28,13 +31,24 @@ const UNDERLYING_COLLATERAL_TOKEN_SET = new Set<string>(UNDERLYING_COLLATERAL_TO
 const COLLATERAL_TOKEN_SET = new Set<string>(COLLATERAL_TOKENS);
 
 type TokenContractTypes = {
-  ETH: null;
   stETH: ERC20;
   wstETH: ERC20Permit;
+  'wstETH-v1': ERC20Permit;
   rETH: ERC20;
-  wcrETH: WrappedCollateralToken;
+  'rETH-v1': ERC20;
+  WETH: ERC20;
+  'wcrETH-v1': WrappedCollateralToken;
+  WBTC: ERC20;
+  cbETH: ERC20;
+  swETH: ERC20;
   R: ERC20Permit;
 };
+
+export function isInterestRateVault(
+  underlyingCollateralToken: UnderlyingCollateralToken,
+): underlyingCollateralToken is InterestRateVault {
+  return !VAULTS_V1.includes(underlyingCollateralToken as never);
+}
 
 export function isWrappableCappedCollateralToken(token: Token): token is WrappableCappedCollateralToken {
   return WRAPPABLE_CAPPED_COLLATERAL_TOKEN_SET.has(token);
@@ -68,10 +82,6 @@ export function getTokenContract<T extends Token>(collateralToken: T, runner: Co
   const tokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
   const tokenAddress = RaftConfig.getTokenAddress(collateralToken);
 
-  if (tokenAddress === ZeroAddress) {
-    return null as TokenContractTypes[T];
-  }
-
   if (isWrappedCappedUnderlyingCollateralToken(collateralToken)) {
     return WrappedCollateralToken__factory.connect(tokenAddress, runner) as TokenContractTypes[T];
   }
@@ -81,4 +91,8 @@ export function getTokenContract<T extends Token>(collateralToken: T, runner: Co
   }
 
   return ERC20__factory.connect(tokenAddress, runner) as TokenContractTypes[T];
+}
+
+export function getInterestRateDebtTokenContract(debtToken: string, runner: ContractRunner) {
+  return InterestRateDebtToken__factory.connect(debtToken, runner);
 }

@@ -1,57 +1,52 @@
 import { Decimal } from '@tempusfinance/decimal';
-import { Signer, ContractTransactionResponse, TransactionResponse, ethers } from 'ethers';
+import { Signer, ContractTransactionResponse, TransactionResponse, ethers, AddressLike } from 'ethers';
 import { request, gql } from 'graphql-request';
 import { getTokenAllowance } from '../allowance';
 import { RaftConfig, SupportedCollateralTokens } from '../config';
 import { PriceFeed } from '../price';
-import {
-  ERC20,
-  PositionManager,
-  ERC20Permit,
-  ERC20Permit__factory,
-  OneInchOneStepLeverageStETH__factory,
-  OneInchOneStepLeverageStETH,
-} from '../typechain';
+import { PositionManager, OneInchOneStepLeverageStETH__factory, OneInchOneStepLeverageStETH } from '../typechain';
 import OneInchOneStepLeverageStETHABI from './../abi/OneInchOneStepLeverageStETH.json';
 import { ERC20PermitSignatureStruct } from '../typechain/PositionManager';
 import {
   CollateralToken,
-  R_TOKEN,
   SwapRouter,
   Token,
   TransactionWithFeesOptions,
   UnderlyingCollateralToken,
+  VaultVersion,
 } from '../types';
 import {
-  createEmptyPermitSignature,
-  createPermitSignature,
+  getPermitOrApproveTokenStep,
   getPositionManagerContract,
   getTokenContract,
-  isEoaAddress,
+  getWhitelistStep,
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
   sendTransactionWithGasLimit,
 } from '../utils';
 import { PositionWithRunner } from './base';
-import { SWAP_ROUTER_MAX_SLIPPAGE } from '../constants';
+import {
+  MAX_FEE_PERCENTAGE_PRECISION,
+  RAFT_COLLATERAL_TOKEN_PRECISION,
+  RAFT_DEBT_TOKEN_PRECISION,
+  SWAP_ROUTER_MAX_SLIPPAGE,
+} from '../constants';
 import { Protocol } from '../protocol';
-
-export interface ManagePositionStepType {
-  name: 'whitelist' | 'approve' | 'permit' | 'manage';
-  token?: Token;
-}
+import {
+  BasePositionManaging,
+  InterestRatePositionManaging,
+  ManagePositionOptions,
+  ManagePositionStep,
+  ManagePositionStepsPrefetch,
+  StEthPositionManaging,
+  UnderlyingCollateralTokenPositionManaging,
+  WrappableCappedCollateralTokenPositionManaging,
+} from './manage';
+import { isInterestRateVault } from '../utils/token';
 
 export interface LeveragePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'leverage';
   token?: Token;
-}
-
-interface ManagePositionStepsPrefetch {
-  isDelegateWhitelisted?: boolean;
-  collateralTokenAllowance?: Decimal;
-  collateralPermitSignature?: ERC20PermitSignatureStruct;
-  rTokenAllowance?: Decimal;
-  rPermitSignature?: ERC20PermitSignatureStruct;
 }
 
 interface LeveragePositionStepsPrefetch {
@@ -64,42 +59,6 @@ interface LeveragePositionStepsPrefetch {
   underlyingCollateralPrice?: Decimal;
 }
 
-type WhitelistStep = {
-  type: {
-    name: 'whitelist';
-  };
-  stepNumber: number;
-  numberOfSteps: number;
-  action: () => Promise<TransactionResponse>;
-};
-
-type PermitStep = {
-  type: {
-    name: 'permit';
-    token: Token;
-  };
-  stepNumber: number;
-  numberOfSteps: number;
-  action: () => Promise<ERC20PermitSignatureStruct>;
-};
-
-type ApproveStep = {
-  type: {
-    name: 'approve';
-    token: Token;
-  };
-  stepNumber: number;
-  numberOfSteps: number;
-  action: () => Promise<TransactionResponse>;
-};
-
-export interface ManagePositionStep {
-  type: ManagePositionStepType;
-  stepNumber: number;
-  numberOfSteps: number;
-  action: () => Promise<TransactionResponse | ERC20PermitSignatureStruct>;
-}
-
 export interface LeveragePositionStep {
   type: LeveragePositionStepType;
   stepNumber: number;
@@ -110,22 +69,10 @@ export interface LeveragePositionStep {
 interface UserPositionResponse {
   underlyingCollateralToken: string | null;
   isLeveraged: boolean | null;
+  vaultVersion: VaultVersion;
 }
 
 const DEBT_CHANGE_TO_CLOSE = Decimal.MAX_DECIMAL.mul(-1);
-
-/**
- * Options for managing a position.
- * @property collateralToken The collateral token to use for the operation.
- * @property frontendTag The frontend operator tag for the transaction.
- * @property approvalType The approval type for the collateral token or R token. Smart contract position owners have to
- * use `approve` since they don't support signing. Defaults to permit.
- */
-export interface ManagePositionOptions<C extends CollateralToken> extends TransactionWithFeesOptions {
-  collateralToken?: C;
-  frontendTag?: string;
-  approvalType?: 'permit' | 'approve';
-}
 
 /**
  * Options for leveraging a position.
@@ -163,9 +110,7 @@ export interface ManagePositionCallbacks {
  */
 export class UserPosition<T extends UnderlyingCollateralToken> extends PositionWithRunner {
   private user: Signer;
-  private collateralTokens = new Map<CollateralToken, ERC20>();
   private positionManager: PositionManager;
-  private rToken: ERC20Permit;
 
   /**
    * Fetches the position of a given user or returns null if the user does not have a position. Differs from the
@@ -180,6 +125,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         position(id: $positionId) {
           underlyingCollateralToken
           isLeveraged
+          vaultVersion
         }
       }
     `;
@@ -205,8 +151,11 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     }
 
     const isLeveraged = response.position?.isLeveraged ?? false;
+    const vaultVersion = response.position?.vaultVersion ?? 'v2';
+    const resolvedUnderlyingCollateralToken =
+      underlyingCollateralToken === 'wstETH' && vaultVersion === 'v1' ? 'wstETH-v1' : underlyingCollateralToken;
 
-    const position = new UserPosition(user, underlyingCollateralToken);
+    const position = new UserPosition(user, resolvedUnderlyingCollateralToken);
     position.setIsLeveraged(isLeveraged);
     await position.fetch();
 
@@ -230,7 +179,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     this.user = user;
     this.positionManager = getPositionManagerContract('base', RaftConfig.networkConfig.positionManager, user);
-    this.rToken = ERC20Permit__factory.connect(RaftConfig.networkConfig.tokens[R_TOKEN].address, this.user);
+  }
+
+  public get isInterestRate(): boolean {
+    return isInterestRateVault(this.underlyingCollateralToken);
   }
 
   /**
@@ -346,12 +298,18 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     const {
       maxFeePercentage = Decimal.ONE,
       gasLimitMultiplier = Decimal.ONE,
-      frontendTag,
+      frontendTag = '',
       approvalType = 'permit',
     } = options;
     let { collateralToken = this.underlyingCollateralToken as T } = options;
+    const isInterestRateVaultToken = isInterestRateVault(this.underlyingCollateralToken);
 
-    // check whether it's closing position (i.e. collateralChange is ZERO while debtChange is -ve MAX)
+    // Only allow depositing more collateral or repaying debt
+    if (!isInterestRateVaultToken && debtChange.gt(Decimal.ZERO)) {
+      throw new Error('Cannot borrow more debt from v1 vaults');
+    }
+
+    // check whether it's closing position (i.e. collateralChange is ZERO while debtChange is negative MAX)
     if (collateralChange.isZero() && !debtChange.equals(DEBT_CHANGE_TO_CLOSE)) {
       if (debtChange.isZero()) {
         throw Error('Collateral and debt change cannot be both zero');
@@ -362,162 +320,36 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       collateralToken = this.underlyingCollateralToken as T;
     }
 
-    const absoluteCollateralChangeValue = collateralChange.abs().value;
-    const isCollateralIncrease = collateralChange.gt(Decimal.ZERO);
-    const absoluteDebtChangeValue = debtChange.abs().value;
-    const isDebtIncrease = debtChange.gt(Decimal.ZERO);
-    const maxFeePercentageValue = maxFeePercentage.value;
-    const isUnderlyingToken = this.isUnderlyingCollateralToken(collateralToken);
+    let positionManaging: BasePositionManaging;
 
-    const whitelistingRequired = !isUnderlyingToken;
-    const collateralTokenContract = getTokenContract(collateralToken, this.user);
-    const collateralTokenAllowanceRequired = collateralTokenContract !== null && isCollateralIncrease;
-    const rTokenAllowanceRequired = !isDebtIncrease && !isUnderlyingToken;
-    const positionManagerAddress = RaftConfig.getPositionManagerAddress(
-      this.underlyingCollateralToken,
-      collateralToken,
-    );
-    const userAddress = await this.getUserAddress();
-
-    const { collateralPermitSignature: cachedCollateralPermitSignature, rPermitSignature: cachedRPermitSignature } =
-      options;
-    let { isDelegateWhitelisted, collateralTokenAllowance, rTokenAllowance } = options;
-
-    // In case the delegate whitelisting check is not passed externally, check the whitelist status
-    if (isDelegateWhitelisted === undefined) {
-      isDelegateWhitelisted = whitelistingRequired
-        ? await this.isDelegateWhitelisted(positionManagerAddress, userAddress)
-        : false;
-    }
-
-    // In case the collateral token allowance check is not passed externally, check the allowance
-    if (collateralTokenAllowance === undefined) {
-      collateralTokenAllowance = collateralTokenAllowanceRequired
-        ? await getTokenAllowance(collateralTokenContract, userAddress, positionManagerAddress)
-        : Decimal.MAX_DECIMAL;
-    }
-
-    // In case the R token allowance check is not passed externally, check the allowance
-    if (rTokenAllowance === undefined) {
-      rTokenAllowance = rTokenAllowanceRequired
-        ? await getTokenAllowance(this.rToken, userAddress, positionManagerAddress)
-        : Decimal.MAX_DECIMAL;
-    }
-
-    const isEoaPositionOwner = await isEoaAddress(userAddress, this.contractRunner);
-    const canUsePermit = isEoaPositionOwner && approvalType === 'permit';
-    const collateralTokenConfig = RaftConfig.networkConfig.tokens[collateralToken];
-    const canCollateralTokenUsePermit = collateralTokenConfig.supportsPermit && canUsePermit;
-
-    const whitelistingStepNeeded = whitelistingRequired && !isDelegateWhitelisted;
-    const collateralApprovalStepNeeded =
-      collateralTokenAllowanceRequired && // action needs collateral token allowance check
-      collateralChange.gt(collateralTokenAllowance ?? Decimal.ZERO) && // current allowance is not enough
-      (!canCollateralTokenUsePermit || !cachedCollateralPermitSignature); // approval step or signing a permit is needed
-    const rTokenApprovalStepNeeded =
-      rTokenAllowanceRequired && // action needs R token allowance check
-      debtChange.abs().gt(rTokenAllowance ?? Decimal.ZERO) && // current allowance is not enough
-      (!canUsePermit || !cachedRPermitSignature); // approval step or signing a permit is needed
-
-    // The number of steps is the number of optional steps that are required based on input values plus one required
-    // step (`manage`)
-    const numberOfSteps =
-      Number(whitelistingStepNeeded) + Number(collateralApprovalStepNeeded) + Number(rTokenApprovalStepNeeded) + 1;
-    let stepCounter = 1;
-
-    if (whitelistingStepNeeded) {
-      yield* this.getWhitelistStep(positionManagerAddress, () => stepCounter++, numberOfSteps);
-    }
-
-    let collateralPermitSignature = createEmptyPermitSignature();
-    let rPermitSignature = createEmptyPermitSignature();
-
-    if (collateralApprovalStepNeeded) {
-      collateralPermitSignature = yield* this.getApproveOrPermitStep(
-        collateralToken,
-        collateralTokenContract,
-        collateralChange,
-        positionManagerAddress,
-        () => stepCounter++,
-        numberOfSteps,
-        canCollateralTokenUsePermit,
-        cachedCollateralPermitSignature,
-      );
-    }
-
-    if (rTokenApprovalStepNeeded) {
-      rPermitSignature = yield* this.getApproveOrPermitStep(
-        R_TOKEN,
-        this.rToken,
-        debtChange.abs(),
-        positionManagerAddress,
-        () => stepCounter++,
-        numberOfSteps,
-        canUsePermit,
-        cachedRPermitSignature,
-      );
-    }
-
-    if (isUnderlyingCollateralToken(collateralToken)) {
-      yield {
-        type: {
-          name: 'manage',
-        },
-        stepNumber: stepCounter++,
-        numberOfSteps,
-        action: () =>
-          sendTransactionWithGasLimit(
-            this.positionManager.managePosition,
-            [
-              RaftConfig.getTokenAddress(collateralToken),
-              userAddress,
-              absoluteCollateralChangeValue,
-              isCollateralIncrease,
-              absoluteDebtChangeValue,
-              isDebtIncrease,
-              maxFeePercentageValue,
-              collateralPermitSignature,
-            ],
-            gasLimitMultiplier,
-            frontendTag,
-            this.user,
-          ),
-      };
-    } else if (
-      isWrappableCappedCollateralToken(collateralToken) ||
-      (collateralToken === 'stETH' && this.underlyingCollateralToken === 'wstETH')
-    ) {
-      const method = isWrappableCappedCollateralToken(collateralToken)
-        ? getPositionManagerContract('wrapped', positionManagerAddress, this.user).managePosition
-        : getPositionManagerContract('stETH', positionManagerAddress, this.user).managePositionStETH;
-
-      yield {
-        type: {
-          name: 'manage',
-        },
-        stepNumber: stepCounter++,
-        numberOfSteps,
-        action: () =>
-          sendTransactionWithGasLimit(
-            method,
-            [
-              absoluteCollateralChangeValue,
-              isCollateralIncrease,
-              absoluteDebtChangeValue,
-              isDebtIncrease,
-              maxFeePercentageValue,
-              rPermitSignature,
-            ],
-            gasLimitMultiplier,
-            frontendTag,
-            this.user,
-          ),
-      };
+    if (isInterestRateVaultToken) {
+      positionManaging = new InterestRatePositionManaging(this.user);
+    } else if (isUnderlyingCollateralToken(collateralToken)) {
+      positionManaging = new UnderlyingCollateralTokenPositionManaging(this.user);
+    } else if (isWrappableCappedCollateralToken(collateralToken)) {
+      positionManaging = new WrappableCappedCollateralTokenPositionManaging(this.user);
+    } else if (this.underlyingCollateralToken === 'wstETH-v1' && collateralToken === 'stETH') {
+      positionManaging = new StEthPositionManaging(this.user);
     } else {
       throw new Error(
         `Underlying collateral token ${this.underlyingCollateralToken} does not support collateral token ${collateralToken}`,
       );
     }
+
+    yield* positionManaging.manage(
+      collateralChange,
+      debtChange,
+      this.underlyingCollateralToken,
+      this.isDelegateWhitelisted,
+      {
+        ...options,
+        maxFeePercentage,
+        gasLimitMultiplier,
+        frontendTag,
+        approvalType,
+        collateralToken,
+      },
+    );
   }
 
   /**
@@ -584,7 +416,6 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     const isClosePosition = leverage.equals(1) && actualPrincipalCollateralChange.isZero();
     const collateralTokenContract = getTokenContract(collateralToken, this.user);
     const collateralTokenAllowanceRequired = collateralTokenContract !== null && isPrincipalCollateralIncrease;
-    const userAddress = await this.getUserAddress();
 
     if (slippage.gt(SWAP_ROUTER_MAX_SLIPPAGE[swapRouter])) {
       throw new Error(
@@ -612,18 +443,16 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     // In case the delegate whitelisting check is not passed externally, check the whitelist status
     if (isDelegateWhitelisted === undefined) {
-      isDelegateWhitelisted = await this.isDelegateWhitelisted(
-        RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
-        userAddress,
-      );
+      isDelegateWhitelisted = await this.isDelegateWhitelisted(RaftConfig.networkConfig.oneInchOneStepLeverageStEth);
     }
 
     // In case the collateral token allowance check is not passed externally, check the allowance
     if (collateralTokenAllowance === undefined) {
       if (collateralTokenAllowanceRequired) {
         collateralTokenAllowance = await getTokenAllowance(
+          collateralToken,
           collateralTokenContract,
-          userAddress,
+          this.user,
           RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
         );
       } else {
@@ -642,20 +471,22 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     let stepCounter = 1;
 
     if (whitelistingStepNeeded) {
-      yield* this.getWhitelistStep(
+      yield* getWhitelistStep(
+        this.positionManager,
         RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
-        () => stepCounter++,
+        stepCounter++,
         numberOfSteps,
       );
     }
 
     if (collateralApprovalStepNeeded) {
-      yield* this.getApproveOrPermitStep(
+      yield* getPermitOrApproveTokenStep(
+        this.user,
         collateralToken,
         collateralTokenContract,
         principalCollateralChange,
         RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
-        () => stepCounter++,
+        stepCounter++,
         numberOfSteps,
         false, // One step leverage doesn't support permit
       );
@@ -770,6 +601,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         collateralToSwap = debtChange.abs().mul(Decimal.ONE.add(0.001)).div(underlyingCollateralPrice);
       }
 
+      const collateralDecimals = RaftConfig.networkConfig.tokens[collateralToken].decimals;
+
       yield {
         type: {
           name: 'leverage',
@@ -783,13 +616,13 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
               ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
               : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH, // used to stETH
             [
-              debtChange.abs().toBigInt(),
+              debtChange.abs().toBigInt(RAFT_DEBT_TOKEN_PRECISION),
               isDebtIncrease,
-              principalCollateralChange.abs().toBigInt(),
+              principalCollateralChange.abs().toBigInt(RAFT_COLLATERAL_TOKEN_PRECISION),
               isPrincipalCollateralIncrease,
               oneInchDataAmmData,
-              isDebtIncrease ? minReturn.toBigInt() : collateralToSwap.toBigInt(),
-              maxFeePercentage.toBigInt(),
+              isDebtIncrease ? minReturn.toBigInt(collateralDecimals) : collateralToSwap.toBigInt(collateralDecimals),
+              maxFeePercentage.toBigInt(MAX_FEE_PERCENTAGE_PRECISION),
             ],
             gasLimitMultiplier,
             frontendTag,
@@ -824,7 +657,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
             absolutePrincipalCollateralChangeValue,
             isPrincipalCollateralIncrease,
             leverage,
-            maxFeePercentage.toBigInt(),
+            maxFeePercentage.toBigInt(MAX_FEE_PERCENTAGE_PRECISION),
             gasLimitMultiplier,
             frontendTag,
           );
@@ -840,12 +673,12 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
   /**
    * Checks if delegate for a given collateral token is whitelisted for the position owner.
-   * @param collateralToken Collateral token to check the whitelist for.
+   * @param delegate The delegate to check.
    * @returns True if the delegate is whitelisted or the collateral token is the position's underlying collateral token,
    * otherwise false.
    */
-  public async isDelegateWhitelisted(delegateAddress: string, userAddress: string): Promise<boolean> {
-    return await this.positionManager.isDelegateWhitelisted(userAddress, delegateAddress);
+  public async isDelegateWhitelisted(delegate: AddressLike): Promise<boolean> {
+    return await this.positionManager.isDelegateWhitelisted(this.user, delegate);
   }
 
   /**
@@ -1061,108 +894,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
     return this.userAddress;
   }
 
-  private *getWhitelistStep(
-    delegatorAddress: string,
-    getStepNumber: () => number,
-    numberOfSteps: number,
-  ): Generator<WhitelistStep, void, unknown> {
-    yield {
-      type: {
-        name: 'whitelist',
-      },
-      stepNumber: getStepNumber(),
-      numberOfSteps,
-      action: () => this.positionManager.whitelistDelegate(delegatorAddress, true),
-    };
-  }
-
   private loadOneStepLeverageStETH(): OneInchOneStepLeverageStETH {
     return OneInchOneStepLeverageStETH__factory.connect(
       RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
       this.user,
     );
-  }
-
-  private *getSignTokenPermitStep(
-    token: Token,
-    tokenContract: ERC20Permit,
-    approveAmount: Decimal,
-    spenderAddress: string,
-    getStepNumber: () => number,
-    numberOfSteps: number,
-    cachedSignature?: ERC20PermitSignatureStruct,
-  ): Generator<PermitStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
-    const signature =
-      cachedSignature ??
-      (yield {
-        type: {
-          name: 'permit' as const,
-          token: token,
-        },
-        stepNumber: getStepNumber(),
-        numberOfSteps,
-        action: () => createPermitSignature(this.user, approveAmount, spenderAddress, tokenContract),
-      });
-
-    if (!signature) {
-      throw new Error(`${token} permit signature is required`);
-    }
-
-    return signature;
-  }
-
-  private *getApproveTokenStep(
-    token: Token,
-    tokenContract: ERC20 | ERC20Permit,
-    approveAmount: Decimal,
-    spenderAddress: string,
-    getStepNumber: () => number,
-    numberOfSteps: number,
-  ): Generator<ApproveStep, void, unknown> {
-    yield {
-      type: {
-        name: 'approve' as const,
-        token: token,
-      },
-      stepNumber: getStepNumber(),
-      numberOfSteps,
-      action: () => tokenContract.approve(spenderAddress, approveAmount.toBigInt(Decimal.PRECISION)),
-    };
-  }
-
-  private *getApproveOrPermitStep(
-    token: Token,
-    tokenContract: ERC20 | ERC20Permit,
-    approveAmount: Decimal,
-    spenderAddress: string,
-    getStepNumber: () => number,
-    numberOfSteps: number,
-    canUsePermit: boolean,
-    cachedPermitSignature?: ERC20PermitSignatureStruct,
-  ): Generator<PermitStep | ApproveStep, ERC20PermitSignatureStruct, ERC20PermitSignatureStruct | undefined> {
-    let permitSignature = createEmptyPermitSignature();
-
-    if (canUsePermit) {
-      permitSignature = yield* this.getSignTokenPermitStep(
-        token,
-        tokenContract,
-        approveAmount,
-        spenderAddress,
-        getStepNumber,
-        numberOfSteps,
-        cachedPermitSignature,
-      );
-    } else {
-      yield* this.getApproveTokenStep(
-        token,
-        tokenContract,
-        approveAmount,
-        spenderAddress,
-        getStepNumber,
-        numberOfSteps,
-      );
-    }
-
-    return permitSignature;
   }
 }
