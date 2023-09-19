@@ -20,8 +20,8 @@ export const COLLATERAL_TOKENS = [
 export const RAFT_TOKEN = 'RAFT';
 export const VERAFT_TOKEN = 'veRAFT';
 export const R_TOKEN = 'R';
-export const LP_BALANCER_TOKEN = 'B-80RAFT-20R';
-export const TOKENS = [...COLLATERAL_TOKENS, RAFT_TOKEN, R_TOKEN, LP_BALANCER_TOKEN] as const;
+export const RAFT_BPT_TOKEN = 'B-80RAFT-20R';
+export const TOKENS = [...COLLATERAL_TOKENS, RAFT_TOKEN, R_TOKEN, RAFT_BPT_TOKEN] as const;
 
 export const VAULT_VERSIONS = ['v1', 'v2'] as const;
 export const VAULTS_V1 = ['wstETH-v1', 'wcrETH-v1'] as const;

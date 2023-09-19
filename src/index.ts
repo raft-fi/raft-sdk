@@ -42,6 +42,7 @@ export {
   WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS,
   RAFT_TOKEN,
   VERAFT_TOKEN,
+  RAFT_BPT_TOKEN,
   type CollateralToken,
   type RToken,
   type Token,
