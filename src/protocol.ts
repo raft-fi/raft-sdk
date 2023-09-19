@@ -25,6 +25,8 @@ import {
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
   getInterestRateDebtTokenContract,
+  getRaftDebtToken,
+  getRaftCollateralToken,
 } from './utils';
 import {
   BORROWING_RATE_PRECISION,
@@ -165,9 +167,8 @@ export class Protocol {
   async fetchCollateralSupply(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
     await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
-        const collateralTokenAddress = RaftConfig.networkConfig.raftCollateralTokens[collateralToken];
         const { decimals } = RaftConfig.networkConfig.tokens[collateralToken];
-        const contract = ERC20Indexable__factory.connect(collateralTokenAddress, this.provider);
+        const contract = getTokenContract(getRaftCollateralToken(collateralToken), this.provider);
 
         this._collateralSupply[collateralToken] = new Decimal(await contract.totalSupply(), decimals);
       }),
@@ -230,9 +231,8 @@ export class Protocol {
   async fetchDebtSupply(): Promise<Record<UnderlyingCollateralToken, Decimal | null>> {
     await Promise.all(
       UNDERLYING_COLLATERAL_TOKENS.map(async collateralToken => {
-        const debtTokenAddress = RaftConfig.networkConfig.raftDebtTokens[collateralToken];
         const { decimals } = RaftConfig.networkConfig.tokens[collateralToken];
-        const contract = ERC20Indexable__factory.connect(debtTokenAddress, this.provider);
+        const contract = getTokenContract(getRaftDebtToken(collateralToken), this.provider);
 
         this._debtSupply[collateralToken] = new Decimal(await contract.totalSupply(), decimals);
       }),

@@ -6,17 +6,17 @@ import { EMPTY_PERMIT_SIGNATURE, buildTransactionWithGasLimit, createPermitSigna
 import { ERC20PermitSignatureStruct, getTokenAllowance } from '../../src';
 
 vi.mock('../../src/allowance', async () => ({
-  ...(await vi.importActual<any>('../../src/allowance')),
+  ...(await vi.importActual<typeof import('../../src/allowance')>('../../src/allowance')),
   getTokenAllowance: vi.fn(),
 }));
 
 vi.mock('../../src/utils/permit', async () => ({
-  ...(await vi.importActual<any>('../../src/utils/permit')),
+  EMPTY_PERMIT_SIGNATURE: {},
   createPermitSignature: vi.fn(),
 }));
 
 vi.mock('../../src/utils/transactions', async () => ({
-  ...(await vi.importActual<any>('../../src/utils/transactions')),
+  ...(await vi.importActual<typeof import('../../src/utils/transactions')>('../../src/utils/transactions')),
   buildTransactionWithGasLimit: vi.fn(),
 }));
 
@@ -118,6 +118,7 @@ describe('UserSavings', () => {
       (buildTransactionWithGasLimit as Mock).mockResolvedValue({
         sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
+        gasLimit: Decimal.ZERO,
       });
 
       const firstStep = await steps.next();

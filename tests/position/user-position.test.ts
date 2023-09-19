@@ -11,9 +11,10 @@ import {
 import { CollateralToken, UnderlyingCollateralToken, VaultV1 } from '../../src/types';
 import { getWstEthToStEthRate } from '../../src/price';
 import { SWAP_ROUTER_MAX_SLIPPAGE } from '../../src/constants';
+import { ERC20Indexable, ERC20Indexable__factory } from '../../src/typechain';
 
 vi.mock('../../src/allowance', async () => ({
-  ...(await vi.importActual<any>('../../src/allowance')),
+  ...(await vi.importActual<typeof import('../../src/allowance')>('../../src/allowance')),
   getTokenAllowance: vi.fn(),
 }));
 
@@ -21,11 +22,19 @@ vi.mock('../../src/price/rates', async () => ({
   getWstEthToStEthRate: vi.fn(),
 }));
 
-vi.mock('../../src/utils', async () => ({
-  ...(await vi.importActual<any>('../../src/utils')),
-  buildTransactionWithGasLimit: vi.fn(),
+vi.mock('../../src/utils/permit', async () => ({
+  EMPTY_PERMIT_SIGNATURE: {},
   createPermitSignature: vi.fn(),
+}));
+
+vi.mock('../../src/utils/position-manager', async () => ({
+  ...(await vi.importActual<typeof import('../../src/utils/position-manager')>('../../src/utils/position-manager')),
   getPositionManagerContract: vi.fn(),
+}));
+
+vi.mock('../../src/utils/transactions', async () => ({
+  ...(await vi.importActual<typeof import('../../src/utils/transactions')>('../../src/utils/transactions')),
+  buildTransactionWithGasLimit: vi.fn(),
 }));
 
 const mockEoaSigner = {
@@ -768,10 +777,24 @@ describe('UserPosition', () => {
     it.each([
       ['wstETH' as CollateralToken, 'wstETH' as UnderlyingCollateralToken],
       ['stETH' as CollateralToken, 'wstETH' as UnderlyingCollateralToken],
-      ['rETH' as CollateralToken, 'wcrETH' as UnderlyingCollateralToken],
     ])(
       'should generate steps [whitelist + approve + leverage] for %s leveraging',
       async (collateralToken, underlyingCollateralToken) => {
+        const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
+        const getWstEthToStEthRateMock = vi.fn().mockResolvedValue(new Decimal(1.1));
+
+        vi.spyOn(ERC20Indexable__factory, 'connect').mockReturnValue({} as unknown as ERC20Indexable);
+        (getWstEthToStEthRate as Mock).mockImplementation(getWstEthToStEthRateMock);
+        (getPositionManagerContract as Mock).mockReturnValue({
+          managePosition: null,
+          whitelistDelegate: null,
+        });
+        (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+          sendTransaction: vi.fn(),
+          gasEstimate: Decimal.ZERO,
+          gasLimit: Decimal.ZERO,
+        });
+
         const userPosition = new UserPosition(mockEoaSigner, underlyingCollateralToken);
         const steps = userPosition.getLeverageSteps(Decimal.ONE, new Decimal(0.5), new Decimal(2), new Decimal(0.1), {
           collateralToken,
@@ -781,16 +804,7 @@ describe('UserPosition', () => {
           underlyingCollateralPrice: new Decimal(1000),
         });
 
-        const isDelegateWhitelistedMock = vi.fn().mockResolvedValue(false);
-        const getWstEthToStEthRateMock = vi.fn().mockResolvedValue(new Decimal(1.1));
-
         vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
-        (getWstEthToStEthRate as Mock).mockImplementation(getWstEthToStEthRateMock);
-        (buildTransactionWithGasLimit as Mock).mockResolvedValue({
-          sendTransaction: vi.fn(),
-          gasEstimate: Decimal.ZERO,
-          gasLimit: Decimal.ZERO,
-        });
 
         const numberOfSteps = 3;
 

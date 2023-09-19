@@ -2,7 +2,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { Provider } from 'ethers';
 import * as graphqlRequest from 'graphql-request';
 import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
-import { Protocol } from '../src';
+import { Protocol, RaftConfig } from '../src';
 import { getPositionManagerContract, getTokenContract } from '../src/utils';
 
 vi.mock('graphql-request', async () => ({
@@ -33,14 +33,26 @@ describe('Protocol', () => {
       const protocol = Protocol.getInstance(mockProvider);
 
       expect(protocol.collateralSupply).toEqual({
+        'wstETH-v1': null,
+        'wcrETH-v1': null,
         wstETH: null,
-        wcrETH: null,
+        rETH: null,
+        WETH: null,
+        WBTC: null,
+        cbETH: null,
+        swETH: null,
       });
 
       const collateralSupply = await protocol.fetchCollateralSupply();
       const expectedCollateralSupply = {
+        'wstETH-v1': new Decimal(1n, Decimal.PRECISION),
+        'wcrETH-v1': new Decimal(1n, Decimal.PRECISION),
         wstETH: new Decimal(100n, Decimal.PRECISION),
-        wcrETH: new Decimal(1n, Decimal.PRECISION),
+        rETH: new Decimal(1n, Decimal.PRECISION),
+        WETH: new Decimal(1n, Decimal.PRECISION),
+        WBTC: new Decimal(1n, RaftConfig.networkConfig.tokens.WBTC.decimals),
+        cbETH: new Decimal(1n, Decimal.PRECISION),
+        swETH: new Decimal(1n, Decimal.PRECISION),
       };
 
       expect(collateralSupply).toEqual(expectedCollateralSupply);
@@ -57,14 +69,26 @@ describe('Protocol', () => {
       const protocol = Protocol.getInstance(mockProvider);
 
       expect(protocol.debtSupply).toEqual({
+        'wstETH-v1': null,
+        'wcrETH-v1': null,
         wstETH: null,
-        wcrETH: null,
+        rETH: null,
+        WETH: null,
+        WBTC: null,
+        cbETH: null,
+        swETH: null,
       });
 
       const debtSupply = await protocol.fetchDebtSupply();
       const expectedDebtSupply = {
+        'wstETH-v1': new Decimal(1n, Decimal.PRECISION),
+        'wcrETH-v1': new Decimal(1n, Decimal.PRECISION),
         wstETH: new Decimal(100n, Decimal.PRECISION),
-        wcrETH: new Decimal(1n, Decimal.PRECISION),
+        rETH: new Decimal(1n, Decimal.PRECISION),
+        WETH: new Decimal(1n, Decimal.PRECISION),
+        WBTC: new Decimal(1n, RaftConfig.networkConfig.tokens.WBTC.decimals),
+        cbETH: new Decimal(1n, Decimal.PRECISION),
+        swETH: new Decimal(1n, Decimal.PRECISION),
       };
 
       expect(debtSupply).toEqual(expectedDebtSupply);
@@ -93,14 +117,26 @@ describe('Protocol', () => {
       const protocol = Protocol.getInstance(mockProvider);
 
       expect(protocol.borrowingRate).toEqual({
+        'wstETH-v1': null,
+        'wcrETH-v1': null,
         wstETH: null,
-        wcrETH: null,
+        rETH: null,
+        WETH: null,
+        WBTC: null,
+        cbETH: null,
+        swETH: null,
       });
 
       const borrowingRate = await protocol.fetchBorrowingRate();
       const expectedBorrowingRate = {
+        'wstETH-v1': new Decimal(0.01),
+        'wcrETH-v1': new Decimal(0.01),
         wstETH: new Decimal(0.01),
-        wcrETH: new Decimal(0.01),
+        rETH: new Decimal(0.01),
+        WETH: new Decimal(0.01),
+        WBTC: new Decimal(0.01),
+        cbETH: new Decimal(0.01),
+        swETH: new Decimal(0.01),
       };
 
       expect(borrowingRate).toEqual(expectedBorrowingRate);
@@ -152,7 +188,7 @@ describe('Protocol', () => {
 
       const protocol = Protocol.getInstance(mockProvider);
 
-      expect(protocol.getPositionCollateralCap('rETH')).resolves.toEqual(new Decimal(100n, Decimal.PRECISION));
+      expect(protocol.getPositionCollateralCap('wcrETH-v1')).resolves.toEqual(new Decimal(100n, Decimal.PRECISION));
     });
 
     it('should return null if token is not supported', async () => {
@@ -170,7 +206,7 @@ describe('Protocol', () => {
 
       const protocol = Protocol.getInstance(mockProvider);
 
-      expect(protocol.getTotalCollateralCap('rETH')).resolves.toEqual(new Decimal(100n, Decimal.PRECISION));
+      expect(protocol.getTotalCollateralCap('wcrETH-v1')).resolves.toEqual(new Decimal(100n, Decimal.PRECISION));
     });
 
     it('should return null if token is not supported', async () => {

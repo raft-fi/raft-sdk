@@ -5,7 +5,7 @@ import { getTokenContract } from '../src/utils';
 import { Balance } from '../src';
 
 vi.mock('../src/utils', async () => ({
-  ...(await vi.importActual<any>('../src/utils')),
+  ...(await vi.importActual<typeof import('../src/utils')>('../src/utils')),
   getTokenContract: vi.fn(),
 }));
 

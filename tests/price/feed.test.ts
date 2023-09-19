@@ -1,21 +1,20 @@
 import { request } from 'graphql-request';
 import { JsonRpcProvider } from 'ethers';
+import { describe, expect, it, Mock, vi } from 'vitest';
 import { PriceFeed, TOKENS } from '../../src';
 import { Decimal } from '@tempusfinance/decimal';
 
-jest.mock('graphql-request', () => ({
-  ...jest.requireActual('graphql-request'),
-  request: jest.fn(),
+vi.mock('graphql-request', async () => ({
+  ...(await vi.importActual<typeof import('graphql-request')>('graphql-request')),
+  request: vi.fn(),
 }));
-
-const describeWhen = (condition: boolean) => (condition ? describe : describe.skip);
 
 const forkProvider = new JsonRpcProvider('http://127.0.0.1:8545');
 
-describeWhen(process.env.CI === 'true')('PriceFeed', () => {
+describe.skipIf(process.env.CI !== 'true')('PriceFeed', () => {
   describe('getPrice', () => {
     it('should return non-zero price for each token', async () => {
-      (request as jest.Mock).mockRejectedValue(new Error('Failed to fetch price'));
+      (request as Mock).mockRejectedValue(new Error('Failed to fetch price'));
 
       for (const token of TOKENS) {
         const priceFeed = new PriceFeed(forkProvider);
