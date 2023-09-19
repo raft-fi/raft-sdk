@@ -22,7 +22,7 @@ import {
   getTokenContract,
   isEoaAddress,
 } from '../utils';
-import { LP_BALANCER_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions } from '../types';
+import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions } from '../types';
 
 const YEAR_IN_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -99,7 +99,7 @@ export class RaftToken {
     this.provider = provider;
     this.walletAddress = walletAddress;
     this.veContract = VotingEscrow__factory.connect(RaftConfig.networkConfig.veRaftAddress, provider);
-    this.raftBptContract = getTokenContract(LP_BALANCER_TOKEN, this.provider);
+    this.raftBptContract = getTokenContract(RAFT_BPT_TOKEN, this.provider);
     this.airdropContract = MerkleDistributor__factory.connect(RaftConfig.networkConfig.raftAirdropAddress, provider);
     this.claimAndStakeContract = ClaimRaftAndStake__factory.connect(
       RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
@@ -476,7 +476,7 @@ export class RaftToken {
       );
       // sign permit for LP token for approval amount
       balancerLPTokenPermitSignature = await createPermitSignature(
-        LP_BALANCER_TOKEN,
+        RAFT_BPT_TOKEN,
         signer,
         this.claimableAmount,
         RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
