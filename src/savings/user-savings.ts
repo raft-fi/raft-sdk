@@ -174,9 +174,7 @@ export class UserSavings extends Savings {
   }
 
   public async currentSavings(): Promise<Decimal> {
-    const userAddress = await this.getUserAddress();
-
-    const userSavings = await this.rSavingsModuleContract.maxWithdraw(userAddress);
+    const userSavings = await this.rSavingsModuleContract.maxWithdraw(this.user);
 
     return new Decimal(userSavings, RR_PRECISION);
   }

@@ -53,20 +53,3 @@ export async function buildTransactionWithGasLimit<
     gasLimit,
   };
 }
-
-// TODO: keep this since there are consumers for sendTransactionWithGasLimit(), should change them one by one later
-export async function sendTransactionWithGasLimit<
-  A extends Array<unknown>,
-  R,
-  S extends Exclude<StateMutability, 'view'>,
->(
-  method: TypedContractMethod<A, R, S>,
-  args: { [I in keyof A]-?: A[I] },
-  gasLimitMultiplier: Decimal = Decimal.ONE,
-  tag?: string,
-  signer?: Signer,
-  value?: bigint,
-): Promise<TransactionResponse> {
-  const { sendTransaction } = await buildTransactionWithGasLimit(method, args, gasLimitMultiplier, tag, signer, value);
-  return sendTransaction();
-}

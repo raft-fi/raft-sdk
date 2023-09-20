@@ -31,13 +31,8 @@ export class Balance {
    * Fetches and returns token balance.
    */
   public async fetchBalance(): Promise<Decimal | null> {
-    if (this.tokenContract) {
-      const tokenConfig = RaftConfig.networkConfig.tokens[this.token];
-      this.balance = new Decimal(await this.tokenContract.balanceOf(this.walletAddress), tokenConfig.decimals);
-    } else {
-      // In case token is ETH
-      this.balance = new Decimal(await this.provider.getBalance(this.walletAddress), ETH_PRECISION);
-    }
+    const { decimals } = RaftConfig.networkConfig.tokens[this.token];
+    this.balance = new Decimal(await this.tokenContract.balanceOf(this.walletAddress), decimals);
 
     return this.balance;
   }

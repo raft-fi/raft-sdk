@@ -11,7 +11,7 @@ export {
   type PermitStep,
   type WhitelistStep,
 } from './steps';
-export { sendTransactionWithGasLimit, buildTransactionWithGasLimit, type BuiltTransactionData } from './transactions';
+export { buildTransactionWithGasLimit, type BuiltTransactionData } from './transactions';
 export {
   getRaftCollateralToken,
   getRaftDebtToken,

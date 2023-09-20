@@ -17,13 +17,13 @@ import {
   VaultVersion,
 } from '../types';
 import {
+  buildTransactionWithGasLimit,
   getPermitOrApproveTokenStep,
   getPositionManagerContract,
   getTokenContract,
   getWhitelistStep,
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
-  sendTransactionWithGasLimit,
 } from '../utils';
 import { PositionWithRunner } from './base';
 import {
@@ -609,6 +609,21 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         collateralToken === 'wstETH'
           ? this.loadOneStepLeverageStETH().manageLeveragedPosition // used for wstETH
           : this.loadOneStepLeverageStETH().manageLeveragedPositionStETH; // used to stETH
+      const { sendTransaction } = await buildTransactionWithGasLimit(
+        method,
+        [
+          debtChange.abs().toBigInt(RAFT_DEBT_TOKEN_PRECISION),
+          isDebtIncrease,
+          principalCollateralChange.abs().toBigInt(RAFT_COLLATERAL_TOKEN_PRECISION),
+          isPrincipalCollateralIncrease,
+          oneInchDataAmmData,
+          isDebtIncrease ? minReturn.toBigInt(collateralDecimals) : collateralToSwap.toBigInt(collateralDecimals),
+          maxFeePercentage.toBigInt(MAX_FEE_PERCENTAGE_PRECISION),
+        ],
+        gasLimitMultiplier,
+        frontendTag,
+        this.user,
+      );
 
       yield {
         type: {
@@ -617,22 +632,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         stepNumber: stepCounter++,
         numberOfSteps,
         // TODO: implement the actual leverage function
-        action: () =>
-          sendTransactionWithGasLimit(
-            method,
-            [
-              debtChange.abs().toBigInt(RAFT_DEBT_TOKEN_PRECISION),
-              isDebtIncrease,
-              principalCollateralChange.abs().toBigInt(RAFT_COLLATERAL_TOKEN_PRECISION),
-              isPrincipalCollateralIncrease,
-              oneInchDataAmmData,
-              isDebtIncrease ? minReturn.toBigInt(collateralDecimals) : collateralToSwap.toBigInt(collateralDecimals),
-              maxFeePercentage.toBigInt(MAX_FEE_PERCENTAGE_PRECISION),
-            ],
-            gasLimitMultiplier,
-            frontendTag,
-            this.user,
-          ),
+        action: sendTransaction,
       };
     } else if (isWrappableCappedCollateralToken(collateralToken)) {
       // TODO - Add support for rETH (wrapped capped tokens)
