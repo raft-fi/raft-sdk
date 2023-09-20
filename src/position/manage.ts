@@ -3,13 +3,13 @@ import { Decimal } from '@tempusfinance/decimal';
 import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
 import {
   EMPTY_PERMIT_SIGNATURE,
+  buildTransactionWithGasLimit,
   getPermitOrApproveTokenStep,
   getPositionManagerContract,
   getTokenContract,
   getWhitelistStep,
   isEoaAddress,
   isInterestRateVault,
-  sendTransactionWithGasLimit,
 } from '../utils';
 import { RaftConfig, SupportedCollateralTokens } from '../config';
 import { getTokenAllowance } from '../allowance';
@@ -288,21 +288,22 @@ export class InterestRatePositionManaging extends BasePositionManaging {
       this.user,
     ).managePosition;
 
-    return () =>
-      sendTransactionWithGasLimit(
-        method,
-        [
-          RaftConfig.getTokenAddress(collateralToken),
-          this.user,
-          ...this.getAbsValueAndIsIncrease(collateralChange),
-          ...this.getAbsValueAndIsIncrease(debtChange),
-          maxFeePercentage.value,
-          collateralPermitSignature,
-        ],
-        gasLimitMultiplier,
-        frontendTag,
+    const { sendTransaction } = await buildTransactionWithGasLimit(
+      method,
+      [
+        RaftConfig.getTokenAddress(collateralToken),
         this.user,
-      );
+        ...this.getAbsValueAndIsIncrease(collateralChange),
+        ...this.getAbsValueAndIsIncrease(debtChange),
+        maxFeePercentage.value,
+        collateralPermitSignature,
+      ],
+      gasLimitMultiplier,
+      frontendTag,
+      this.user,
+    );
+
+    return sendTransaction;
   }
 }
 
@@ -318,21 +319,22 @@ export class UnderlyingCollateralTokenPositionManaging extends BasePositionManag
       frontendTag,
     } = args;
 
-    return () =>
-      sendTransactionWithGasLimit(
-        this.positionManager.managePosition,
-        [
-          RaftConfig.getTokenAddress(collateralToken),
-          this.user,
-          ...this.getAbsValueAndIsIncrease(collateralChange),
-          ...this.getAbsValueAndIsIncrease(debtChange),
-          maxFeePercentage.value,
-          collateralPermitSignature,
-        ],
-        gasLimitMultiplier,
-        frontendTag,
+    const { sendTransaction } = await buildTransactionWithGasLimit(
+      this.positionManager.managePosition,
+      [
+        RaftConfig.getTokenAddress(collateralToken),
         this.user,
-      );
+        ...this.getAbsValueAndIsIncrease(collateralChange),
+        ...this.getAbsValueAndIsIncrease(debtChange),
+        maxFeePercentage.value,
+        collateralPermitSignature,
+      ],
+      gasLimitMultiplier,
+      frontendTag,
+      this.user,
+    );
+
+    return sendTransaction;
   }
 }
 
@@ -348,19 +350,20 @@ export class WrappableCappedCollateralTokenPositionManaging extends BasePosition
       frontendTag,
     } = args;
 
-    return () =>
-      sendTransactionWithGasLimit(
-        getPositionManagerContract('wrapped', positionManagerAddress, this.user).managePosition,
-        [
-          ...this.getAbsValueAndIsIncrease(collateralChange),
-          ...this.getAbsValueAndIsIncrease(debtChange),
-          maxFeePercentage.value,
-          rPermitSignature,
-        ],
-        gasLimitMultiplier,
-        frontendTag,
-        this.user,
-      );
+    const { sendTransaction } = await buildTransactionWithGasLimit(
+      getPositionManagerContract('wrapped', positionManagerAddress, this.user).managePosition,
+      [
+        ...this.getAbsValueAndIsIncrease(collateralChange),
+        ...this.getAbsValueAndIsIncrease(debtChange),
+        maxFeePercentage.value,
+        rPermitSignature,
+      ],
+      gasLimitMultiplier,
+      frontendTag,
+      this.user,
+    );
+
+    return sendTransaction;
   }
 }
 
@@ -376,18 +379,19 @@ export class StEthPositionManaging extends BasePositionManaging {
       frontendTag,
     } = args;
 
-    return () =>
-      sendTransactionWithGasLimit(
-        getPositionManagerContract('stETH', positionManagerAddress, this.user).managePositionStETH,
-        [
-          ...this.getAbsValueAndIsIncrease(collateralChange),
-          ...this.getAbsValueAndIsIncrease(debtChange),
-          maxFeePercentage.value,
-          rPermitSignature,
-        ],
-        gasLimitMultiplier,
-        frontendTag,
-        this.user,
-      );
+    const { sendTransaction } = await buildTransactionWithGasLimit(
+      getPositionManagerContract('stETH', positionManagerAddress, this.user).managePositionStETH,
+      [
+        ...this.getAbsValueAndIsIncrease(collateralChange),
+        ...this.getAbsValueAndIsIncrease(debtChange),
+        maxFeePercentage.value,
+        rPermitSignature,
+      ],
+      gasLimitMultiplier,
+      frontendTag,
+      this.user,
+    );
+
+    return sendTransaction;
   }
 }

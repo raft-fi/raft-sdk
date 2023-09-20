@@ -209,6 +209,9 @@ describe('UserPosition', () => {
       vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
       (createPermitSignature as Mock).mockResolvedValue(EMPTY_PERMIT_SIGNATURE);
+      (getPositionManagerContract as Mock).mockResolvedValue({
+        managePosition: null,
+      });
       (buildTransactionWithGasLimit as Mock).mockResolvedValue({
         sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
@@ -284,6 +287,9 @@ describe('UserPosition', () => {
 
       vi.spyOn(userPosition, 'isDelegateWhitelisted').mockImplementation(isDelegateWhitelistedMock);
       (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
+      (getPositionManagerContract as Mock).mockResolvedValue({
+        managePosition: null,
+      });
       (buildTransactionWithGasLimit as Mock).mockResolvedValue({
         sendTransaction: vi.fn(),
         gasEstimate: Decimal.ZERO,
@@ -544,6 +550,9 @@ describe('UserPosition', () => {
       (getTokenAllowance as Mock).mockResolvedValue(Decimal.ZERO);
       (getPositionManagerContract as Mock).mockResolvedValue({
         managePosition: null,
+      });
+      (buildTransactionWithGasLimit as Mock).mockResolvedValue({
+        sendTransaction: vi.fn(),
       });
 
       const numberOfSteps = 1;

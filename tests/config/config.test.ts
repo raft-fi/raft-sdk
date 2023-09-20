@@ -46,6 +46,8 @@ describe('RaftConfig', () => {
     RaftConfig.setNetwork('mainnet');
     expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.stETH.address)).toEqual('stETH');
     expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.wstETH.address)).toEqual('wstETH');
+    expect(RaftConfig.getTokenTicker(mainnetConfig.tokens['wstETH-v1'].address)).toEqual('wstETH');
+    expect(RaftConfig.getTokenTicker(mainnetConfig.tokens['rETH-v1'].address)).toEqual('rETH');
     expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.R.address)).toEqual('R');
 
     RaftConfig.setNetwork('goerli');

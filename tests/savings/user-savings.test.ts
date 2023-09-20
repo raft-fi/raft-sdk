@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { UserSavings } from '../../src/savings';
 import { EMPTY_PERMIT_SIGNATURE, buildTransactionWithGasLimit, createPermitSignature } from '../../src/utils';
 import { ERC20PermitSignatureStruct, getTokenAllowance } from '../../src';
+import { RSavingsModule, RSavingsModule__factory } from '../../src/typechain';
 
 vi.mock('../../src/allowance', async () => ({
   ...(await vi.importActual<typeof import('../../src/allowance')>('../../src/allowance')),
@@ -133,6 +134,19 @@ describe('UserSavings', () => {
       const terminationStep = await steps.next();
 
       expect(terminationStep.done).toBe(true);
+    });
+  });
+
+  describe('currentSavings', () => {
+    it('should return current savings', async () => {
+      vi.spyOn(RSavingsModule__factory, 'connect').mockReturnValue({
+        maxWithdraw: vi.fn().mockResolvedValue(100n * 10n ** 18n),
+      } as unknown as RSavingsModule);
+
+      const savings = new UserSavings(mockEoaSigner);
+      const currentSavings = await savings.currentSavings();
+
+      expect(currentSavings).toEqual(new Decimal(100));
     });
   });
 });
