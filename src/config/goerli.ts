@@ -215,10 +215,10 @@ export const goerliConfig: NetworkConfig = {
   testNetwork: true,
   rSavingsModule: '0xDeEae93bf4bdA40529Fe5769Dd817996e86eb4Dd',
   // deploy merkle-distributor everytime
-  raftAirdropAddress: '0x552e7271Dd11502BfaAD488140F3de9ca15bEd84',
-  claimRaftStakeVeRaftAddress: '0x2b1ad5011846D737fc13F2D3ed238C62942e4410',
+  raftAirdropAddress: '0x79C150ec604FdE96db3f8B30Ff4A0a534C8a9AcA',
+  claimRaftStakeVeRaftAddress: '0x87Fa9DEDdbFC0e692779c09646fe06bbaD308acA',
   // this is veBAL
-  veRaftAddress: '0x33A99Dcc4C85C014cf12626959111D5898bbCAbF',
+  veRaftAddress: '0x0628fFBe2AE5A26F8C95F3de3Ddc957B3b87a27a',
   // this is veBAL/WETH pool
   balancerWeightedPoolId: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00000200000000000000000060',
 };

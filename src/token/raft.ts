@@ -24,7 +24,7 @@ import {
 } from '../utils';
 import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions } from '../types';
 
-const YEAR_IN_MS = 365 * 24 * 60 * 60 * 1000;
+const YEAR_IN_SEC = 365 * 24 * 60 * 60;
 
 // annual give away = 10% of 1B evenly over 3 years
 const ANNUAL_GIVE_AWAY = new Decimal(1000000000).mul(0.1).div(3);
@@ -312,7 +312,7 @@ export class RaftToken {
   public async getUserVeRaftBalance(): Promise<UserVeRaftBalance> {
     const [lockedBalance, veRaftBalance, totalSupply] = await Promise.all([
       this.veContract.locked(this.walletAddress) as Promise<BptLockedBalance>,
-      this.veContract['balanceOf(address)'](this.walletAddress) as Promise<bigint>,
+      this.veContract.balanceOf(this.walletAddress) as Promise<bigint>,
       this.veContract.supply(),
     ]);
 
@@ -436,7 +436,7 @@ export class RaftToken {
     const { gasLimitMultiplier = Decimal.ONE } = options;
     const index = BigInt(this.merkleTreeIndex);
     const amount = this.claimableAmount.toBigInt(Decimal.PRECISION);
-    const unlockTime = BigInt(Date.now()) + period.mul(YEAR_IN_MS).toBigInt();
+    const unlockTime = BigInt(Math.floor(Date.now() / 1000)) + period.mul(YEAR_IN_SEC).toBigInt(0);
 
     const poolData = await this.getBalancerPoolData();
     const bptOutGivenExactRaftIn = await this.calculateBptOutGivenExactRaftIn(this.claimableAmount.mul(period), {
@@ -450,7 +450,8 @@ export class RaftToken {
     // minBptAmountOut = calculated BPT out * (1 - slippage)
     const minBptAmountOut = new Decimal(bptOutGivenExactRaftIn.toString()).mul(Decimal.ONE.sub(slippage));
 
-    const tokenContract = getTokenContract(RAFT_TOKEN, signer);
+    const raftTokenContract = getTokenContract(RAFT_TOKEN, signer);
+    const bptTokenContract = getTokenContract(RAFT_BPT_TOKEN, signer);
 
     let raftTokenPermitSignature = EMPTY_PERMIT_SIGNATURE;
     let balancerLPTokenPermitSignature = EMPTY_PERMIT_SIGNATURE;
@@ -462,8 +463,17 @@ export class RaftToken {
       await getApproval(
         this.claimableAmount,
         this.walletAddress,
-        tokenContract as ERC20,
+        raftTokenContract as ERC20,
         RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
+      );
+      // approve BPT token for approval amount
+      await getApproval(
+        // 120% amount of calculated BPT amount
+        //new Decimal(minBptAmountOut.toString()).mul(1.2),
+        Decimal.MAX_DECIMAL,
+        this.walletAddress,
+        bptTokenContract as ERC20,
+        RaftConfig.networkConfig.veRaftAddress,
       );
     } else {
       // sign permit for $RAFT token for approval amount
@@ -472,14 +482,14 @@ export class RaftToken {
         signer,
         this.claimableAmount,
         RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
-        tokenContract,
+        raftTokenContract,
       );
-      // sign permit for LP token for approval amount
+      // sign permit for BPT token for approval amount
       balancerLPTokenPermitSignature = await createPermitSignature(
         RAFT_BPT_TOKEN,
         signer,
         this.claimableAmount,
-        RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
+        RaftConfig.networkConfig.veRaftAddress,
         this.raftBptContract,
       );
     }
@@ -487,10 +497,11 @@ export class RaftToken {
     const { sendTransaction } = await buildTransactionWithGasLimit(
       this.claimAndStakeContract.execute,
       [
-        { index, merkleProof: this.merkleProof },
+        index,
         this.walletAddress,
         amount,
         unlockTime,
+        this.merkleProof,
         minBptAmountOut.toBigInt(Decimal.PRECISION),
         raftTokenPermitSignature,
         balancerLPTokenPermitSignature,
