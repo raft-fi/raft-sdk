@@ -162,21 +162,9 @@
   {
     "inputs": [
       {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "index",
-            "type": "uint256"
-          },
-          {
-            "internalType": "bytes32[]",
-            "name": "merkleProof",
-            "type": "bytes32[]"
-          }
-        ],
-        "internalType": "struct IClaimRaftAndStake.ClaimInfo",
-        "name": "claimInfo",
-        "type": "tuple"
+        "internalType": "uint256",
+        "name": "index",
+        "type": "uint256"
       },
       {
         "internalType": "address",
@@ -192,6 +180,11 @@
         "internalType": "uint256",
         "name": "unlockTime",
         "type": "uint256"
+      },
+      {
+        "internalType": "bytes32[]",
+        "name": "merkleProof",
+        "type": "bytes32[]"
       },
       {
         "internalType": "uint256",
