@@ -450,7 +450,7 @@ export class RaftToken {
   }
 
   public async claimRaftAndStakeBptForVeRaft(
-    period: Decimal,
+    lockYear: number,
     slippage: Decimal,
     signer: Signer,
     options: TransactionWithFeesOptions = {},
@@ -462,10 +462,10 @@ export class RaftToken {
     const { gasLimitMultiplier = Decimal.ONE } = options;
     const index = BigInt(this.merkleTreeIndex);
     const amount = this.claimableAmount.toBigInt(Decimal.PRECISION);
-    const unlockTime = BigInt(Math.floor(Date.now() / 1000)) + period.mul(YEAR_IN_SEC).toBigInt(0);
+    const unlockTime = Math.floor(Date.now() / 1000) + lockYear * YEAR_IN_SEC;
 
     const poolData = await this.getBalancerPoolData();
-    const bptBptAmountFromRaft = await this.getBptAmountFromRaft(this.claimableAmount.mul(period), {
+    const bptBptAmountFromRaft = await this.getBptAmountFromRaft(this.claimableAmount, {
       poolData,
     });
 
@@ -526,7 +526,7 @@ export class RaftToken {
         index,
         this.walletAddress,
         amount,
-        unlockTime,
+        BigInt(unlockTime),
         this.merkleProof,
         minBptAmountOut.toBigInt(Decimal.PRECISION),
         raftTokenPermitSignature,
