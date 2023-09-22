@@ -25,8 +25,6 @@ import {
 } from '../utils';
 import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions } from '../types';
 
-const YEAR_IN_SEC = 365 * 24 * 60 * 60;
-
 // annual give away = 10% of 1B evenly over 3 years
 const ANNUAL_GIVE_AWAY = new Decimal(1000000000).mul(0.1).div(3);
 
@@ -450,7 +448,7 @@ export class RaftToken {
   }
 
   public async claimRaftAndStakeBptForVeRaft(
-    lockYear: number,
+    unlockTime: number,
     slippage: Decimal,
     signer: Signer,
     options: TransactionWithFeesOptions = {},
@@ -462,7 +460,6 @@ export class RaftToken {
     const { gasLimitMultiplier = Decimal.ONE } = options;
     const index = BigInt(this.merkleTreeIndex);
     const amount = this.claimableAmount.toBigInt(Decimal.PRECISION);
-    const unlockTime = Math.floor(Date.now() / 1000) + lockYear * YEAR_IN_SEC;
 
     const poolData = await this.getBalancerPoolData();
     const bptBptAmountFromRaft = await this.getBptAmountFromRaft(this.claimableAmount, {
