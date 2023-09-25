@@ -6,7 +6,6 @@ import {
   ChaiPot__factory,
   ChaiToken__factory,
   ChainlinkDaiUsdAggregator__factory,
-  ERC20Indexable__factory,
   WrappedCollateralToken,
 } from './typechain';
 import {

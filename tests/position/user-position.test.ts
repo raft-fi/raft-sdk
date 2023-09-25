@@ -20,6 +20,7 @@ vi.mock('../../src/allowance', async () => ({
 
 vi.mock('../../src/price/rates', async () => ({
   getWstEthToStEthRate: vi.fn(),
+  getRRToRRate: vi.fn(),
 }));
 
 vi.mock('../../src/utils/permit', async () => ({
