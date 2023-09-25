@@ -39,3 +39,11 @@ export class Savings {
     return issuanceRate.mul(SECONDS_PER_YEAR);
   }
 }
+
+export function isSupportedSavingsNetwork(value: string): value is SupportedSavingsNetwork {
+  const networks: string[] = [...SUPPORTED_SAVINGS_NETWORKS];
+  if (networks.includes(value)) {
+    return true;
+  }
+  return false;
+}
