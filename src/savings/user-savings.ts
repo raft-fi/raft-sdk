@@ -1,8 +1,8 @@
 import { Signer, TransactionResponse } from 'ethers';
 import request, { gql } from 'graphql-request';
 import { Decimal } from '@tempusfinance/decimal';
-import { ERC20PermitSignatureStruct } from '../typechain/RSavingsModule';
-import { RToken, R_TOKEN, TransactionWithFeesOptions } from '../types';
+import { ERC20PermitSignatureStruct } from '../typechain/RSavingsRate';
+import { RR_TOKEN, RToken, R_TOKEN, TransactionWithFeesOptions } from '../types';
 import {
   ApproveStep,
   BaseStep,
@@ -18,7 +18,6 @@ import { ERC20Permit } from '../typechain';
 import { RaftConfig } from '../config';
 import { getTokenAllowance } from '../allowance';
 import { Savings } from './savings';
-import { RR_PRECISION } from '../constants';
 
 export interface ManageSavingsStepType {
   name: 'approve' | 'permit' | 'manageSavings';
@@ -96,7 +95,7 @@ export class UserSavings extends Savings {
     // In case the R token allowance check is not passed externally, check the allowance
     if (rTokenAllowance === undefined) {
       rTokenAllowance = rTokenAllowanceRequired
-        ? await getTokenAllowance(R_TOKEN, this.rToken, this.user, RaftConfig.networkConfig.rSavingsModule)
+        ? await getTokenAllowance(R_TOKEN, this.rToken, this.user, RaftConfig.getTokenAddress(RR_TOKEN))
         : Decimal.MAX_DECIMAL;
     }
 
@@ -113,7 +112,7 @@ export class UserSavings extends Savings {
         R_TOKEN,
         this.rToken,
         amount,
-        RaftConfig.networkConfig.rSavingsModule,
+        RaftConfig.getTokenAddress(RR_TOKEN),
         stepCounter++,
         numberOfSteps,
         canUsePermit,
@@ -121,22 +120,23 @@ export class UserSavings extends Savings {
       );
     }
 
+    const absAmountValue = amount.abs().toBigInt(RaftConfig.networkConfig.tokens.R.decimals);
     let builtTransactionData: BuiltTransactionData;
 
     // If amount is greater then zero, user wants to deposit, otherwise call withdraw
     if (isSavingsIncrease) {
       if (canUsePermit) {
         builtTransactionData = await buildTransactionWithGasLimit(
-          this.rSavingsModuleContract.depositWithPermit,
-          [amount.abs().toBigInt(RR_PRECISION), this.user, rPermitSignature],
+          this.rSavingsRateContract.depositWithPermit,
+          [absAmountValue, this.user, rPermitSignature],
           gasLimitMultiplier,
           frontendTag,
           this.user,
         );
       } else {
         builtTransactionData = await buildTransactionWithGasLimit(
-          this.rSavingsModuleContract.deposit,
-          [amount.abs().toBigInt(RR_PRECISION), this.user],
+          this.rSavingsRateContract.deposit,
+          [absAmountValue, this.user],
           gasLimitMultiplier,
           frontendTag,
           this.user,
@@ -144,8 +144,8 @@ export class UserSavings extends Savings {
       }
     } else {
       builtTransactionData = await buildTransactionWithGasLimit(
-        this.rSavingsModuleContract.withdraw,
-        [amount.abs().toBigInt(RaftConfig.networkConfig.tokens.R.decimals), this.user, this.user],
+        this.rSavingsRateContract.withdraw,
+        [absAmountValue, this.user, this.user],
         gasLimitMultiplier,
         frontendTag,
         this.user,
@@ -174,9 +174,9 @@ export class UserSavings extends Savings {
   }
 
   public async currentSavings(): Promise<Decimal> {
-    const userSavings = await this.rSavingsModuleContract.maxWithdraw(this.user);
+    const userSavings = await this.rSavingsRateContract.maxWithdraw(this.user);
 
-    return new Decimal(userSavings, RR_PRECISION);
+    return new Decimal(userSavings, RaftConfig.networkConfig.tokens.R.decimals);
   }
 
   async getSavingsTransactions(): Promise<SavingsTransaction[]> {

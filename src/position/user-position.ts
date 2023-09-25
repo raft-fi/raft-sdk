@@ -406,7 +406,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
 
     const priceFeed = new PriceFeed(this.user.provider);
     if (!underlyingRate) {
-      underlyingRate = await priceFeed.getUnderlyingCollateralRate(this.underlyingCollateralToken, collateralToken);
+      underlyingRate = await priceFeed.getConversionRate(collateralToken);
     }
 
     const actualPrincipalCollateralChange = principalCollateralChange.mul(Decimal.ONE.div(underlyingRate));

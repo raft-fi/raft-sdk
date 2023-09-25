@@ -1,2 +1,2 @@
 export { PriceFeed } from './feed';
-export { getWstEthToStEthRate } from './rates';
+export { getRRToRRate, getWstEthToStEthRate } from './rates';

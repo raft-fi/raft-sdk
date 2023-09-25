@@ -21,6 +21,7 @@ export {
   isInterestRateVault,
   isRaftCollateralToken,
   isRaftDebtToken,
+  isRRToken,
   isRToken,
   isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,

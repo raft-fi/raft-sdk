@@ -10,6 +10,8 @@ import {
   ERC20Permit__factory,
   ERC20__factory,
   InterestRateDebtToken__factory,
+  RSavingsRate,
+  RSavingsRate__factory,
   WrappedCollateralToken,
   WrappedCollateralToken__factory,
   WstETH,
@@ -19,6 +21,8 @@ import {
   COLLATERAL_TOKENS,
   CollateralToken,
   InterestRateVault,
+  RRToken,
+  RR_TOKEN,
   RToken,
   R_TOKEN,
   RaftCollateralToken,
@@ -51,6 +55,7 @@ type TokenContractTypes = {
   swETH: ERC20;
   RAFT: ERC20Permit;
   R: ERC20PermitRToken;
+  RR: RSavingsRate;
   'B-80RAFT-20R': ERC20Permit;
   'rwstETH-c': ERC20Indexable;
   'rwstETH-d': ERC20Indexable;
@@ -96,6 +101,10 @@ export function isCollateralToken(token: Token): token is CollateralToken {
 
 export function isRToken(token: Token): token is RToken {
   return token === R_TOKEN;
+}
+
+export function isRRToken(token: Token): token is RRToken {
+  return token === RR_TOKEN;
 }
 
 export function getWrappedCappedCollateralToken(
@@ -151,6 +160,10 @@ export function getTokenContract<T extends Token | RaftCollateralToken | RaftDeb
 
   if (isRToken(token)) {
     return ERC20PermitRToken__factory.connect(tokenAddress, runner) as TokenContractTypes[T];
+  }
+
+  if (isRRToken(token)) {
+    return RSavingsRate__factory.connect(tokenAddress, runner) as TokenContractTypes[T];
   }
 
   if (token === 'wstETH' || token === 'wstETH-v1') {

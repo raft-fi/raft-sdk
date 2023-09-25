@@ -1,7 +1,7 @@
 import { AddressLike, Provider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { Token } from './types';
-import { ERC20, ERC20Permit, WstETH } from './typechain';
+import { ERC20, ERC20Permit, RSavingsRate, WstETH } from './typechain';
 import { getTokenContract } from './utils';
 import { RaftConfig } from './config';
 
@@ -14,7 +14,7 @@ import { RaftConfig } from './config';
  */
 export async function getTokenAllowance(
   token: Token,
-  tokenContract: ERC20 | ERC20Permit | WstETH,
+  tokenContract: ERC20 | ERC20Permit | WstETH | RSavingsRate,
   owner: AddressLike,
   spender: AddressLike,
 ): Promise<Decimal> {
@@ -29,7 +29,7 @@ export class Allowance {
   private owner: AddressLike;
   private spender: AddressLike;
   private provider: Provider;
-  private tokenContract: ERC20Permit | ERC20 | WstETH;
+  private tokenContract: ERC20Permit | ERC20 | WstETH | RSavingsRate;
 
   /**
    * Creates a new representation of an allowance.

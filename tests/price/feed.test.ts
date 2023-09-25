@@ -32,10 +32,10 @@ describe.skipIf(process.env.CI !== 'true')('PriceFeed', () => {
     });
   });
 
-  describe('getUnderlyingCollateralRate', () => {
+  describe('getConversionRate', () => {
     it('should return valid rate for wstETH:stETH', async () => {
       const priceFeed = new PriceFeed(forkProvider);
-      const rate = await priceFeed.getUnderlyingCollateralRate('wstETH-v1', 'stETH');
+      const rate = await priceFeed.getConversionRate('stETH');
 
       expect(rate.gt(1)).toBeTruthy();
       expect(rate.lt(2)).toBeTruthy();
@@ -43,7 +43,7 @@ describe.skipIf(process.env.CI !== 'true')('PriceFeed', () => {
 
     it('should return 1:1 rate for wcrETH:rETH', async () => {
       const priceFeed = new PriceFeed(forkProvider);
-      const rate = await priceFeed.getUnderlyingCollateralRate('wcrETH-v1', 'rETH-v1');
+      const rate = await priceFeed.getConversionRate('rETH-v1');
 
       expect(rate.equals(Decimal.ONE)).toBeTruthy();
     });

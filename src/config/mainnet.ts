@@ -1,6 +1,6 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { NetworkConfig, TokenConfig, UnderlyingTokens } from './types';
-import { getWstEthToStEthRate } from '../price';
+import { getRRToRRate, getWstEthToStEthRate } from '../price';
 import { Token } from '../types';
 
 const POSITION_MANAGER_ADDRESS = '0x5f59b322eb3e16a0c78846195af1f588b77403fc';
@@ -81,7 +81,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
     decimals: 18,
     supportsPermit: false,
     priceFeed: {
-      ticker: 'stETH',
+      subgraphTokenTicker: 'stETH',
       fallbackToken: 'wstETH',
       getFallbackRate: getWstEthToStEthRate,
     },
@@ -163,6 +163,16 @@ const tokensConfig: Record<Token, TokenConfig> = {
     supportsPermit: true,
     priceFeed: Decimal.ONE,
   },
+  RR: {
+    address: '0x2ba26baE6dF1153e29813d7f926143f9c94402f3',
+    ticker: 'RR',
+    decimals: 18,
+    supportsPermit: false,
+    priceFeed: {
+      fallbackToken: 'R',
+      getFallbackRate: getRRToRRate,
+    },
+  },
   'B-80RAFT-20R': {
     address: '0x0000000000000000000000000000000000000000', // TODO: update address
     ticker: 'B-80RAFT-20R',
@@ -214,7 +224,6 @@ export const mainnetConfig: NetworkConfig = {
   tokens: tokensConfig,
   daiAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   testNetwork: false,
-  rSavingsModule: '0x2ba26bae6df1153e29813d7f926143f9c94402f3',
   // TODO: wait for deployment
   raftAirdropAddress: '0x0000000000000000000000000000000000000000',
   claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',

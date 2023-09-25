@@ -1,10 +1,10 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Contract, Provider } from 'ethers';
 import { request, gql } from 'graphql-request';
-import { RaftConfig } from '../config';
-import { Token, UnderlyingCollateralToken } from '../types';
+import { RaftConfig, PriceRate } from '../config';
+import { CollateralToken, RRToken, Token, UnderlyingCollateralToken } from '../types';
 import { SUBGRAPH_PRICE_PRECISION } from '../constants';
-import { SubgraphPriceFeedToken, SupportedCollateralTokens } from '../config/types';
+import { SubgraphPriceFeedToken } from '../config/types';
 import { isUnderlyingCollateralToken } from '../utils';
 
 export type PriceQueryResponse = {
@@ -30,29 +30,27 @@ export class PriceFeed {
       return this.fetchPriceFromPriceFeed(priceFeed);
     }
 
-    const { ticker, fallbackToken, getFallbackRate } = priceFeed;
+    const { subgraphTokenTicker, fallbackToken, getFallbackRate } = priceFeed;
 
-    try {
-      return await this.fetchSubgraphPrice(ticker);
-    } catch (e) {
-      const fallbackPrice = await this.getPrice(fallbackToken);
-      const rate = await getFallbackRate(this.provider);
-      return fallbackPrice.mul(rate);
+    if (subgraphTokenTicker) {
+      try {
+        return await this.fetchSubgraphPrice(subgraphTokenTicker);
+      } catch {
+        return this.fetchFallbackPrice(fallbackToken, getFallbackRate);
+      }
     }
+
+    return this.fetchFallbackPrice(fallbackToken, getFallbackRate);
   }
 
   /**
    * This function provides conversion rate from any supported underlying token to any supported
-   * collateral token.
-   * @param underlyingCollateral Underlying collateral token which rate converts from.
-   * @param collateralToken Collateral token which rate converts to.
+   * collateral token (in case of collateral tokens) or to R (in case of RR).
+   * @param token Token to get conversion rate for.
    * @returns Conversion rate from underlying collateral token to collateral token.
    */
-  public async getUnderlyingCollateralRate<U extends UnderlyingCollateralToken>(
-    _underlyingCollateral: U,
-    collateralToken: SupportedCollateralTokens[U],
-  ): Promise<Decimal> {
-    const { priceFeed } = RaftConfig.networkConfig.tokens[collateralToken];
+  public async getConversionRate(token: CollateralToken | RRToken): Promise<Decimal> {
+    const { priceFeed } = RaftConfig.networkConfig.tokens[token];
 
     if (priceFeed instanceof Decimal || (typeof priceFeed === 'string' && isUnderlyingCollateralToken(priceFeed))) {
       return Decimal.ONE;
@@ -113,5 +111,11 @@ export class PriceFeed {
     const response = await request<{ price: PriceQueryResponse }>(RaftConfig.subgraphEndpoint, query, variables);
 
     return new Decimal(BigInt(response.price.value), SUBGRAPH_PRICE_PRECISION);
+  }
+
+  private async fetchFallbackPrice(baseToken: Token, getRate: PriceRate): Promise<Decimal> {
+    const baseTokenPrice = await this.getPrice(baseToken);
+    const rate = await getRate(this.provider);
+    return baseTokenPrice.mul(rate);
   }
 }
