@@ -122,11 +122,11 @@ export function getRaftDebtToken(token: UnderlyingCollateralToken): RaftDebtToke
 }
 
 export function isRaftCollateralToken(token: string): token is RaftCollateralToken {
-  return token.startsWith('r') && token.endsWith('-c') && token.slice(1, -2) in UNDERLYING_COLLATERAL_TOKEN_SET;
+  return token.startsWith('r') && token.endsWith('-c') && UNDERLYING_COLLATERAL_TOKEN_SET.has(token.slice(1, -2));
 }
 
 export function isRaftDebtToken(token: string): token is RaftDebtToken {
-  return token.startsWith('r') && token.endsWith('-d') && token.slice(1, -2) in UNDERLYING_COLLATERAL_TOKEN_SET;
+  return token.startsWith('r') && token.endsWith('-d') && UNDERLYING_COLLATERAL_TOKEN_SET.has(token.slice(1, -2));
 }
 
 export function getUnderlyingCollateralTokenFromRaftToken(
