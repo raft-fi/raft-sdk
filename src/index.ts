@@ -21,7 +21,7 @@ export {
   type SavingsStep,
   type SavingsTransaction,
   type SavingsTransactionType,
-  UserSavings,
+  type UserSavings,
   Savings,
 } from './savings';
 export { PriceFeed } from './price';
