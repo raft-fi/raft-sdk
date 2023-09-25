@@ -318,3 +318,11 @@ const getMessageState = (status: number) => {
   }
   return 'unknown';
 };
+
+export function isSupportedBridgeNetwork(value: string): value is SupportedBridgeNetwork {
+  const networks: string[] = [...SUPPORTED_BRIDGE_NETWORKS];
+  if (networks.includes(value)) {
+    return true;
+  }
+  return false;
+}

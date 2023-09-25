@@ -1,4 +1,5 @@
 import { TOKENS, Token, UnderlyingCollateralToken } from '../types';
+import { baseConfig } from './base';
 import { goerliConfig } from './goerli';
 import { mainnetConfig } from './mainnet';
 import { NetworkConfig, SupportedCollateralTokens, SupportedNetwork } from './types';
@@ -6,11 +7,13 @@ import { NetworkConfig, SupportedCollateralTokens, SupportedNetwork } from './ty
 const networkConfig: Record<SupportedNetwork, NetworkConfig> = {
   mainnet: mainnetConfig,
   goerli: goerliConfig,
+  base: baseConfig,
 };
 
 const networkIds: Record<SupportedNetwork, number> = {
   mainnet: 1,
   goerli: 5,
+  base: 8453,
 };
 
 export class RaftConfig {

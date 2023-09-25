@@ -18,11 +18,14 @@ export {
   type PositionTransactionType,
 } from './position';
 export {
+  SUPPORTED_SAVINGS_NETWORKS,
   type SavingsStep,
   type SavingsTransaction,
   type SavingsTransactionType,
-  UserSavings,
+  type SupportedSavingsNetwork,
   Savings,
+  UserSavings,
+  isSupportedSavingsNetwork,
 } from './savings';
 export { PriceFeed } from './price';
 export { Protocol } from './protocol';
@@ -63,4 +66,5 @@ export {
   type BridgeTokensStep,
   type BridgeTokensStepType,
   type SupportedBridgeNetwork,
+  isSupportedBridgeNetwork,
 } from './bridge';
