@@ -1,133 +1,76 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { Provider } from 'ethers';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { RaftToken } from '../../src/token';
 
 describe('RaftToken', () => {
   const DUMMY_ADDRESS = '0x0';
   const DUMMY_PROVIDER = {} as Provider;
+  const YEAR_IN_SEC = 365 * 24 * 60 * 60;
 
   it('should return the correct estimated APR based on different input', async () => {
     const token = new RaftToken(DUMMY_ADDRESS, DUMMY_PROVIDER);
+    vi.spyOn(token, 'fetchVeRaftAvgTotalSupply').mockResolvedValue(new Decimal(34567890));
+    vi.spyOn(token, 'getMaxVeLockPeriod').mockResolvedValue(2 * YEAR_IN_SEC);
+    vi.spyOn(token, 'getAnnualGiveAway').mockReturnValue(new Decimal(33333333));
+    vi.spyOn(Date, 'now').mockReturnValue(0);
 
     const tests = [
       {
-        stakeAmount: new Decimal(123456),
-        period: 1,
-        veRaftAvgTotalSupply: new Decimal(34567890),
-        annualGiveAway: new Decimal(33333333),
-        expected: new Decimal(0.481283),
+        bptAmount: new Decimal(123456),
+        unlockTime: new Date(2 * YEAR_IN_SEC),
+        expected: new Decimal(0.000482142148054906),
       },
       {
-        stakeAmount: new Decimal(123456),
-        period: 0.5,
-        veRaftAvgTotalSupply: new Decimal(34567890),
-        annualGiveAway: new Decimal(33333333),
-        expected: new Decimal(0.240856),
+        bptAmount: new Decimal(123456),
+        unlockTime: new Date(YEAR_IN_SEC),
+        expected: new Decimal(0.000241071289267833),
       },
       {
-        stakeAmount: new Decimal(123456),
-        period: 0.25,
-        veRaftAvgTotalSupply: new Decimal(34567890),
-        annualGiveAway: new Decimal(33333333),
-        expected: new Decimal(0.120481),
+        bptAmount: new Decimal(123456),
+        unlockTime: new Date(0.5 * YEAR_IN_SEC),
+        expected: new Decimal(0.00012053569844418),
       },
       {
-        stakeAmount: new Decimal(123456),
-        period: 0,
-        veRaftAvgTotalSupply: new Decimal(34567890),
-        annualGiveAway: new Decimal(33333333),
+        bptAmount: new Decimal(123456),
+        unlockTime: new Date(0.25 * YEAR_IN_SEC),
+        expected: new Decimal(0.000060267862674656),
+      },
+      {
+        bptAmount: new Decimal(123456),
+        unlockTime: new Date(0),
         expected: new Decimal(0),
       },
       {
-        stakeAmount: new Decimal(234567),
-        period: 1,
-        veRaftAvgTotalSupply: new Decimal(45678901),
-        annualGiveAway: new Decimal(44444444),
-        expected: new Decimal(0.485241),
+        bptAmount: new Decimal(234567),
+        unlockTime: new Date(2 * YEAR_IN_SEC),
+        expected: new Decimal(0.000482141373186717),
       },
       {
-        stakeAmount: new Decimal(234567),
-        period: 0.5,
-        veRaftAvgTotalSupply: new Decimal(45678901),
-        annualGiveAway: new Decimal(44444444),
-        expected: new Decimal(0.242931),
+        bptAmount: new Decimal(234567),
+        unlockTime: new Date(YEAR_IN_SEC),
+        expected: new Decimal(0.000241071095550496),
       },
       {
-        stakeAmount: new Decimal(234567),
-        period: 0.25,
-        veRaftAvgTotalSupply: new Decimal(45678901),
-        annualGiveAway: new Decimal(44444444),
-        expected: new Decimal(0.121543),
+        bptAmount: new Decimal(234567),
+        unlockTime: new Date(0.5 * YEAR_IN_SEC),
+        expected: new Decimal(0.000120535650014692),
       },
       {
-        stakeAmount: new Decimal(234567),
-        period: 0,
-        veRaftAvgTotalSupply: new Decimal(45678901),
-        annualGiveAway: new Decimal(44444444),
-        expected: new Decimal(0),
+        bptAmount: new Decimal(234567),
+        unlockTime: new Date(0.25 * YEAR_IN_SEC),
+        expected: new Decimal(0.000060267850567207),
       },
       {
-        stakeAmount: new Decimal(345678),
-        period: 1,
-        veRaftAvgTotalSupply: new Decimal(56789012),
-        annualGiveAway: new Decimal(55555555),
-        expected: new Decimal(0.487655),
-      },
-      {
-        stakeAmount: new Decimal(345678),
-        period: 0.5,
-        veRaftAvgTotalSupply: new Decimal(56789012),
-        annualGiveAway: new Decimal(55555555),
-        expected: new Decimal(0.244198),
-      },
-      {
-        stakeAmount: new Decimal(345678),
-        period: 0.25,
-        veRaftAvgTotalSupply: new Decimal(56789012),
-        annualGiveAway: new Decimal(55555555),
-        expected: new Decimal(0.122192),
-      },
-      {
-        stakeAmount: new Decimal(345678),
-        period: 0,
-        veRaftAvgTotalSupply: new Decimal(56789012),
-        annualGiveAway: new Decimal(55555555),
-        expected: new Decimal(0),
-      },
-      {
-        stakeAmount: new Decimal(456789),
-        period: 1,
-        veRaftAvgTotalSupply: new Decimal(67890123),
-        annualGiveAway: new Decimal(66666666),
-        expected: new Decimal(0.489343),
-      },
-      {
-        stakeAmount: new Decimal(456789),
-        period: 0.5,
-        veRaftAvgTotalSupply: new Decimal(67890123),
-        annualGiveAway: new Decimal(66666666),
-        expected: new Decimal(0.245082),
-      },
-      {
-        stakeAmount: new Decimal(456789),
-        period: 0.25,
-        veRaftAvgTotalSupply: new Decimal(67890123),
-        annualGiveAway: new Decimal(66666666),
-        expected: new Decimal(0.122644),
-      },
-      {
-        stakeAmount: new Decimal(456789),
-        period: 0,
-        veRaftAvgTotalSupply: new Decimal(67890123),
-        annualGiveAway: new Decimal(66666666),
+        bptAmount: new Decimal(234567),
+        unlockTime: new Date(0),
         expected: new Decimal(0),
       },
     ];
 
-    for (const { stakeAmount, period, veRaftAvgTotalSupply, annualGiveAway, expected } of tests) {
-      const result = await token.estimateStakingApr(stakeAmount, period, { veRaftAvgTotalSupply, annualGiveAway });
-      expect(result.toString().substring(0, 8)).toBe(expected.toString().substring(0, 8));
+    for (const { bptAmount, unlockTime, expected } of tests) {
+      const result = await token.estimateStakingApr(bptAmount, unlockTime);
+      expect(result.toString().substring(0, 16)).toBe(expected.toString().substring(0, 16));
     }
   });
 
