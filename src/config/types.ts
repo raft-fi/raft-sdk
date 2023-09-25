@@ -2,7 +2,7 @@ import { Decimal } from '@tempusfinance/decimal';
 import { RToken, Token, UnderlyingCollateralToken, WrappedCappedUnderlyingCollateralToken } from '../types';
 import { ContractRunner } from 'ethers';
 
-export type SupportedNetwork = 'goerli' | 'mainnet';
+export type SupportedNetwork = 'goerli' | 'mainnet' | 'base';
 export type PositionManagerType = 'base' | 'stETH' | 'wrapped' | 'interest-rate';
 export type SubgraphPriceFeedToken = 'ETH' | 'stETH';
 
