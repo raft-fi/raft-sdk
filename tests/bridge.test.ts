@@ -41,7 +41,7 @@ describe('Bridge', () => {
       });
 
       const bridge = new Bridge(mockEoaSigner);
-      const steps = bridge.getBridgeRSteps('ethereum', 'base', new Decimal(100));
+      const steps = bridge.getBridgeRSteps('mainnet', 'base', new Decimal(100));
 
       const numberOfSteps = 2;
 
