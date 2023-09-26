@@ -94,6 +94,8 @@ export class UserSavings extends Savings {
 
     // In case the R token allowance check is not passed externally, check the allowance
     if (rTokenAllowance === undefined) {
+      // TODO - Using this instead of RaftConfig because wrong network might be set for RaftConfig. We need to remove global
+      // network setter for RaftConfig and specify network every time user creates savings, bridge or position objects.
       rTokenAllowance = rTokenAllowanceRequired
         ? await getTokenAllowance(R_TOKEN, this.rToken, this.user, await this.rSavingsRateContract.getAddress())
         : Decimal.MAX_DECIMAL;
