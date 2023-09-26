@@ -58,7 +58,7 @@ interface BridgeNetworkConfig {
 
 export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkConfig } = {
   mainnet: {
-    routerAddress: '0xE561d5E02207fb5eB32cca20a699E0d8919a1476',
+    routerAddress: '0x48d2Ae51E665298000A42f924E7Ad09914f21821',
     chainSelector: '5009297550715157269',
     tokenAddress: '0x183015a9ba6ff60230fdeadc3f43b3d788b13e21',
     tokenTicker: 'R',
@@ -72,9 +72,9 @@ export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkCo
     tokenDecimals: 18,
   },
   base: {
-    routerAddress: '', // TODO - Fill in once contracts are deployed
-    chainSelector: '',
-    tokenAddress: '',
+    routerAddress: '0xe6d29aDa21574C1fCb02bd49aD2347B19766CBC9',
+    chainSelector: '15971525489660198786',
+    tokenAddress: '0xafb2820316e7bc5ef78d295ab9b8bb2257534576',
     tokenTicker: 'R',
     tokenDecimals: 18,
   },
