@@ -12,7 +12,7 @@ const tokensConfig: Record<RRToken | RToken, TokenConfig> = {
     priceFeed: Decimal.ONE,
   },
   RR: {
-    address: '0x0000000000000000000000000000000000000000', // TODO: add address
+    address: '0xa5b3fee253f9de67201dc8572bd2cbb4a81c1bec',
     ticker: 'RR',
     decimals: 18,
     supportsPermit: false,
