@@ -5,9 +5,9 @@ import { RSavingsRate } from '../typechain';
 import { getTokenContract } from '../utils';
 import { RaftConfig } from '../config';
 
-export type SupportedSavingsNetwork = 'ethereum' | 'ethereum-goerli' | 'base';
+export type SupportedSavingsNetwork = 'mainnet' | 'goerli' | 'base';
 
-export const SUPPORTED_SAVINGS_NETWORKS: SupportedSavingsNetwork[] = ['ethereum', 'ethereum-goerli', 'base'];
+export const SUPPORTED_SAVINGS_NETWORKS: SupportedSavingsNetwork[] = ['mainnet', 'goerli', 'base'];
 
 export class Savings {
   protected providerOrSigner: ContractRunner;

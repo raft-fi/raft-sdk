@@ -38,11 +38,11 @@ export interface BridgeStep
 }
 export type BridgeTokensStep = ApproveStep<RToken> | BridgeStep;
 
-export type SupportedBridgeNetwork = 'ethereum' | 'ethereumSepolia' | 'base' | 'arbitrumGoerli';
+export type SupportedBridgeNetwork = 'mainnet' | 'ethereumSepolia' | 'base' | 'arbitrumGoerli';
 export type SupportedBridgeToken = 'R' | 'CCIP-LnM' | 'clCCIP-LnM';
 
 export const SUPPORTED_BRIDGE_NETWORKS: SupportedBridgeNetwork[] = [
-  'ethereum',
+  'mainnet',
   'ethereumSepolia',
   'base',
   'arbitrumGoerli',
@@ -57,7 +57,7 @@ interface BridgeNetworkConfig {
 }
 
 export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkConfig } = {
-  ethereum: {
+  mainnet: {
     routerAddress: '0xE561d5E02207fb5eB32cca20a699E0d8919a1476',
     chainSelector: '5009297550715157269',
     tokenAddress: '0x183015a9ba6ff60230fdeadc3f43b3d788b13e21',
@@ -88,9 +88,9 @@ export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkCo
 };
 
 export const BRIDGE_NETWORK_LANES: { [key in SupportedBridgeNetwork]: SupportedBridgeNetwork[] } = {
-  ethereum: ['base'],
+  mainnet: ['base'],
   ethereumSepolia: ['arbitrumGoerli'],
-  base: ['ethereum'],
+  base: ['mainnet'],
   arbitrumGoerli: ['ethereumSepolia'],
 };
 

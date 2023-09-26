@@ -33,6 +33,10 @@ export class RaftConfig {
     this._balancerSubgraphEndpoint = balancerSubgraphEndpoint;
   }
 
+  static get network(): SupportedNetwork {
+    return this._network;
+  }
+
   static get networkId(): number {
     return networkIds[this._network];
   }
