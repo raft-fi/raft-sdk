@@ -28,11 +28,6 @@ import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions } from '../types
 // annual give away = 10% of 1B evenly over 3 years
 const ANNUAL_GIVE_AWAY = new Decimal(1000000000).mul(0.1).div(3);
 
-type EstimateAprOption = {
-  veRaftAvgTotalSupply?: Decimal;
-  annualGiveAway?: Decimal;
-};
-
 type PoolDataOption = {
   poolData?: SubgraphPoolBase | null;
 };
@@ -93,6 +88,7 @@ export class RaftToken {
   private merkleProof?: WhitelistMerkleProof | null;
   private merkleTreeIndex?: number | null;
   private claimableAmount: Decimal = Decimal.ZERO;
+  private annualGiveAway: Decimal = ANNUAL_GIVE_AWAY;
   private minVeLockPeriod?: number | null;
   private maxVeLockPeriod?: number | null;
 
@@ -158,17 +154,21 @@ export class RaftToken {
 
   /**
    * Returns the avg total supply of veRAFT.
-   * @param period The period, in year.
+   * @param unlockTime The unlock time for the staking.
    * @returns Total supply of veRAFT.
    */
-  public async fetchVeRaftAvgTotalSupply(period: number): Promise<Decimal> {
-    const stakePeriodInSecond = period * 365 * 24 * 60 * 60;
+  public async fetchVeRaftAvgTotalSupply(unlockTime: Date): Promise<Decimal> {
     const currentTimeInSecond = Math.floor(Date.now() / 1000);
+    const avgStakingPeriodInSecond = Math.floor((Math.floor(unlockTime.getTime() / 1000) - currentTimeInSecond) / 2);
+
+    if (avgStakingPeriodInSecond <= 0) {
+      return Decimal.ZERO;
+    }
 
     const epoch = await this.veContract.epoch();
     const lastPoint = (await this.veContract.point_history(epoch)) as VeRaftBalancePoint;
 
-    const totalSupply = this.getTotalVeRaftBalanceFromPoint(lastPoint, currentTimeInSecond + stakePeriodInSecond / 2);
+    const totalSupply = this.getTotalVeRaftBalanceFromPoint(lastPoint, currentTimeInSecond + avgStakingPeriodInSecond);
     return new Decimal(totalSupply, Decimal.PRECISION);
   }
 
@@ -177,14 +177,14 @@ export class RaftToken {
    * @returns The annual give away of RAFT.
    */
   public getAnnualGiveAway(): Decimal {
-    return ANNUAL_GIVE_AWAY;
+    return this.annualGiveAway;
   }
 
   /**
    * Returns the min lock period for veRAFT, in second.
    * @returns The min lock period for veRAFT, in second.
    */
-  public async getMinVeLockPeriod(): Promise<number | null> {
+  public async getMinVeLockPeriod(): Promise<number> {
     if (!this.minVeLockPeriod && this.minVeLockPeriod !== 0) {
       this.minVeLockPeriod = Number(await this.veContract.MINTIME());
     }
@@ -196,7 +196,7 @@ export class RaftToken {
    * Returns the max lock period for veRAFT, in second.
    * @returns The max lock period for veRAFT, in second.
    */
-  public async getMaxVeLockPeriod(): Promise<number | null> {
+  public async getMaxVeLockPeriod(): Promise<number> {
     if (!this.maxVeLockPeriod && this.maxVeLockPeriod !== 0) {
       this.maxVeLockPeriod = Number(await this.veContract.MAXTIME());
     }
@@ -206,33 +206,36 @@ export class RaftToken {
 
   /**
    * Returns the estimated staking APR for the input.
-   * @param stakeAmount The stake amount of RAFT.
-   * @param period The period, in year.
+   * @param bptAmount The stake amount of BPT.
+   * @param unlockTime The unlock time for the staking.
    * @param options.veRaftAvgTotalSupply The avg total supply of veRAFT. If not provided, will query.
-   * @param options.annualGiveAway The annual give away of RAFT. If not provided, will query.
    * @returns The estimated staking APR.
    */
-  public async estimateStakingApr(
-    stakeAmount: Decimal,
-    period: number,
-    options: EstimateAprOption = {},
-  ): Promise<Decimal> {
-    let { veRaftAvgTotalSupply, annualGiveAway } = options;
+  public async estimateStakingApr(bptAmount: Decimal, unlockTime: Date): Promise<Decimal> {
+    const stakingPeriodInSecond = Math.floor((unlockTime.getTime() - Date.now()) / 1000);
 
-    if (!veRaftAvgTotalSupply) {
-      veRaftAvgTotalSupply = await this.fetchVeRaftAvgTotalSupply(period);
+    if (stakingPeriodInSecond <= 0) {
+      return Decimal.ZERO;
     }
 
-    if (!annualGiveAway) {
-      annualGiveAway = this.getAnnualGiveAway();
+    const [veRaftAvgTotalSupply, maxVeLockPeriod] = await Promise.all([
+      this.fetchVeRaftAvgTotalSupply(unlockTime),
+      this.getMaxVeLockPeriod(),
+    ]);
+    const annualGiveAway = this.getAnnualGiveAway();
+
+    if (maxVeLockPeriod <= 0 || annualGiveAway.isZero()) {
+      return Decimal.ZERO;
     }
 
-    // avg veRAFT = staked RAFT * period / 2
-    const newVeRaftAvgAmount = stakeAmount.mul(period).div(2);
+    const periodPortion = stakingPeriodInSecond / maxVeLockPeriod;
+
+    // avg veRAFT = staked BPT * period portion / 2
+    const newVeRaftAvgAmount = bptAmount.mul(periodPortion).div(2);
     const newVeRaftAvgTotalAmount = veRaftAvgTotalSupply.add(newVeRaftAvgAmount);
 
-    // estimated APR = new avg veRAFT / total avg veRAFT * annual give away / staked RAFT
-    return newVeRaftAvgAmount.div(newVeRaftAvgTotalAmount).mul(annualGiveAway).div(stakeAmount);
+    // estimated APR = new avg veRAFT / total avg veRAFT * annual give away / staked BPT
+    return newVeRaftAvgAmount.div(newVeRaftAvgTotalAmount).mul(annualGiveAway).div(bptAmount);
   }
 
   public async getBalancerPoolData(): Promise<SubgraphPoolBase | null> {
@@ -491,9 +494,7 @@ export class RaftToken {
       );
       // approve BPT token for approval amount
       await getApproval(
-        // 120% amount of calculated BPT amount
-        //new Decimal(minBptAmountOut.toString()).mul(1.2),
-        Decimal.MAX_DECIMAL,
+        bptBptAmountFromRaft,
         this.walletAddress,
         bptTokenContract as ERC20,
         RaftConfig.networkConfig.veRaftAddress,
