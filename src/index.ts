@@ -32,6 +32,9 @@ export { Protocol } from './protocol';
 export {
   RaftToken,
   type UserVeRaftBalance,
+  type ClaimRaftStakeBptStepType,
+  type ClaimRaftStakeBptStep,
+  type ClaimRaftStakeBptPrefetch,
   type StakeBptStep,
   type StakeBptStepType,
   type StakeBptPrefetch,
