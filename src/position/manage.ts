@@ -131,7 +131,7 @@ export abstract class BasePositionManaging {
     let stepCounter = 1;
 
     if (whitelistingStepNeeded) {
-      yield* getWhitelistStep(this.positionManager, positionManagerAddress, stepCounter++, numberOfSteps);
+      yield* getWhitelistStep(this.positionManager, positionManagerAddress, stepCounter++, numberOfSteps, this.user);
     }
 
     const { canUserUsePermit, canCollateralTokenUsePermit } = permitChecks;
@@ -298,9 +298,9 @@ export class InterestRatePositionManaging extends BasePositionManaging {
         maxFeePercentage.value,
         collateralPermitSignature,
       ],
+      this.user,
       gasLimitMultiplier,
       frontendTag,
-      this.user,
     );
 
     return sendTransaction;
@@ -329,9 +329,9 @@ export class UnderlyingCollateralTokenPositionManaging extends BasePositionManag
         maxFeePercentage.value,
         collateralPermitSignature,
       ],
+      this.user,
       gasLimitMultiplier,
       frontendTag,
-      this.user,
     );
 
     return sendTransaction;
@@ -358,9 +358,9 @@ export class WrappableCappedCollateralTokenPositionManaging extends BasePosition
         maxFeePercentage.value,
         rPermitSignature,
       ],
+      this.user,
       gasLimitMultiplier,
       frontendTag,
-      this.user,
     );
 
     return sendTransaction;
@@ -387,9 +387,9 @@ export class StEthPositionManaging extends BasePositionManaging {
         maxFeePercentage.value,
         rPermitSignature,
       ],
+      this.user,
       gasLimitMultiplier,
       frontendTag,
-      this.user,
     );
 
     return sendTransaction;

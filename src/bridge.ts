@@ -161,15 +161,16 @@ export class Bridge {
         sourceChainRouter,
         stepCounter++,
         numberOfSteps,
+        this.user,
       );
     }
 
     const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
       sourceChainRouter.ccipSend,
       [destinationChainSelector, message],
+      this.user,
       gasLimitMultiplier,
       frontendTag,
-      this.user,
       ccipFeeBigInt,
     );
 

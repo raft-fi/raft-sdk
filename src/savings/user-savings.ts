@@ -131,26 +131,26 @@ export class UserSavings extends Savings {
         builtTransactionData = await buildTransactionWithGasLimit(
           this.rSavingsRateContract.depositWithPermit,
           [absAmountValue, this.user, rPermitSignature],
+          this.user,
           gasLimitMultiplier,
           frontendTag,
-          this.user,
         );
       } else {
         builtTransactionData = await buildTransactionWithGasLimit(
           this.rSavingsRateContract.deposit,
           [absAmountValue, this.user],
+          this.user,
           gasLimitMultiplier,
           frontendTag,
-          this.user,
         );
       }
     } else {
       builtTransactionData = await buildTransactionWithGasLimit(
         this.rSavingsRateContract.withdraw,
         [absAmountValue, this.user, this.user],
+        this.user,
         gasLimitMultiplier,
         frontendTag,
-        this.user,
       );
     }
 

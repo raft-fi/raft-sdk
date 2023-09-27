@@ -479,6 +479,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         RaftConfig.networkConfig.oneInchOneStepLeverageStEth,
         stepCounter++,
         numberOfSteps,
+        this.user,
       );
     }
 
@@ -620,9 +621,9 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
           isDebtIncrease ? minReturn.toBigInt(collateralDecimals) : collateralToSwap.toBigInt(collateralDecimals),
           maxFeePercentage.toBigInt(MAX_FEE_PERCENTAGE_PRECISION),
         ],
+        this.user,
         gasLimitMultiplier,
         frontendTag,
-        this.user,
       );
 
       yield {

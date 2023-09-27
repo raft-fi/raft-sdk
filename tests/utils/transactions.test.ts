@@ -11,16 +11,15 @@ const mockMethod = {
 } as unknown as TypedContractMethod<never[], unknown, 'nonpayable'>;
 
 describe('buildTransactionWithGasLimit', () => {
-  it('should return valid gas estimations and limit', async () => {
-    const gasLimitMultiplier = new Decimal(1.5);
-    const { gasEstimate: gasEstimateNoSigner, gasLimit: gasLimitNoSigner } = await buildTransactionWithGasLimit(
-      mockMethod,
-      [],
-      gasLimitMultiplier,
-    );
+  it.skipIf(process.env.CI !== 'true')('should return valid gas estimations and limit', async () => {
+    const provider = new JsonRpcProvider('http://127.0.0.1:8545');
+    const signer = Wallet.fromPhrase('test test test test test test test test test test test junk', provider);
 
-    expect(gasEstimateNoSigner).toEqual(new Decimal(100000n, Decimal.PRECISION));
-    expect(gasLimitNoSigner).toEqual(new Decimal(150000n, Decimal.PRECISION));
+    const gasLimitMultiplier = new Decimal(1.5);
+    const { gasEstimate, gasLimit } = await buildTransactionWithGasLimit(mockMethod, [], signer, gasLimitMultiplier);
+
+    expect(gasEstimate).toEqual(new Decimal(2103312526500000n, Decimal.PRECISION));
+    expect(gasLimit).toEqual(new Decimal(150000n, Decimal.PRECISION));
   });
 
   it.skipIf(process.env.CI !== 'true')(
@@ -34,8 +33,6 @@ describe('buildTransactionWithGasLimit', () => {
       const { sendTransaction: sendTransactionNoTag } = await buildTransactionWithGasLimit(
         stETH.approve,
         [RaftConfig.getPositionManagerAddress('wstETH'), 1n],
-        undefined,
-        undefined,
         signer,
       );
       const transactionResponseNoTag = await sendTransactionNoTag();
@@ -44,9 +41,9 @@ describe('buildTransactionWithGasLimit', () => {
       const { sendTransaction: sendTransactionWithTag } = await buildTransactionWithGasLimit(
         stETH.approve,
         [RaftConfig.getPositionManagerAddress('wstETH'), 1n],
+        signer,
         undefined,
         tag,
-        signer,
       );
       const transactionResponseWithTag = await sendTransactionWithTag();
       await transactionResponseWithTag.wait();
@@ -61,9 +58,9 @@ describe('buildTransactionWithGasLimit', () => {
       const { sendTransaction: sendTransactionEmptyTag } = await buildTransactionWithGasLimit(
         stETH.approve,
         [RaftConfig.getPositionManagerAddress('wstETH'), 1n],
+        signer,
         undefined,
         '',
-        signer,
       );
       const transactionResponseEmptyTag = await sendTransactionEmptyTag();
       await transactionResponseEmptyTag.wait();

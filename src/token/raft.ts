@@ -442,9 +442,9 @@ export class RaftToken {
     const { sendTransaction } = await buildTransactionWithGasLimit(
       this.airdropContract.claim,
       [index, this.walletAddress, amount, this.merkleProof],
+      signer,
       gasLimitMultiplier,
       'raft',
-      signer,
     );
 
     return sendTransaction();
@@ -530,9 +530,9 @@ export class RaftToken {
         raftTokenPermitSignature,
         balancerLPTokenPermitSignature,
       ],
+      signer,
       gasLimitMultiplier,
       'raft',
-      signer,
     );
 
     return sendTransaction();
