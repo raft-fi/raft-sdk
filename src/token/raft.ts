@@ -471,9 +471,9 @@ export class RaftToken {
         EMPTY_PERMIT_SIGNATURE,
         EMPTY_PERMIT_SIGNATURE,
       ],
+      signer,
       gasLimitMultiplier,
       'raft',
-      signer,
     );
 
     yield {
