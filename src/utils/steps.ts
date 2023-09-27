@@ -43,11 +43,13 @@ export async function* getWhitelistStep(
   delegatorAddress: string,
   stepNumber: number,
   numberOfSteps: number,
+  signer: Signer,
 ): AsyncGenerator<WhitelistStep, void, unknown> {
-  const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(positionManager.whitelistDelegate, [
-    delegatorAddress,
-    true,
-  ]);
+  const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
+    positionManager.whitelistDelegate,
+    [delegatorAddress, true],
+    signer,
+  );
 
   yield {
     type: {
@@ -97,12 +99,14 @@ export async function* getApproveTokenStep<T extends Token>(
   spender: AddressLike,
   stepNumber: number,
   numberOfSteps: number,
+  signer: Signer,
 ): AsyncGenerator<ApproveStep<T>, void, unknown> {
   const tokenDecimals = RaftConfig.networkConfig.tokens[token].decimals;
-  const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(tokenContract.approve, [
-    spender,
-    approveAmount.toBigInt(tokenDecimals),
-  ]);
+  const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
+    tokenContract.approve,
+    [spender, approveAmount.toBigInt(tokenDecimals)],
+    signer,
+  );
 
   yield {
     type: {
@@ -141,7 +145,7 @@ export async function* getPermitOrApproveTokenStep<T extends Token>(
       cachedPermitSignature,
     );
   } else {
-    yield* getApproveTokenStep(token, tokenContract, approveAmount, spender, stepNumber, numberOfSteps);
+    yield* getApproveTokenStep(token, tokenContract, approveAmount, spender, stepNumber, numberOfSteps, signer);
   }
 
   return permitSignature;

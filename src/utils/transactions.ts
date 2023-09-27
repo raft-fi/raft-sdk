@@ -26,19 +26,24 @@ export async function buildTransactionWithGasLimit<
 >(
   method: TypedContractMethod<A, R, S>,
   args: { [I in keyof A]-?: A[I] },
+  signer: Signer,
   gasLimitMultiplier: Decimal = Decimal.ONE,
   tag?: string,
-  signer?: Signer,
   value?: bigint,
 ): Promise<BuiltTransactionData> {
-  const gasEstimate = new Decimal(await method.estimateGas(...args, { value } as Overrides<S>), ETH_PRECISION);
-  const gasLimit = gasEstimate.mul(gasLimitMultiplier);
+  const gasEstimate = await method.estimateGas(...args, { value } as Overrides<S>);
+  const gasEstimateDecimal = new Decimal(gasEstimate, ETH_PRECISION);
+  const gasEstimateWei = new Decimal(gasEstimate.toString());
+  const gasLimit = gasEstimateDecimal.mul(gasLimitMultiplier);
+  const feeData = await signer.provider?.getFeeData();
+  const gasPrice = feeData?.gasPrice ? new Decimal(feeData.gasPrice, ETH_PRECISION) : Decimal.ZERO;
   const overrides = { value, gasLimit: gasLimit.toBigInt(ETH_PRECISION) } as Overrides<S>;
+  const gasInEth = gasEstimateWei.mul(gasPrice);
 
-  if (!signer || !tag) {
+  if (!tag) {
     return {
       sendTransaction: () => method(...args, overrides),
-      gasEstimate,
+      gasEstimate: gasInEth,
       gasLimit,
     };
   }
@@ -49,7 +54,7 @@ export async function buildTransactionWithGasLimit<
 
   return {
     sendTransaction: () => signer.sendTransaction(transactionRequest),
-    gasEstimate,
+    gasEstimate: gasInEth,
     gasLimit,
   };
 }
