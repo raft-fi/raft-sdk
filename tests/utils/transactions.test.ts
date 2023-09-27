@@ -11,11 +11,15 @@ const mockMethod = {
 } as unknown as TypedContractMethod<never[], unknown, 'nonpayable'>;
 
 describe('buildTransactionWithGasLimit', () => {
-  it('should return valid gas estimations and limit', async () => {
+  it.skipIf(process.env.CI !== 'true')('should return valid gas estimations and limit', async () => {
+    const provider = new JsonRpcProvider('http://127.0.0.1:8545');
+    const signer = Wallet.fromPhrase('test test test test test test test test test test test junk', provider);
+
     const gasLimitMultiplier = new Decimal(1.5);
     const { gasEstimate: gasEstimateNoSigner, gasLimit: gasLimitNoSigner } = await buildTransactionWithGasLimit(
       mockMethod,
       [],
+      signer,
       gasLimitMultiplier,
     );
 
@@ -34,8 +38,6 @@ describe('buildTransactionWithGasLimit', () => {
       const { sendTransaction: sendTransactionNoTag } = await buildTransactionWithGasLimit(
         stETH.approve,
         [RaftConfig.getPositionManagerAddress('wstETH'), 1n],
-        undefined,
-        undefined,
         signer,
       );
       const transactionResponseNoTag = await sendTransactionNoTag();
@@ -44,9 +46,9 @@ describe('buildTransactionWithGasLimit', () => {
       const { sendTransaction: sendTransactionWithTag } = await buildTransactionWithGasLimit(
         stETH.approve,
         [RaftConfig.getPositionManagerAddress('wstETH'), 1n],
+        signer,
         undefined,
         tag,
-        signer,
       );
       const transactionResponseWithTag = await sendTransactionWithTag();
       await transactionResponseWithTag.wait();
@@ -61,9 +63,9 @@ describe('buildTransactionWithGasLimit', () => {
       const { sendTransaction: sendTransactionEmptyTag } = await buildTransactionWithGasLimit(
         stETH.approve,
         [RaftConfig.getPositionManagerAddress('wstETH'), 1n],
+        signer,
         undefined,
         '',
-        signer,
       );
       const transactionResponseEmptyTag = await sendTransactionEmptyTag();
       await transactionResponseEmptyTag.wait();
