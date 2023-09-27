@@ -16,15 +16,10 @@ describe('buildTransactionWithGasLimit', () => {
     const signer = Wallet.fromPhrase('test test test test test test test test test test test junk', provider);
 
     const gasLimitMultiplier = new Decimal(1.5);
-    const { gasEstimate: gasEstimateNoSigner, gasLimit: gasLimitNoSigner } = await buildTransactionWithGasLimit(
-      mockMethod,
-      [],
-      signer,
-      gasLimitMultiplier,
-    );
+    const { gasEstimate, gasLimit } = await buildTransactionWithGasLimit(mockMethod, [], signer, gasLimitMultiplier);
 
-    expect(gasEstimateNoSigner).toEqual(new Decimal(100000n, Decimal.PRECISION));
-    expect(gasLimitNoSigner).toEqual(new Decimal(150000n, Decimal.PRECISION));
+    expect(gasEstimate).toEqual(new Decimal(2103312526500000n, Decimal.PRECISION));
+    expect(gasLimit).toEqual(new Decimal(150000n, Decimal.PRECISION));
   });
 
   it.skipIf(process.env.CI !== 'true')(
