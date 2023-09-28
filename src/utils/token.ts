@@ -12,6 +12,8 @@ import {
   InterestRateDebtToken__factory,
   RSavingsRate,
   RSavingsRate__factory,
+  VotingEscrow,
+  VotingEscrow__factory,
   WrappedCollateralToken,
   WrappedCollateralToken__factory,
   WstETH,
@@ -54,6 +56,7 @@ type TokenContractTypes = {
   cbETH: ERC20;
   swETH: ERC20;
   RAFT: ERC20Permit;
+  veRAFT: VotingEscrow;
   R: ERC20PermitRToken;
   RR: RSavingsRate;
   'B-80RAFT-20R': ERC20Permit;
@@ -107,6 +110,10 @@ export function isRRToken(token: Token): token is RRToken {
   return token === RR_TOKEN;
 }
 
+export function isVeRaftToken(token: Token): token is 'veRAFT' {
+  return token === 'veRAFT';
+}
+
 export function getWrappedCappedCollateralToken(
   underlyingToken: WrappableCappedCollateralToken,
 ): WrappedCappedUnderlyingCollateralToken {
@@ -157,6 +164,10 @@ export function getTokenContract<T extends Token | RaftCollateralToken | RaftDeb
 
   const tokenConfig = RaftConfig.networkConfig.tokens[token as Token];
   const tokenAddress = RaftConfig.getTokenAddress(token);
+
+  if (isVeRaftToken(token)) {
+    return VotingEscrow__factory.connect(tokenAddress, runner) as TokenContractTypes[T];
+  }
 
   if (isRToken(token)) {
     return ERC20PermitRToken__factory.connect(tokenAddress, runner) as TokenContractTypes[T];

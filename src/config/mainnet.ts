@@ -154,7 +154,14 @@ const tokensConfig: Record<Token, TokenConfig> = {
     ticker: 'RAFT',
     decimals: 18,
     supportsPermit: true,
-    priceFeed: Decimal.ONE, // TODO: update price feed
+    priceFeed: null,
+  },
+  veRAFT: {
+    address: '0xC128a9954e6c874eA3d62ce62B468bA073093F25', // TODO: update address
+    ticker: 'veRAFT',
+    decimals: 18,
+    supportsPermit: false,
+    priceFeed: null,
   },
   R: {
     address: '0x183015a9ba6ff60230fdeadc3f43b3d788b13e21',
@@ -178,7 +185,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
     ticker: 'B-80RAFT-20R',
     decimals: 18,
     supportsPermit: true,
-    priceFeed: Decimal.ONE, // TODO: update price feed
+    priceFeed: null,
   },
 };
 
@@ -227,8 +234,6 @@ export const mainnetConfig: NetworkConfig = {
   // TODO: wait for deployment
   raftAirdropAddress: '0x0000000000000000000000000000000000000000',
   claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
-  // TODO: update this to veRAFT
-  veRaftAddress: '0xC128a9954e6c874eA3d62ce62B468bA073093F25',
   // TODO: update this to RAFT/R pool
   balancerWeightedPoolId: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014',
   feeDistributorAddress: '0x0000000000000000000000000000000000000000',

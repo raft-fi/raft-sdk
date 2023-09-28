@@ -1,7 +1,6 @@
 import { AddressLike, Provider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { Token } from './types';
-import { ERC20, ERC20Permit, RSavingsRate, WstETH } from './typechain';
+import { Token, Erc20TokenContract, VeRaftToken } from './types';
 import { getTokenContract } from './utils';
 import { RaftConfig } from './config';
 
@@ -14,7 +13,7 @@ import { RaftConfig } from './config';
  */
 export async function getTokenAllowance(
   token: Token,
-  tokenContract: ERC20 | ERC20Permit | WstETH | RSavingsRate,
+  tokenContract: Erc20TokenContract,
   owner: AddressLike,
   spender: AddressLike,
 ): Promise<Decimal> {
@@ -29,7 +28,7 @@ export class Allowance {
   private owner: AddressLike;
   private spender: AddressLike;
   private provider: Provider;
-  private tokenContract: ERC20Permit | ERC20 | WstETH | RSavingsRate;
+  private tokenContract: Erc20TokenContract;
 
   /**
    * Creates a new representation of an allowance.
@@ -38,7 +37,7 @@ export class Allowance {
    * @param spender Address to which allowance belongs.
    * @param provider: Provider to use for data fetching.
    */
-  public constructor(token: Token, owner: AddressLike, spender: AddressLike, provider: Provider) {
+  public constructor(token: Exclude<Token, VeRaftToken>, owner: AddressLike, spender: AddressLike, provider: Provider) {
     this.token = token;
     this.owner = owner;
     this.spender = spender;
