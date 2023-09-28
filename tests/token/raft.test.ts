@@ -69,7 +69,10 @@ describe('RaftToken', () => {
     ];
 
     for (const { bptAmount, unlockTime, expected } of tests) {
-      const result = await token.estimateStakingApr(bptAmount, unlockTime);
+      const result = await token.estimateStakingApr(bptAmount, unlockTime, {
+        bptLockedBalance: Decimal.ZERO,
+        veRaftBalance: Decimal.ZERO,
+      });
       expect(result.toString().substring(0, 16)).toBe(expected.toString().substring(0, 16));
     }
   });
