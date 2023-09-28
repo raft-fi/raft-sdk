@@ -1,6 +1,6 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { NetworkConfig, TokenConfig, UnderlyingTokens } from './types';
-import { getWstEthToStEthRate } from '../price';
+import { getRRToRRate, getWstEthToStEthRate } from '../price';
 import { Token } from '../types';
 
 const POSITION_MANAGER_ADDRESS = '0xeaf8aad45d563f14d8b443277dd51c426ad8607f';
@@ -80,7 +80,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
     decimals: 18,
     supportsPermit: false,
     priceFeed: {
-      ticker: 'stETH',
+      subgraphTokenTicker: 'stETH',
       fallbackToken: 'wstETH',
       getFallbackRate: getWstEthToStEthRate,
     },
@@ -148,12 +148,36 @@ const tokensConfig: Record<Token, TokenConfig> = {
     supportsPermit: false,
     priceFeed: 'swETH',
   },
+  RAFT: {
+    address: '0xfa8449189744799ad2ace7e0ebac8bb7575eff47', // TODO: update address
+    ticker: 'RAFT',
+    decimals: 18,
+    supportsPermit: true,
+    priceFeed: Decimal.ONE, // TODO: update price feed
+  },
   R: {
     address: '0x9b41fE4EE4F23507953CCA339A4eC27eAc9e02b8',
     ticker: 'R',
     decimals: 18,
     supportsPermit: true,
     priceFeed: Decimal.ONE,
+  },
+  RR: {
+    address: '0xDeEae93bf4bdA40529Fe5769Dd817996e86eb4Dd',
+    ticker: 'RR',
+    decimals: 18,
+    supportsPermit: false,
+    priceFeed: {
+      fallbackToken: 'R',
+      getFallbackRate: getRRToRRate,
+    },
+  },
+  'B-80RAFT-20R': {
+    address: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00', // TODO: update address
+    ticker: 'B-80RAFT-20R',
+    decimals: 18,
+    supportsPermit: true,
+    priceFeed: Decimal.ONE, // TODO: update price feed
   },
 };
 
@@ -199,5 +223,11 @@ export const goerliConfig: NetworkConfig = {
   tokens: tokensConfig,
   daiAddress: '', // Add address if we ever deploy one step leverage on goerli
   testNetwork: true,
-  rSavingsModule: '0xDeEae93bf4bdA40529Fe5769Dd817996e86eb4Dd',
+  // deploy merkle-distributor everytime
+  raftAirdropAddress: '0x79C150ec604FdE96db3f8B30Ff4A0a534C8a9AcA',
+  claimRaftStakeVeRaftAddress: '0x87Fa9DEDdbFC0e692779c09646fe06bbaD308acA',
+  // this is veBAL
+  veRaftAddress: '0x0628fFBe2AE5A26F8C95F3de3Ddc957B3b87a27a',
+  // this is veBAL/WETH pool
+  balancerWeightedPoolId: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00000200000000000000000060',
 };

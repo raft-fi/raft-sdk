@@ -1,12 +1,12 @@
-import { AddressLike, JsonRpcProvider } from 'ethers';
+import { AddressLike, Provider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
 import { Token } from './types';
-import { ERC20, ERC20Permit } from './typechain';
+import { ERC20, ERC20Permit, RSavingsRate, WstETH } from './typechain';
 import { getTokenContract } from './utils';
 import { RaftConfig } from './config';
 
 /**
- * Fetches and returns token allowance. In case of `null` token contract, returns infinity (`Decimal.MAX_DECIMAL`).
+ * Fetches and returns token allowance.
  * @param tokenContract Token contract to check allowance for.
  * @param owner Wallet to check allowance for.
  * @param spender Address to which allowance belongs.
@@ -14,14 +14,12 @@ import { RaftConfig } from './config';
  */
 export async function getTokenAllowance(
   token: Token,
-  tokenContract: ERC20 | ERC20Permit | null,
+  tokenContract: ERC20 | ERC20Permit | WstETH | RSavingsRate,
   owner: AddressLike,
   spender: AddressLike,
 ): Promise<Decimal> {
   const tokenConfig = RaftConfig.networkConfig.tokens[token];
-  return tokenContract !== null
-    ? new Decimal(await tokenContract.allowance(owner, spender), tokenConfig.decimals)
-    : Decimal.MAX_DECIMAL;
+  return new Decimal(await tokenContract.allowance(owner, spender), tokenConfig.decimals);
 }
 
 export class Allowance {
@@ -30,8 +28,8 @@ export class Allowance {
   private allowance: Decimal | null = null;
   private owner: AddressLike;
   private spender: AddressLike;
-  private provider: JsonRpcProvider;
-  private tokenContract: ERC20Permit | ERC20 | null;
+  private provider: Provider;
+  private tokenContract: ERC20Permit | ERC20 | WstETH | RSavingsRate;
 
   /**
    * Creates a new representation of an allowance.
@@ -40,12 +38,11 @@ export class Allowance {
    * @param spender Address to which allowance belongs.
    * @param provider: Provider to use for data fetching.
    */
-  public constructor(token: Token, owner: AddressLike, spender: AddressLike, provider: JsonRpcProvider) {
+  public constructor(token: Token, owner: AddressLike, spender: AddressLike, provider: Provider) {
     this.token = token;
     this.owner = owner;
     this.spender = spender;
     this.provider = provider;
-
     this.tokenContract = getTokenContract(this.token, this.provider);
   }
 

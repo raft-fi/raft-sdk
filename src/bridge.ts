@@ -38,11 +38,11 @@ export interface BridgeStep
 }
 export type BridgeTokensStep = ApproveStep<RToken> | BridgeStep;
 
-export type SupportedBridgeNetwork = 'ethereum' | 'ethereumSepolia' | 'base' | 'arbitrumGoerli';
+export type SupportedBridgeNetwork = 'mainnet' | 'ethereumSepolia' | 'base' | 'arbitrumGoerli';
 export type SupportedBridgeToken = 'R' | 'CCIP-LnM' | 'clCCIP-LnM';
 
 export const SUPPORTED_BRIDGE_NETWORKS: SupportedBridgeNetwork[] = [
-  'ethereum',
+  'mainnet',
   'ethereumSepolia',
   'base',
   'arbitrumGoerli',
@@ -57,8 +57,8 @@ interface BridgeNetworkConfig {
 }
 
 export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkConfig } = {
-  ethereum: {
-    routerAddress: '0xE561d5E02207fb5eB32cca20a699E0d8919a1476',
+  mainnet: {
+    routerAddress: '0x48d2Ae51E665298000A42f924E7Ad09914f21821',
     chainSelector: '5009297550715157269',
     tokenAddress: '0x183015a9ba6ff60230fdeadc3f43b3d788b13e21',
     tokenTicker: 'R',
@@ -72,9 +72,9 @@ export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkCo
     tokenDecimals: 18,
   },
   base: {
-    routerAddress: '', // TODO - Fill in once contracts are deployed
-    chainSelector: '',
-    tokenAddress: '',
+    routerAddress: '0xe6d29aDa21574C1fCb02bd49aD2347B19766CBC9',
+    chainSelector: '15971525489660198786',
+    tokenAddress: '0xafb2820316e7bc5ef78d295ab9b8bb2257534576',
     tokenTicker: 'R',
     tokenDecimals: 18,
   },
@@ -88,9 +88,9 @@ export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkCo
 };
 
 export const BRIDGE_NETWORK_LANES: { [key in SupportedBridgeNetwork]: SupportedBridgeNetwork[] } = {
-  ethereum: ['base'],
+  mainnet: ['base'],
   ethereumSepolia: ['arbitrumGoerli'],
-  base: ['ethereum'],
+  base: ['mainnet'],
   arbitrumGoerli: ['ethereumSepolia'],
 };
 
@@ -161,15 +161,16 @@ export class Bridge {
         sourceChainRouter,
         stepCounter++,
         numberOfSteps,
+        this.user,
       );
     }
 
     const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
       sourceChainRouter.ccipSend,
       [destinationChainSelector, message],
+      this.user,
       gasLimitMultiplier,
       frontendTag,
-      this.user,
       ccipFeeBigInt,
     );
 
@@ -318,3 +319,11 @@ const getMessageState = (status: number) => {
   }
   return 'unknown';
 };
+
+export function isSupportedBridgeNetwork(value: string): value is SupportedBridgeNetwork {
+  const networks: string[] = [...SUPPORTED_BRIDGE_NETWORKS];
+  if (networks.includes(value)) {
+    return true;
+  }
+  return false;
+}

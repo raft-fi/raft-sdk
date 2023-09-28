@@ -11,15 +11,21 @@ export {
   type PermitStep,
   type WhitelistStep,
 } from './steps';
-export { sendTransactionWithGasLimit, buildTransactionWithGasLimit, type BuiltTransactionData } from './transactions';
+export { buildTransactionWithGasLimit, type BuiltTransactionData } from './transactions';
 export {
+  getRaftCollateralToken,
+  getRaftDebtToken,
   getTokenContract,
   getWrappedCappedCollateralToken,
   isCollateralToken,
   isInterestRateVault,
-  isUnderlyingCollateralToken,
+  isRaftCollateralToken,
+  isRaftDebtToken,
+  isRRToken,
   isRToken,
+  isUnderlyingCollateralToken,
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
   getInterestRateDebtTokenContract,
 } from './token';
+export { getApproval } from './approve';

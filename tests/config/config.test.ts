@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { RaftConfig } from '../../src';
 import { goerliConfig } from '../../src/config/goerli';
 import { mainnetConfig } from '../../src/config/mainnet';
@@ -14,6 +15,11 @@ describe('RaftConfig', () => {
   it('should set subgraph endpoint', () => {
     RaftConfig.setSubgraphEndpoint('some-endpoint');
     expect(RaftConfig.subgraphEndpoint).toEqual('some-endpoint');
+  });
+
+  it('should set Balancer subgraph endpoint', () => {
+    RaftConfig.setBalancerSubgraphEndpoint('some-endpoint');
+    expect(RaftConfig.balancerSubgraphEndpoint).toEqual('some-endpoint');
   });
 
   it('should return true for test network', () => {
@@ -40,6 +46,8 @@ describe('RaftConfig', () => {
     RaftConfig.setNetwork('mainnet');
     expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.stETH.address)).toEqual('stETH');
     expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.wstETH.address)).toEqual('wstETH');
+    expect(RaftConfig.getTokenTicker(mainnetConfig.tokens['wstETH-v1'].address)).toEqual('wstETH');
+    expect(RaftConfig.getTokenTicker(mainnetConfig.tokens['rETH-v1'].address)).toEqual('rETH');
     expect(RaftConfig.getTokenTicker(mainnetConfig.tokens.R.address)).toEqual('R');
 
     RaftConfig.setNetwork('goerli');

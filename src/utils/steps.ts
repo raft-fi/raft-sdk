@@ -1,6 +1,6 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { AddressLike, Signer, TransactionResponse } from 'ethers';
-import { ERC20, ERC20Permit } from '../typechain';
+import { ERC20, ERC20Permit, WstETH } from '../typechain';
 import { Token } from '../types';
 import { ERC20PermitSignatureStruct, PositionManager } from '../typechain/PositionManager';
 import { RaftConfig } from '../config';
@@ -43,11 +43,13 @@ export async function* getWhitelistStep(
   delegatorAddress: string,
   stepNumber: number,
   numberOfSteps: number,
+  signer: Signer,
 ): AsyncGenerator<WhitelistStep, void, unknown> {
-  const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(positionManager.whitelistDelegate, [
-    delegatorAddress,
-    true,
-  ]);
+  const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
+    positionManager.whitelistDelegate,
+    [delegatorAddress, true],
+    signer,
+  );
 
   yield {
     type: {
@@ -63,7 +65,7 @@ export async function* getWhitelistStep(
 export function* getSignTokenPermitStep<T extends Token>(
   signer: Signer,
   token: T,
-  tokenContract: ERC20Permit,
+  tokenContract: ERC20Permit | WstETH,
   approveAmount: Decimal,
   spender: AddressLike,
   stepNumber: number,
@@ -92,17 +94,19 @@ export function* getSignTokenPermitStep<T extends Token>(
 
 export async function* getApproveTokenStep<T extends Token>(
   token: T,
-  tokenContract: ERC20 | ERC20Permit,
+  tokenContract: ERC20 | ERC20Permit | WstETH,
   approveAmount: Decimal,
   spender: AddressLike,
   stepNumber: number,
   numberOfSteps: number,
+  signer: Signer,
 ): AsyncGenerator<ApproveStep<T>, void, unknown> {
   const tokenDecimals = RaftConfig.networkConfig.tokens[token].decimals;
-  const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(tokenContract.approve, [
-    spender,
-    approveAmount.toBigInt(tokenDecimals),
-  ]);
+  const { sendTransaction, gasEstimate } = await buildTransactionWithGasLimit(
+    tokenContract.approve,
+    [spender, approveAmount.toBigInt(tokenDecimals)],
+    signer,
+  );
 
   yield {
     type: {
@@ -119,7 +123,7 @@ export async function* getApproveTokenStep<T extends Token>(
 export async function* getPermitOrApproveTokenStep<T extends Token>(
   signer: Signer,
   token: T,
-  tokenContract: ERC20 | ERC20Permit,
+  tokenContract: ERC20 | ERC20Permit | WstETH,
   approveAmount: Decimal,
   spender: AddressLike,
   stepNumber: number,
@@ -133,7 +137,7 @@ export async function* getPermitOrApproveTokenStep<T extends Token>(
     permitSignature = yield* getSignTokenPermitStep(
       signer,
       token,
-      tokenContract,
+      tokenContract as ERC20Permit | WstETH,
       approveAmount,
       spender,
       stepNumber,
@@ -141,7 +145,7 @@ export async function* getPermitOrApproveTokenStep<T extends Token>(
       cachedPermitSignature,
     );
   } else {
-    yield* getApproveTokenStep(token, tokenContract, approveAmount, spender, stepNumber, numberOfSteps);
+    yield* getApproveTokenStep(token, tokenContract, approveAmount, spender, stepNumber, numberOfSteps, signer);
   }
 
   return permitSignature;

@@ -18,14 +18,24 @@ export {
   type PositionTransactionType,
 } from './position';
 export {
+  SUPPORTED_SAVINGS_NETWORKS,
   type SavingsStep,
   type SavingsTransaction,
   type SavingsTransactionType,
-  UserSavings,
+  type SupportedSavingsNetwork,
   Savings,
+  UserSavings,
+  isSupportedSavingsNetwork,
 } from './savings';
 export { PriceFeed } from './price';
 export { Protocol } from './protocol';
+export {
+  RaftToken,
+  type UserVeRaftBalance,
+  type StakeBptStep,
+  type StakeBptStepType,
+  type StakeBptPrefetch,
+} from './token';
 export {
   COLLATERAL_TOKENS,
   R_TOKEN,
@@ -33,6 +43,9 @@ export {
   UNDERLYING_COLLATERAL_TOKENS,
   WRAPPABLE_CAPPED_COLLATERAL_TOKENS,
   WRAPPED_CAPPED_UNDERLYING_COLLATERAL_TOKENS,
+  RAFT_TOKEN,
+  VERAFT_TOKEN,
+  RAFT_BPT_TOKEN,
   type CollateralToken,
   type RToken,
   type Token,
@@ -53,4 +66,5 @@ export {
   type BridgeTokensStep,
   type BridgeTokensStepType,
   type SupportedBridgeNetwork,
+  isSupportedBridgeNetwork,
 } from './bridge';
