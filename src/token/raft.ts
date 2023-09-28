@@ -15,7 +15,6 @@ import {
   MerkleDistributor,
   MerkleDistributor__factory,
   VotingEscrow,
-  VotingEscrow__factory,
 } from '../typechain';
 import {
   EMPTY_PERMIT_SIGNATURE,
@@ -25,7 +24,7 @@ import {
   getTokenContract,
   isEoaAddress,
 } from '../utils';
-import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions } from '../types';
+import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions, VERAFT_TOKEN } from '../types';
 import { SECONDS_PER_YEAR } from '../constants';
 
 // annual give away = 10% of 1B evenly over 3 years
@@ -113,7 +112,7 @@ export class RaftToken {
     this.provider = provider;
     this.walletAddress = walletAddress;
     this.raftContract = getTokenContract(RAFT_TOKEN, this.provider);
-    this.veContract = VotingEscrow__factory.connect(RaftConfig.networkConfig.veRaftAddress, provider);
+    this.veContract = getTokenContract(VERAFT_TOKEN, provider);
     this.raftBptContract = getTokenContract(RAFT_BPT_TOKEN, this.provider);
     this.airdropContract = MerkleDistributor__factory.connect(RaftConfig.networkConfig.raftAirdropAddress, provider);
     this.claimAndStakeContract = ClaimRaftAndStake__factory.connect(
@@ -389,7 +388,7 @@ export class RaftToken {
   public async getUserBptAllowance(): Promise<Decimal> {
     const tokenAllowance = await this.raftBptContract.allowance(
       this.walletAddress,
-      RaftConfig.networkConfig.veRaftAddress,
+      RaftConfig.networkConfig.tokens.veRAFT.address,
     );
     return new Decimal(tokenAllowance, Decimal.PRECISION);
   }
@@ -462,7 +461,7 @@ export class RaftToken {
 
       const action = () =>
         bptTokenContract.approve(
-          RaftConfig.networkConfig.veRaftAddress,
+          RaftConfig.networkConfig.tokens.veRAFT.address,
           bptBptAmountFromRaft.toBigInt(Decimal.PRECISION),
         );
 
@@ -517,7 +516,7 @@ export class RaftToken {
       // ask for BPT token approval
       const bptTokenContract = getTokenContract(RAFT_BPT_TOKEN, signer);
       const action = () =>
-        bptTokenContract.approve(RaftConfig.networkConfig.veRaftAddress, bptAmount.toBigInt(Decimal.PRECISION));
+        bptTokenContract.approve(RaftConfig.networkConfig.tokens.veRAFT.address, bptAmount.toBigInt(Decimal.PRECISION));
 
       yield {
         type: 'approve',
@@ -651,7 +650,7 @@ export class RaftToken {
         bptBptAmountFromRaft,
         this.walletAddress,
         bptTokenContract as ERC20,
-        RaftConfig.networkConfig.veRaftAddress,
+        RaftConfig.networkConfig.tokens.veRAFT.address,
       );
     } else {
       // sign permit for $RAFT token for approval amount
@@ -667,7 +666,7 @@ export class RaftToken {
         RAFT_BPT_TOKEN,
         signer,
         this.claimableAmount,
-        RaftConfig.networkConfig.veRaftAddress,
+        RaftConfig.networkConfig.tokens.veRAFT.address,
         bptTokenContract,
       );
     }
