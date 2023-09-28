@@ -10,6 +10,8 @@ import {
   ClaimRaftAndStake__factory,
   ERC20,
   ERC20Permit,
+  FeeDistributor,
+  FeeDistributor__factory,
   MerkleDistributor,
   MerkleDistributor__factory,
   VotingEscrow,
@@ -98,6 +100,7 @@ export class RaftToken {
   private raftBptContract: ERC20Permit;
   private airdropContract: MerkleDistributor;
   private claimAndStakeContract: ClaimRaftAndStake;
+  private feeDistributorContract: FeeDistributor;
   private merkleTree?: WhitelistMerkleTree;
   private merkleProof?: WhitelistMerkleProof | null;
   private merkleTreeIndex?: number | null;
@@ -115,6 +118,10 @@ export class RaftToken {
     this.airdropContract = MerkleDistributor__factory.connect(RaftConfig.networkConfig.raftAirdropAddress, provider);
     this.claimAndStakeContract = ClaimRaftAndStake__factory.connect(
       RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
+      provider,
+    );
+    this.feeDistributorContract = FeeDistributor__factory.connect(
+      RaftConfig.networkConfig.feeDistributorAddress,
       provider,
     );
   }
@@ -387,6 +394,15 @@ export class RaftToken {
     return new Decimal(tokenAllowance, Decimal.PRECISION);
   }
 
+  public async getClaimableRaftFromStakedBpt(): Promise<Decimal> {
+    const amount = await this.feeDistributorContract.claimToken.staticCall(
+      this.walletAddress,
+      RaftConfig.networkConfig.tokens.RAFT.address,
+    );
+
+    return new Decimal(amount, Decimal.PRECISION);
+  }
+
   public async *getClaimRaftAndStakeBptSteps(
     unlockTime: Date,
     slippage: Decimal,
@@ -563,6 +579,23 @@ export class RaftToken {
     const { sendTransaction } = await buildTransactionWithGasLimit(
       this.airdropContract.claim,
       [index, this.walletAddress, amount, this.merkleProof],
+      signer,
+      gasLimitMultiplier,
+      'raft',
+    );
+
+    return sendTransaction();
+  }
+
+  public async claimRaftFromStakedBpt(
+    signer: Signer,
+    options: TransactionWithFeesOptions = {},
+  ): Promise<TransactionResponse> {
+    const { gasLimitMultiplier = Decimal.ONE } = options;
+
+    const { sendTransaction } = await buildTransactionWithGasLimit(
+      this.feeDistributorContract.claimToken,
+      [this.walletAddress, RaftConfig.networkConfig.tokens.RAFT.address],
       signer,
       gasLimitMultiplier,
       'raft',
