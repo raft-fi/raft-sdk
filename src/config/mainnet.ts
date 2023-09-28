@@ -231,4 +231,5 @@ export const mainnetConfig: NetworkConfig = {
   veRaftAddress: '0xC128a9954e6c874eA3d62ce62B468bA073093F25',
   // TODO: update this to RAFT/R pool
   balancerWeightedPoolId: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014',
+  feeDistributorAddress: '0x0000000000000000000000000000000000000000',
 };

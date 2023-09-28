@@ -24,6 +24,7 @@ import {
   isEoaAddress,
 } from '../utils';
 import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions } from '../types';
+import { SECONDS_PER_YEAR } from '../constants';
 
 // annual give away = 10% of 1B evenly over 3 years
 const ANNUAL_GIVE_AWAY = new Decimal(1000000000).mul(0.1).div(3);
@@ -67,6 +68,18 @@ type WhitelistMerkleTree = {
   claims: Record<string, WhitelistMerkleTreeItem>;
 };
 
+export interface ClaimRaftStakeBptStepType {
+  name: 'approve' | 'claim-and-stake';
+  token?: typeof RAFT_TOKEN | typeof RAFT_BPT_TOKEN;
+}
+export interface ClaimRaftStakeBptStep {
+  type: ClaimRaftStakeBptStepType;
+  action: () => Promise<TransactionResponse>;
+}
+export type ClaimRaftStakeBptPrefetch = {
+  raftAllowance?: Decimal;
+  bptAllowance?: Decimal;
+};
 export type StakeBptStepType = 'approve' | 'stake-new' | 'stake-increase' | 'stake-extend';
 export type StakeBptStep = {
   type: StakeBptStepType;
@@ -80,6 +93,7 @@ export type StakeBptPrefetch = {
 export class RaftToken {
   private provider: Provider;
   private walletAddress: string;
+  private raftContract: ERC20Permit;
   private veContract: VotingEscrow;
   private raftBptContract: ERC20Permit;
   private airdropContract: MerkleDistributor;
@@ -95,6 +109,7 @@ export class RaftToken {
   public constructor(walletAddress: string, provider: Provider) {
     this.provider = provider;
     this.walletAddress = walletAddress;
+    this.raftContract = getTokenContract(RAFT_TOKEN, this.provider);
     this.veContract = VotingEscrow__factory.connect(RaftConfig.networkConfig.veRaftAddress, provider);
     this.raftBptContract = getTokenContract(RAFT_BPT_TOKEN, this.provider);
     this.airdropContract = MerkleDistributor__factory.connect(RaftConfig.networkConfig.raftAirdropAddress, provider);
@@ -229,13 +244,14 @@ export class RaftToken {
     }
 
     const periodPortion = stakingPeriodInSecond / maxVeLockPeriod;
+    const numOfYear = maxVeLockPeriod / SECONDS_PER_YEAR;
 
     // avg veRAFT = staked BPT * period portion / 2
     const newVeRaftAvgAmount = bptAmount.mul(periodPortion).div(2);
     const newVeRaftAvgTotalAmount = veRaftAvgTotalSupply.add(newVeRaftAvgAmount);
 
-    // estimated APR = new avg veRAFT / total avg veRAFT * annual give away / staked BPT
-    return newVeRaftAvgAmount.div(newVeRaftAvgTotalAmount).mul(annualGiveAway).div(bptAmount);
+    // estimated APR = new avg veRAFT / total avg veRAFT * annual give away / staked BPT / number of year
+    return newVeRaftAvgAmount.div(newVeRaftAvgTotalAmount).mul(annualGiveAway).div(bptAmount).div(numOfYear);
   }
 
   public async getBalancerPoolData(): Promise<SubgraphPoolBase | null> {
@@ -355,12 +371,117 @@ export class RaftToken {
     return new Decimal(balance, Decimal.PRECISION);
   }
 
+  public async getUserRaftAllowance(): Promise<Decimal> {
+    const tokenAllowance = await this.raftContract.allowance(
+      this.walletAddress,
+      RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
+    );
+    return new Decimal(tokenAllowance, Decimal.PRECISION);
+  }
+
   public async getUserBptAllowance(): Promise<Decimal> {
     const tokenAllowance = await this.raftBptContract.allowance(
       this.walletAddress,
       RaftConfig.networkConfig.veRaftAddress,
     );
     return new Decimal(tokenAllowance, Decimal.PRECISION);
+  }
+
+  public async *getClaimRaftAndStakeBptSteps(
+    unlockTime: Date,
+    slippage: Decimal,
+    signer: Signer,
+    options: ClaimRaftStakeBptPrefetch & TransactionWithFeesOptions = {},
+  ): AsyncGenerator<ClaimRaftStakeBptStep, void, void> {
+    const { gasLimitMultiplier = Decimal.ONE } = options;
+    let { raftAllowance, bptAllowance } = options;
+
+    if (this.merkleTreeIndex === null || this.merkleTreeIndex === undefined || !this.merkleProof) {
+      throw new Error('User is not on whitelist to claim RAFT!');
+    }
+
+    if (!raftAllowance) {
+      raftAllowance = await this.getUserRaftAllowance();
+    }
+
+    if (!bptAllowance) {
+      bptAllowance = await this.getUserBptAllowance();
+    }
+
+    const unlockTimeInSec = Math.floor(unlockTime.getTime() / 1000);
+    const poolData = await this.getBalancerPoolData();
+    const bptBptAmountFromRaft = await this.getBptAmountFromRaft(this.claimableAmount, {
+      poolData,
+    });
+
+    if (!poolData || !bptBptAmountFromRaft) {
+      throw new Error('Cannot query balancer pool data!');
+    }
+
+    // minBptAmountOut = calculated BPT out * (1 - slippage)
+    const minBptAmountOut = bptBptAmountFromRaft.mul(Decimal.ONE.sub(slippage));
+
+    // approve $RAFT token for approval amount
+    if (this.claimableAmount.gt(raftAllowance)) {
+      const raftTokenContract = getTokenContract(RAFT_TOKEN, signer);
+
+      const action = () =>
+        raftTokenContract.approve(
+          RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
+          this.claimableAmount.toBigInt(Decimal.PRECISION),
+        );
+
+      yield {
+        type: {
+          name: 'approve',
+          token: RAFT_TOKEN,
+        },
+        action,
+      };
+    }
+
+    // approve BPT token for approval amount
+    if (bptBptAmountFromRaft.gt(bptAllowance)) {
+      const bptTokenContract = getTokenContract(RAFT_BPT_TOKEN, signer);
+
+      const action = () =>
+        bptTokenContract.approve(
+          RaftConfig.networkConfig.veRaftAddress,
+          bptBptAmountFromRaft.toBigInt(Decimal.PRECISION),
+        );
+
+      yield {
+        type: {
+          name: 'approve',
+          token: RAFT_BPT_TOKEN,
+        },
+        action,
+      };
+    }
+
+    const { sendTransaction } = await buildTransactionWithGasLimit(
+      this.claimAndStakeContract.execute,
+      [
+        BigInt(this.merkleTreeIndex),
+        this.walletAddress,
+        this.claimableAmount.toBigInt(Decimal.PRECISION),
+        BigInt(unlockTimeInSec),
+        this.merkleProof,
+        minBptAmountOut.toBigInt(Decimal.PRECISION),
+        EMPTY_PERMIT_SIGNATURE,
+        EMPTY_PERMIT_SIGNATURE,
+      ],
+      signer,
+      gasLimitMultiplier,
+      'raft',
+    );
+
+    yield {
+      type: {
+        name: 'claim-and-stake',
+      },
+      action: sendTransaction,
+    };
   }
 
   public async *getStakeBptSteps(

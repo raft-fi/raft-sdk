@@ -19,22 +19,22 @@ describe('RaftToken', () => {
       {
         bptAmount: new Decimal(123456),
         unlockTime: new Date(2 * YEAR_IN_SEC),
-        expected: new Decimal(0.000482142148054906),
+        expected: new Decimal(0.000241231237686224),
       },
       {
         bptAmount: new Decimal(123456),
         unlockTime: new Date(YEAR_IN_SEC),
-        expected: new Decimal(0.000241071289267833),
+        expected: new Decimal(0.000120615726534803),
       },
       {
         bptAmount: new Decimal(123456),
         unlockTime: new Date(0.5 * YEAR_IN_SEC),
-        expected: new Decimal(0.00012053569844418),
+        expected: new Decimal(0.000060307890190408),
       },
       {
         bptAmount: new Decimal(123456),
         unlockTime: new Date(0.25 * YEAR_IN_SEC),
-        expected: new Decimal(0.000060267862674656),
+        expected: new Decimal(0.000030153951825956),
       },
       {
         bptAmount: new Decimal(123456),
@@ -44,22 +44,22 @@ describe('RaftToken', () => {
       {
         bptAmount: new Decimal(234567),
         unlockTime: new Date(2 * YEAR_IN_SEC),
-        expected: new Decimal(0.000482141373186717),
+        expected: new Decimal(0.000241230849994725),
       },
       {
         bptAmount: new Decimal(234567),
         unlockTime: new Date(YEAR_IN_SEC),
-        expected: new Decimal(0.000241071095550496),
+        expected: new Decimal(0.000120615629611783),
       },
       {
         bptAmount: new Decimal(234567),
         unlockTime: new Date(0.5 * YEAR_IN_SEC),
-        expected: new Decimal(0.000120535650014692),
+        expected: new Decimal(0.000060307865959576),
       },
       {
         bptAmount: new Decimal(234567),
         unlockTime: new Date(0.25 * YEAR_IN_SEC),
-        expected: new Decimal(0.000060267850567207),
+        expected: new Decimal(0.000030153945768209),
       },
       {
         bptAmount: new Decimal(234567),
