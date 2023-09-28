@@ -1,6 +1,13 @@
 import { AddressLike, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
+import {
+  CollateralToken,
+  R_TOKEN,
+  Token,
+  Erc20TokenContract,
+  TransactionWithFeesOptions,
+  UnderlyingCollateralToken,
+} from '../types';
 import {
   EMPTY_PERMIT_SIGNATURE,
   buildTransactionWithGasLimit,
@@ -204,7 +211,7 @@ export abstract class BasePositionManaging {
   private async getNeededSteps<U extends UnderlyingCollateralToken>(
     collateralChange: Decimal,
     debtChange: Decimal,
-    collateralTokenContract: ERC20 | ERC20Permit | WstETH,
+    collateralTokenContract: Erc20TokenContract,
     underlyingCollateralToken: U,
     positionManagerAddress: string,
     checkIfDelegateWhitelisted: (delegate: AddressLike) => Promise<boolean>,

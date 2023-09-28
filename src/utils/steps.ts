@@ -1,7 +1,6 @@
 import { Decimal } from '@tempusfinance/decimal';
 import { AddressLike, Signer, TransactionResponse } from 'ethers';
-import { ERC20, ERC20Permit, WstETH } from '../typechain';
-import { Token } from '../types';
+import { Token, Erc20TokenContract, Erc20PermitTokenContract } from '../types';
 import { ERC20PermitSignatureStruct, PositionManager } from '../typechain/PositionManager';
 import { RaftConfig } from '../config';
 import { EMPTY_PERMIT_SIGNATURE, createPermitSignature } from './permit';
@@ -65,7 +64,7 @@ export async function* getWhitelistStep(
 export function* getSignTokenPermitStep<T extends Token>(
   signer: Signer,
   token: T,
-  tokenContract: ERC20Permit | WstETH,
+  tokenContract: Erc20PermitTokenContract,
   approveAmount: Decimal,
   spender: AddressLike,
   stepNumber: number,
@@ -94,7 +93,7 @@ export function* getSignTokenPermitStep<T extends Token>(
 
 export async function* getApproveTokenStep<T extends Token>(
   token: T,
-  tokenContract: ERC20 | ERC20Permit | WstETH,
+  tokenContract: Erc20TokenContract,
   approveAmount: Decimal,
   spender: AddressLike,
   stepNumber: number,
@@ -123,7 +122,7 @@ export async function* getApproveTokenStep<T extends Token>(
 export async function* getPermitOrApproveTokenStep<T extends Token>(
   signer: Signer,
   token: T,
-  tokenContract: ERC20 | ERC20Permit | WstETH,
+  tokenContract: Erc20TokenContract,
   approveAmount: Decimal,
   spender: AddressLike,
   stepNumber: number,
@@ -137,7 +136,7 @@ export async function* getPermitOrApproveTokenStep<T extends Token>(
     permitSignature = yield* getSignTokenPermitStep(
       signer,
       token,
-      tokenContract as ERC20Permit | WstETH,
+      tokenContract as Erc20PermitTokenContract,
       approveAmount,
       spender,
       stepNumber,
