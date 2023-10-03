@@ -1,3 +1,4 @@
+import request, { gql } from 'graphql-request';
 import { Decimal } from '@tempusfinance/decimal';
 import {
   AbiCoder,
@@ -14,6 +15,31 @@ import { RToken, R_TOKEN, TransactionWithFeesOptions } from './types';
 import { ApproveStep, BaseStep, buildTransactionWithGasLimit, getApproveTokenStep } from './utils';
 import { ETH_PRECISION } from './constants';
 import { getTokenAllowance } from './allowance';
+
+interface BridgeRequestTransactionQuery {
+  id: string;
+  amount: string;
+  timestamp: string;
+  sourceChainSelector: string;
+  destinationChainSelector: string;
+  messageId: string;
+}
+
+interface BridgeRequestTransactionsQuery {
+  position: {
+    bridgeRequests: BridgeRequestTransactionQuery[];
+  } | null;
+}
+
+export interface BridgeRequestTransaction {
+  id: string;
+  type: 'BRIDGE';
+  amount: Decimal;
+  timestamp: Date;
+  sourceChain: string;
+  destinationChain: string;
+  messageId: string;
+}
 
 export interface BridgeTokensOptions extends TransactionWithFeesOptions {
   frontendTag?: string;
@@ -85,6 +111,13 @@ export const BRIDGE_NETWORKS: { [key in SupportedBridgeNetwork]: BridgeNetworkCo
     tokenTicker: 'clCCIP-LnM',
     tokenDecimals: 18,
   },
+};
+
+const CHAIN_SELECTOR_TO_CHAIN_NAME: { [chainSelector: string]: SupportedBridgeNetwork } = {
+  '5009297550715157269': 'mainnet',
+  '16015286601757825753': 'ethereumSepolia',
+  '15971525489660198786': 'base',
+  '6101244977088475029': 'arbitrumGoerli',
 };
 
 export const BRIDGE_NETWORK_LANES: { [key in SupportedBridgeNetwork]: SupportedBridgeNetwork[] } = {
@@ -301,6 +334,42 @@ export class Bridge {
     const allowance = await tokenContract.allowance(this.user, spender);
 
     return new Decimal(allowance, tokenDecimals);
+  }
+
+  async getBridgeTransactions(subgraphUrl: string): Promise<BridgeRequestTransaction[]> {
+    const query = gql`
+      query GetTransactions($ownerAddress: String!) {
+        position(id: $ownerAddress) {
+          bridgeRequests(orderBy: timestamp, orderDirection: desc) {
+            id
+            amount
+            timestamp
+            sourceChainSelector
+            destinationChainSelector
+            messageId
+          }
+        }
+      }
+    `;
+
+    const userAddress = await this.user.getAddress();
+    const response = await request<BridgeRequestTransactionsQuery>(subgraphUrl, query, {
+      ownerAddress: userAddress.toLowerCase(),
+    });
+
+    if (!response.position?.bridgeRequests) {
+      return [];
+    }
+
+    return response.position.bridgeRequests.map(bridgeRequestTransaction => ({
+      ...bridgeRequestTransaction,
+      amount: Decimal.parse(BigInt(bridgeRequestTransaction.amount), 0n, Decimal.PRECISION),
+      timestamp: new Date(Number(bridgeRequestTransaction.timestamp) * 1000),
+      destinationChain: CHAIN_SELECTOR_TO_CHAIN_NAME[bridgeRequestTransaction.destinationChainSelector],
+      sourceChain: CHAIN_SELECTOR_TO_CHAIN_NAME[bridgeRequestTransaction.sourceChainSelector],
+      messageId: bridgeRequestTransaction.messageId,
+      type: 'BRIDGE',
+    }));
   }
 }
 
