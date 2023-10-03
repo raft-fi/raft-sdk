@@ -66,5 +66,6 @@ export {
   type BridgeTokensStep,
   type BridgeTokensStepType,
   type SupportedBridgeNetwork,
+  type BridgeRequestTransaction,
   isSupportedBridgeNetwork,
 } from './bridge';
