@@ -69,6 +69,10 @@ type WhitelistMerkleTree = {
   claims: Record<string, WhitelistMerkleTreeItem>;
 };
 
+export interface AprEstimationOptions {
+  bptLockedBalance?: Decimal;
+  veRaftBalance?: Decimal;
+}
 export interface ClaimRaftStakeBptStepType {
   name: 'approve' | 'claim-and-stake';
   token?: typeof RAFT_TOKEN | typeof RAFT_BPT_TOKEN;
@@ -229,14 +233,27 @@ export class RaftToken {
    * Returns the estimated staking APR for the input.
    * @param bptAmount The stake amount of BPT.
    * @param unlockTime The unlock time for the staking.
-   * @param options.veRaftAvgTotalSupply The avg total supply of veRAFT. If not provided, will query.
+   * @param options.bptLockedBalance Current staked BPT amount
+   * @param options.veRaftBalance Current veRaft position
    * @returns The estimated staking APR.
    */
-  public async estimateStakingApr(bptAmount: Decimal, unlockTime: Date): Promise<Decimal> {
+  public async estimateStakingApr(
+    bptAmount: Decimal,
+    unlockTime: Date,
+    options: AprEstimationOptions = {},
+  ): Promise<Decimal> {
+    let { bptLockedBalance, veRaftBalance } = options;
+
     const stakingPeriodInSecond = Math.floor((unlockTime.getTime() - Date.now()) / 1000);
 
     if (stakingPeriodInSecond <= 0) {
       return Decimal.ZERO;
+    }
+
+    if (!bptLockedBalance || !veRaftBalance) {
+      const balance = await this.getUserVeRaftBalance();
+      bptLockedBalance = balance.bptLockedBalance;
+      veRaftBalance = balance.veRaftBalance;
     }
 
     const [veRaftAvgTotalSupply, maxVeLockPeriod] = await Promise.all([
@@ -252,12 +269,17 @@ export class RaftToken {
     const periodPortion = stakingPeriodInSecond / maxVeLockPeriod;
     const numOfYear = maxVeLockPeriod / SECONDS_PER_YEAR;
 
+    // since veRAFT decrease in linear, avg veRAFT = veRAFT /2
+
     // avg veRAFT = staked BPT * period portion / 2
     const newVeRaftAvgAmount = bptAmount.mul(periodPortion).div(2);
+    const currentVeRaftAvgAmount = veRaftBalance.div(2);
+    const userVeRaftAvgAmount = newVeRaftAvgAmount.add(currentVeRaftAvgAmount);
     const newVeRaftAvgTotalAmount = veRaftAvgTotalSupply.add(newVeRaftAvgAmount);
+    const userTotalBptAmount = bptAmount.add(bptLockedBalance);
 
-    // estimated APR = new avg veRAFT / total avg veRAFT * annual give away / staked BPT / number of year
-    return newVeRaftAvgAmount.div(newVeRaftAvgTotalAmount).mul(annualGiveAway).div(bptAmount).div(numOfYear);
+    // estimated APR = user avg veRAFT / total avg veRAFT * annual give away / staked BPT / number of year
+    return userVeRaftAvgAmount.div(newVeRaftAvgTotalAmount).mul(annualGiveAway).div(userTotalBptAmount).div(numOfYear);
   }
 
   public async getBalancerPoolData(): Promise<SubgraphPoolBase | null> {
