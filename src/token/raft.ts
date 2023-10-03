@@ -25,7 +25,7 @@ import {
   isEoaAddress,
 } from '../utils';
 import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions, VERAFT_TOKEN } from '../types';
-import { SECONDS_PER_YEAR } from '../constants';
+import { SECONDS_IN_WEEK, SECONDS_PER_YEAR } from '../constants';
 
 // annual give away = 10% of 1B evenly over 3 years
 const ANNUAL_GIVE_AWAY = new Decimal(1000000000).mul(0.1).div(3);
@@ -377,6 +377,18 @@ export class RaftToken {
     }
 
     return new Decimal(bptOut.toBigInt(), Decimal.PRECISION);
+  }
+
+  public async calculateVeRaftAmount(bptAmount: Decimal, unlockTime: Date): Promise<Decimal> {
+    const currentTimeInSecond = Math.floor(Date.now() / 1000);
+    const unlockTimeInSecond = Math.floor(unlockTime.getTime() / 1000);
+    const periodInSecond = unlockTimeInSecond - currentTimeInSecond;
+    // period is floored by week (VotingEscrow.vy#L77)
+    const trimmedPeriodInSecond = Math.floor(periodInSecond / SECONDS_IN_WEEK) * SECONDS_IN_WEEK;
+
+    const maxVeLockPeriod = await this.getMaxVeLockPeriod();
+
+    return new Decimal(trimmedPeriodInSecond).div(maxVeLockPeriod).mul(bptAmount);
   }
 
   public async getUserVeRaftBalance(): Promise<UserVeRaftBalance> {
