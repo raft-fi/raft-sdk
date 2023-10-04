@@ -150,14 +150,14 @@ const tokensConfig: Record<Token, TokenConfig> = {
     priceFeed: 'swETH',
   },
   RAFT: {
-    address: '0x0000000000000000000000000000000000000000', // TODO: update address
+    address: '0x4c5cb5d87709387f8821709f7a6664f00dcf0c93',
     ticker: 'RAFT',
     decimals: 18,
     supportsPermit: true,
     priceFeed: null,
   },
   veRAFT: {
-    address: '0xC128a9954e6c874eA3d62ce62B468bA073093F25', // TODO: update address
+    address: '0x45d117011da1d49ba86af6ced94126488084186f',
     ticker: 'veRAFT',
     decimals: 18,
     supportsPermit: false,
@@ -234,7 +234,6 @@ export const mainnetConfig: NetworkConfig = {
   // TODO: wait for deployment
   raftAirdropAddress: '0x0000000000000000000000000000000000000000',
   claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
-  // TODO: update this to RAFT/R pool
-  balancerWeightedPoolId: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014',
+  balancerWeightedPoolId: '0xe91888a1d08e37598867d213a4acb5692071bb3a0002000000000000000005f9',
   feeDistributorAddress: '0x0000000000000000000000000000000000000000',
 };
