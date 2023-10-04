@@ -278,6 +278,10 @@ export class RaftToken {
     const newVeRaftAvgTotalAmount = veRaftAvgTotalSupply.add(newVeRaftAvgAmount);
     const userTotalBptAmount = bptAmount.add(bptLockedBalance);
 
+    if (newVeRaftAvgTotalAmount.isZero() || userTotalBptAmount.isZero() || !numOfYear) {
+      return Decimal.ZERO;
+    }
+
     // estimated APR = user avg veRAFT / total avg veRAFT * annual give away / staked BPT / number of year
     return userVeRaftAvgAmount.div(newVeRaftAvgTotalAmount).mul(annualGiveAway).div(userTotalBptAmount).div(numOfYear);
   }
