@@ -231,9 +231,8 @@ export const mainnetConfig: NetworkConfig = {
   tokens: tokensConfig,
   daiAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   testNetwork: false,
-  // TODO: wait for deployment
   raftAirdropAddress: '0x0000000000000000000000000000000000000000',
   claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
   balancerWeightedPoolId: '0xe91888a1d08e37598867d213a4acb5692071bb3a0002000000000000000005f9',
-  feeDistributorAddress: '0x0000000000000000000000000000000000000000',
+  feeDistributorAddress: '0x636c04cfb9e242e7ea8986c6cd0eaa8175cacc21',
 };
