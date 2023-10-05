@@ -181,7 +181,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
     },
   },
   'B-80RAFT-20R': {
-    address: '0x0000000000000000000000000000000000000000', // TODO: update address
+    address: '0xe91888a1d08e37598867d213a4acb5692071bb3a',
     ticker: 'B-80RAFT-20R',
     decimals: 18,
     supportsPermit: true,
