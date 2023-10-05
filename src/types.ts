@@ -22,7 +22,7 @@ export const RAFT_TOKEN = 'RAFT';
 export const VERAFT_TOKEN = 'veRAFT';
 export const R_TOKEN = 'R';
 export const RR_TOKEN = 'RR';
-export const RAFT_BPT_TOKEN = 'B-80RAFT-20R';
+export const RAFT_BPT_TOKEN = '20R-80RAFT';
 export const TOKENS = [...COLLATERAL_TOKENS, RAFT_TOKEN, VERAFT_TOKEN, R_TOKEN, RR_TOKEN, RAFT_BPT_TOKEN] as const;
 
 export const VAULT_VERSIONS = ['v1', 'v2'] as const;
