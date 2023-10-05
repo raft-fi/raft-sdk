@@ -179,9 +179,9 @@ const tokensConfig: Record<Token, TokenConfig> = {
       getFallbackRate: getRRToRRate,
     },
   },
-  '20R-80RAFT': {
+  'B-80RAFT-20R': {
     address: '0xf8a0623ab66f985effc1c69d05f1af4badb01b00', // TODO: update address
-    ticker: '20R-80RAFT',
+    ticker: 'B-80RAFT-20R',
     decimals: 18,
     supportsPermit: true,
     priceFeed: null,

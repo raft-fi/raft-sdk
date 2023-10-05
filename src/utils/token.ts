@@ -59,7 +59,7 @@ type TokenContractTypes = {
   veRAFT: VotingEscrow;
   R: ERC20PermitRToken;
   RR: RSavingsRate;
-  '20R-80RAFT': ERC20Permit;
+  'B-80RAFT-20R': ERC20Permit;
   'rwstETH-c': ERC20Indexable;
   'rwstETH-d': ERC20Indexable;
   'rwstETH-v1-c': ERC20Indexable;
