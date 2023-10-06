@@ -178,7 +178,7 @@ export class RaftToken {
   }
 
   /**
-   * Returns the avg total supply of veRAFT.
+   * Returns the avg total supply of veRAFT, excluding user supply.
    * @param unlockTime The unlock time for the staking.
    * @returns Total supply of veRAFT.
    */
@@ -194,7 +194,13 @@ export class RaftToken {
     const lastPoint = (await this.veContract.point_history(epoch)) as VeRaftBalancePoint;
 
     const totalSupply = this.getTotalVeRaftBalanceFromPoint(lastPoint, currentTimeInSecond + avgStakingPeriodInSecond);
-    return new Decimal(totalSupply, Decimal.PRECISION);
+
+    // exclude user veRAFT supply
+    const userEpoch = await this.veContract.user_point_epoch(this.walletAddress);
+    const userPoint = (await this.veContract.user_point_history(this.walletAddress, userEpoch)) as VeRaftBalancePoint;
+    const userSupply = this.getTotalVeRaftBalanceFromPoint(userPoint, currentTimeInSecond + avgStakingPeriodInSecond);
+
+    return new Decimal(totalSupply - userSupply, Decimal.PRECISION);
   }
 
   /**
@@ -266,17 +272,15 @@ export class RaftToken {
       return Decimal.ZERO;
     }
 
-    const periodPortion = stakingPeriodInSecond / maxVeLockPeriod;
     const numOfYear = maxVeLockPeriod / SECONDS_PER_YEAR;
 
     // since veRAFT decrease in linear, avg veRAFT = veRAFT /2
 
     // avg veRAFT = staked BPT * period portion / 2
-    const newVeRaftAvgAmount = bptAmount.mul(periodPortion).div(2);
-    const currentVeRaftAvgAmount = veRaftBalance.div(2);
-    const userVeRaftAvgAmount = newVeRaftAvgAmount.add(currentVeRaftAvgAmount);
-    const newVeRaftAvgTotalAmount = veRaftAvgTotalSupply.add(newVeRaftAvgAmount);
     const userTotalBptAmount = bptAmount.add(bptLockedBalance);
+    // new veRAFT = total staked BPT * period portion
+    const userVeRaftAvgAmount = (await this.calculateVeRaftAmount(userTotalBptAmount, unlockTime)).div(2);
+    const newVeRaftAvgTotalAmount = veRaftAvgTotalSupply.add(userVeRaftAvgAmount);
 
     if (newVeRaftAvgTotalAmount.isZero() || userTotalBptAmount.isZero() || !numOfYear) {
       return Decimal.ZERO;
