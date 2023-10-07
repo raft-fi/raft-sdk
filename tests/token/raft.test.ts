@@ -7,6 +7,7 @@ describe('RaftToken', () => {
   const DUMMY_ADDRESS = '0x0';
   const DUMMY_PROVIDER = {} as Provider;
   const YEAR_IN_SEC = 365 * 24 * 60 * 60;
+  const YEAR_IN_MS = YEAR_IN_SEC * 1000;
 
   it('should return the correct estimated APR based on different input', async () => {
     const token = new RaftToken(DUMMY_ADDRESS, DUMMY_PROVIDER);
@@ -18,53 +19,53 @@ describe('RaftToken', () => {
     const tests = [
       {
         bptAmount: new Decimal(123456),
-        unlockTime: new Date(2 * YEAR_IN_SEC),
-        expected: new Decimal(0.000241231237686224),
+        unlockTime: new Date(2 * YEAR_IN_MS),
+        expected: '0.24014311025686594',
       },
       {
         bptAmount: new Decimal(123456),
-        unlockTime: new Date(YEAR_IN_SEC),
-        expected: new Decimal(0.000120615726534803),
+        unlockTime: new Date(YEAR_IN_MS),
+        expected: '0.120178372396786514',
       },
       {
         bptAmount: new Decimal(123456),
-        unlockTime: new Date(0.5 * YEAR_IN_SEC),
-        expected: new Decimal(0.000060307890190408),
+        unlockTime: new Date(0.5 * YEAR_IN_MS),
+        expected: '0.060115926166118135',
       },
       {
         bptAmount: new Decimal(123456),
-        unlockTime: new Date(0.25 * YEAR_IN_SEC),
-        expected: new Decimal(0.000030153951825956),
+        unlockTime: new Date(0.25 * YEAR_IN_MS),
+        expected: '0.030064652538262179',
       },
       {
         bptAmount: new Decimal(123456),
         unlockTime: new Date(0),
-        expected: new Decimal(0),
+        expected: '0',
       },
       {
         bptAmount: new Decimal(234567),
-        unlockTime: new Date(2 * YEAR_IN_SEC),
-        expected: new Decimal(0.000241230849994725),
+        unlockTime: new Date(2 * YEAR_IN_MS),
+        expected: '0.239759521505545377',
       },
       {
         bptAmount: new Decimal(234567),
-        unlockTime: new Date(YEAR_IN_SEC),
-        expected: new Decimal(0.000120615629611783),
+        unlockTime: new Date(YEAR_IN_MS),
+        expected: '0.120082227790997352',
       },
       {
         bptAmount: new Decimal(234567),
-        unlockTime: new Date(0.5 * YEAR_IN_SEC),
-        expected: new Decimal(0.000060307865959576),
+        unlockTime: new Date(0.5 * YEAR_IN_MS),
+        expected: '0.060091858994736769',
       },
       {
         bptAmount: new Decimal(234567),
-        unlockTime: new Date(0.25 * YEAR_IN_SEC),
-        expected: new Decimal(0.000030153945768209),
+        unlockTime: new Date(0.25 * YEAR_IN_MS),
+        expected: '0.030058631862113471',
       },
       {
         bptAmount: new Decimal(234567),
         unlockTime: new Date(0),
-        expected: new Decimal(0),
+        expected: '0',
       },
     ];
 
@@ -73,7 +74,7 @@ describe('RaftToken', () => {
         bptLockedBalance: Decimal.ZERO,
         veRaftBalance: Decimal.ZERO,
       });
-      expect(result.toString().substring(0, 16)).toBe(expected.toString().substring(0, 16));
+      expect(result.toString().substring(0, 16)).toBe(expected.substring(0, 16));
     }
   });
 
