@@ -73,6 +73,7 @@ export interface AprEstimationOptions {
   totalAnnualShare?: Decimal;
   userAnnualShare?: Decimal;
   userVeRaftBalance?: UserVeRaftBalance;
+  poolData?: SubgraphPoolBase | null;
 }
 export interface ClaimRaftStakeBptStepType {
   name: 'approve' | 'claim-and-stake';
@@ -112,6 +113,7 @@ export class RaftToken {
   private annualGiveAway: Decimal = ANNUAL_GIVE_AWAY;
   private minVeLockPeriod?: number | null;
   private maxVeLockPeriod?: number | null;
+  private poolData: SubgraphPoolBase | null;
 
   public constructor(walletAddress: string, provider: Provider) {
     this.provider = provider;
@@ -128,6 +130,7 @@ export class RaftToken {
       RaftConfig.networkConfig.feeDistributorAddress,
       provider,
     );
+    this.poolData = null;
   }
 
   public setWhitelist(merkleTree: WhitelistMerkleTree): void {
@@ -313,6 +316,7 @@ export class RaftToken {
    * @param options.totalAnnualShare Total annual veRAFT share
    * @param options.userAnnualShare User annual veRAFT share
    * @param options.userVeRaftBalance Current user veRaft position
+   * @param options.poolData Balancer pool data
    * @returns The estimated staking APR.
    */
   public async estimateStakingApr(
@@ -320,7 +324,7 @@ export class RaftToken {
     unlockTime: Date,
     options: AprEstimationOptions = {},
   ): Promise<Decimal> {
-    let { totalAnnualShare, userAnnualShare, userVeRaftBalance } = options;
+    let { totalAnnualShare, userAnnualShare, userVeRaftBalance, poolData } = options;
 
     if (!totalAnnualShare) {
       totalAnnualShare = await this.calculateTotalVeRaftAnnualShare();
@@ -337,50 +341,75 @@ export class RaftToken {
       );
     }
 
+    if (!poolData) {
+      poolData = await this.getBalancerPoolData();
+    }
+
+    if (!poolData) {
+      return Decimal.ZERO;
+    }
+
+    // use this to estimate the RAFT/BPT rate without too much price impact
+    const raftBptRaft = await this.getBptAmountFromRaft(new Decimal(1), { poolData });
+
+    if (!raftBptRaft) {
+      return Decimal.ZERO;
+    }
+
     const annualGiveAway = this.getAnnualGiveAway();
     const totalAnnualShareWithoutUser = totalAnnualShare.sub(userAnnualShare);
     const userTotalBptAmount = bptAmount.add(userVeRaftBalance?.bptLockedBalance ?? Decimal.ZERO);
+
+    if (userTotalBptAmount.isZero()) {
+      return Decimal.ZERO;
+    }
+
+    const userStakedRaftAmount = userTotalBptAmount.mul(raftBptRaft);
     const userTotalVeRaftAmount = await this.calculateVeRaftAmount(userTotalBptAmount, unlockTime);
     const newUserAnnualShare = this.calculateUserVeRaftAnnualShare(userTotalVeRaftAmount, unlockTime);
     const newTotalAnnualShare = totalAnnualShareWithoutUser.add(newUserAnnualShare);
 
-    if (newTotalAnnualShare.isZero() || userTotalBptAmount.isZero()) {
+    if (newTotalAnnualShare.isZero()) {
       return Decimal.ZERO;
     }
 
-    // estimated APR = user annual veRAFT share / total annual veRAFT share * annual give away / staked BPT
-    return newUserAnnualShare.div(newTotalAnnualShare).mul(annualGiveAway).div(userTotalBptAmount);
+    // estimated APR = user annual veRAFT share / total annual veRAFT share * annual give away / staked BPT in RAFT
+    return newUserAnnualShare.div(newTotalAnnualShare).mul(annualGiveAway).div(userStakedRaftAmount);
   }
 
   public async getBalancerPoolData(): Promise<SubgraphPoolBase | null> {
-    const query = gql`
-      query GetPoolData($poolId: String!) {
-        pool(id: $poolId) {
-          id
-          address
-          poolType
-          swapFee
-          swapEnabled
-          totalWeight
-          totalShares
-          tokens {
+    if (!this.poolData) {
+      const query = gql`
+        query GetPoolData($poolId: String!) {
+          pool(id: $poolId) {
+            id
             address
-            balance
-            decimals
-            priceRate
-            weight
+            poolType
+            swapFee
+            swapEnabled
+            totalWeight
+            totalShares
+            tokens {
+              address
+              balance
+              decimals
+              priceRate
+              weight
+            }
+            tokensList
           }
-          tokensList
         }
-      }
-    `;
+      `;
 
-    const poolId = RaftConfig.networkConfig.balancerWeightedPoolId;
-    const response = await request<PoolDataQuery>(RaftConfig.balancerSubgraphEndpoint, query, {
-      poolId,
-    });
+      const poolId = RaftConfig.networkConfig.balancerWeightedPoolId;
+      const response = await request<PoolDataQuery>(RaftConfig.balancerSubgraphEndpoint, query, {
+        poolId,
+      });
 
-    return response.pool ?? null;
+      this.poolData = response.pool ?? null;
+    }
+
+    return this.poolData;
   }
 
   /**
@@ -402,13 +431,31 @@ export class RaftToken {
 
     const pool = WeightedPool.fromPool(poolData);
     const poolPairData = pool.parsePoolPairData(poolData.tokensList[0], poolData.tokensList[1]);
-    const tokenIn = new OldBigNumber(raftAmount.toString());
 
-    // https://docs.balancer.fi/guides/arbitrageurs/get-spot-price.html
-    // current spot price
-    const priceBefore = pool._spotPriceAfterSwapExactTokenInForTokenOut(poolPairData, new OldBigNumber(0));
-    // spot price after
-    const priceAfter = pool._spotPriceAfterSwapExactTokenInForTokenOut(poolPairData, tokenIn);
+    let priceBefore: OldBigNumber | null = null;
+    let priceAfter: OldBigNumber | null = null;
+
+    if (poolData.tokensList[0] === RaftConfig.networkConfig.tokens.RAFT.address) {
+      const tokenIn = new OldBigNumber(raftAmount.toString());
+
+      // https://docs.balancer.fi/guides/arbitrageurs/get-spot-price.html
+      // current spot price
+      priceBefore = pool._spotPriceAfterSwapExactTokenInForTokenOut(poolPairData, new OldBigNumber(0));
+      // spot price after
+      priceAfter = pool._spotPriceAfterSwapExactTokenInForTokenOut(poolPairData, tokenIn);
+    } else if (poolData.tokensList[1] === RaftConfig.networkConfig.tokens.RAFT.address) {
+      const tokenOut = new OldBigNumber(raftAmount.toString());
+
+      // https://docs.balancer.fi/guides/arbitrageurs/get-spot-price.html
+      // current spot price
+      priceBefore = pool._spotPriceAfterSwapTokenInForExactTokenOut(poolPairData, new OldBigNumber(0));
+      // spot price after
+      priceAfter = pool._spotPriceAfterSwapTokenInForExactTokenOut(poolPairData, tokenOut);
+    }
+
+    if (!priceBefore || !priceAfter) {
+      return null;
+    }
 
     const priceBeforeDecimal = new Decimal(priceBefore.toString());
     const priceAfterDecimal = new Decimal(priceAfter.toString());
