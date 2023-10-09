@@ -70,8 +70,9 @@ type WhitelistMerkleTree = {
 };
 
 export interface AprEstimationOptions {
-  bptLockedBalance?: Decimal;
-  veRaftBalance?: Decimal;
+  totalAnnualShare?: Decimal;
+  userAnnualShare?: Decimal;
+  userVeRaftBalance?: UserVeRaftBalance;
 }
 export interface ClaimRaftStakeBptStepType {
   name: 'approve' | 'claim-and-stake';
@@ -178,29 +179,99 @@ export class RaftToken {
   }
 
   /**
-   * Returns the avg total supply of veRAFT, excluding user supply.
-   * @param unlockTime The unlock time for the staking.
-   * @returns Total supply of veRAFT.
+   * Returns the total annual veRAFT share (avg veRAFT supply)
+   * @returns Total annual veRAFT share.
    */
-  public async fetchVeRaftAvgTotalSupply(unlockTime: Date): Promise<Decimal> {
+  public async calculateTotalVeRaftAnnualShare(): Promise<Decimal> {
     const currentTimeInSecond = Math.floor(Date.now() / 1000);
-    const avgStakingPeriodInSecond = Math.floor((Math.floor(unlockTime.getTime() / 1000) - currentTimeInSecond) / 2);
-
-    if (avgStakingPeriodInSecond <= 0) {
-      return Decimal.ZERO;
-    }
+    const oneYearAfterInSecond = currentTimeInSecond + SECONDS_PER_YEAR;
 
     const epoch = await this.veContract.epoch();
     const lastPoint = (await this.veContract.point_history(epoch)) as VeRaftBalancePoint;
+    const totalSupply = this.getTotalVeRaftBalanceFromPoint(lastPoint, currentTimeInSecond);
+    const totalSupplyOneYearAfter = this.getTotalVeRaftBalanceFromPoint(lastPoint, oneYearAfterInSecond);
 
-    const totalSupply = this.getTotalVeRaftBalanceFromPoint(lastPoint, currentTimeInSecond + avgStakingPeriodInSecond);
+    /*
+     * veRAFT
+     *    ^
+     *    |\
+     *    | \
+     *    |  \
+     *    |   \
+     *    |    \
+     *    |     \
+     *    |      \
+     *    |       \
+     *    |        \
+     *    |        |\
+     *    |        | \
+     *    |        |  \
+     *    |        |   \
+     *  0 +--------+------> time
+     *      1 year
+     */
+    // x-axis: time, y-axis: veRAFT, then annual share = area of trapezoid
+    const totalShare = (totalSupply + totalSupplyOneYearAfter) / 2n;
 
-    // exclude user veRAFT supply
-    const userEpoch = await this.veContract.user_point_epoch(this.walletAddress);
-    const userPoint = (await this.veContract.user_point_history(this.walletAddress, userEpoch)) as VeRaftBalancePoint;
-    const userSupply = this.getTotalVeRaftBalanceFromPoint(userPoint, currentTimeInSecond + avgStakingPeriodInSecond);
+    return new Decimal(totalShare, Decimal.PRECISION);
+  }
 
-    return new Decimal(totalSupply - userSupply, Decimal.PRECISION);
+  /**
+   * Returns the user annual veRAFT share (avg user veRAFT supply)
+   * @param veRaftBalance User current veRAFT balance
+   * @param unlockTime The unlock time for the staking.
+   * @returns User annual veRAFT share.
+   */
+  public calculateUserVeRaftAnnualShare(veRaftBalance: Decimal, unlockTime: Date | null): Decimal {
+    if (!unlockTime || veRaftBalance.isZero()) {
+      return Decimal.ZERO;
+    }
+
+    const currentTimeInSecond = Math.floor(Date.now() / 1000);
+    const unlockTimeInSecond = Math.floor(unlockTime.getTime() / 1000);
+    const yearPortion = new Decimal(unlockTimeInSecond - currentTimeInSecond).div(SECONDS_PER_YEAR);
+
+    if (yearPortion.gt(1)) {
+      // unlock time > 1 year
+      const veRaftBalanceOneYearAfter = veRaftBalance.div(yearPortion);
+
+      /*
+       * veRAFT
+       *    ^
+       *    |\
+       *    | \
+       *    |  \
+       *    |   \
+       *    |    \
+       *    |     \
+       *    |      \
+       *    |       \
+       *    |        \
+       *    |        |\
+       *    |        | \
+       *    |        |  \
+       *    |        |   \
+       *  0 +--------+------> time
+       *      1 year
+       */
+      // x-axis: time, y-axis: veRAFT, then annual share = area of trapezoid
+      return veRaftBalance.add(veRaftBalanceOneYearAfter).div(2);
+    }
+
+    /*
+     * veRAFT
+     *    ^
+     *    |\
+     *    | \
+     *    |  \
+     *    |   \
+     *    |    \
+     *    |     \
+     *  0 +--------+------> time
+     *      1 year
+     */
+    // x-axis: time, y-axis: veRAFT, then annual share = area of triangle
+    return veRaftBalance.mul(yearPortion).div(2);
   }
 
   /**
@@ -239,8 +310,9 @@ export class RaftToken {
    * Returns the estimated staking APR for the input.
    * @param bptAmount The stake amount of BPT.
    * @param unlockTime The unlock time for the staking.
-   * @param options.bptLockedBalance Current staked BPT amount
-   * @param options.veRaftBalance Current veRaft position
+   * @param options.totalAnnualShare Total annual veRAFT share
+   * @param options.userAnnualShare User annual veRAFT share
+   * @param options.userVeRaftBalance Current user veRaft position
    * @returns The estimated staking APR.
    */
   public async estimateStakingApr(
@@ -248,46 +320,36 @@ export class RaftToken {
     unlockTime: Date,
     options: AprEstimationOptions = {},
   ): Promise<Decimal> {
-    let { bptLockedBalance, veRaftBalance } = options;
+    let { totalAnnualShare, userAnnualShare, userVeRaftBalance } = options;
 
-    const stakingPeriodInSecond = Math.floor((unlockTime.getTime() - Date.now()) / 1000);
-
-    if (stakingPeriodInSecond <= 0) {
-      return Decimal.ZERO;
+    if (!totalAnnualShare) {
+      totalAnnualShare = await this.calculateTotalVeRaftAnnualShare();
     }
 
-    if (!bptLockedBalance || !veRaftBalance) {
-      const balance = await this.getUserVeRaftBalance();
-      bptLockedBalance = balance.bptLockedBalance;
-      veRaftBalance = balance.veRaftBalance;
+    if (!userVeRaftBalance) {
+      userVeRaftBalance = await this.getUserVeRaftBalance();
     }
 
-    const [veRaftAvgTotalSupply, maxVeLockPeriod] = await Promise.all([
-      this.fetchVeRaftAvgTotalSupply(unlockTime),
-      this.getMaxVeLockPeriod(),
-    ]);
+    if (!userAnnualShare) {
+      userAnnualShare = this.calculateUserVeRaftAnnualShare(
+        userVeRaftBalance?.veRaftBalance ?? Decimal.ZERO,
+        userVeRaftBalance?.unlockTime,
+      );
+    }
+
     const annualGiveAway = this.getAnnualGiveAway();
+    const totalAnnualShareWithoutUser = totalAnnualShare.sub(userAnnualShare);
+    const userTotalBptAmount = bptAmount.add(userVeRaftBalance?.bptLockedBalance ?? Decimal.ZERO);
+    const userTotalVeRaftAmount = await this.calculateVeRaftAmount(userTotalBptAmount, unlockTime);
+    const newUserAnnualShare = this.calculateUserVeRaftAnnualShare(userTotalVeRaftAmount, unlockTime);
+    const newTotalAnnualShare = totalAnnualShareWithoutUser.add(newUserAnnualShare);
 
-    if (maxVeLockPeriod <= 0 || annualGiveAway.isZero()) {
+    if (newTotalAnnualShare.isZero() || userTotalBptAmount.isZero()) {
       return Decimal.ZERO;
     }
 
-    const numOfYear = maxVeLockPeriod / SECONDS_PER_YEAR;
-
-    // since veRAFT decrease in linear, avg veRAFT = veRAFT /2
-
-    // avg veRAFT = staked BPT * period portion / 2
-    const userTotalBptAmount = bptAmount.add(bptLockedBalance);
-    // new veRAFT = total staked BPT * period portion
-    const userVeRaftAvgAmount = (await this.calculateVeRaftAmount(userTotalBptAmount, unlockTime)).div(2);
-    const newVeRaftAvgTotalAmount = veRaftAvgTotalSupply.add(userVeRaftAvgAmount);
-
-    if (newVeRaftAvgTotalAmount.isZero() || userTotalBptAmount.isZero() || !numOfYear) {
-      return Decimal.ZERO;
-    }
-
-    // estimated APR = user avg veRAFT / total avg veRAFT * annual give away / staked BPT / number of year
-    return userVeRaftAvgAmount.div(newVeRaftAvgTotalAmount).mul(annualGiveAway).div(userTotalBptAmount).div(numOfYear);
+    // estimated APR = user annual veRAFT share / total annual veRAFT share * annual give away / staked BPT
+    return newUserAnnualShare.div(newTotalAnnualShare).mul(annualGiveAway).div(userTotalBptAmount);
   }
 
   public async getBalancerPoolData(): Promise<SubgraphPoolBase | null> {
