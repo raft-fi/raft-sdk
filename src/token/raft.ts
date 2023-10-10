@@ -12,8 +12,8 @@ import {
   ERC20Permit,
   FeeDistributor,
   FeeDistributor__factory,
-  MerkleDistributor,
-  MerkleDistributor__factory,
+  MerkleDistributorWithDeadline,
+  MerkleDistributorWithDeadline__factory,
   VotingEscrow,
 } from '../typechain';
 import {
@@ -103,7 +103,7 @@ export class RaftToken {
   private raftContract: ERC20Permit;
   private veContract: VotingEscrow;
   private raftBptContract: ERC20Permit;
-  private airdropContract: MerkleDistributor;
+  private airdropContract: MerkleDistributorWithDeadline;
   private claimAndStakeContract: ClaimRaftAndStake;
   private feeDistributorContract: FeeDistributor;
   private merkleTree?: WhitelistMerkleTree;
@@ -121,7 +121,10 @@ export class RaftToken {
     this.raftContract = getTokenContract(RAFT_TOKEN, this.provider);
     this.veContract = getTokenContract(VERAFT_TOKEN, provider);
     this.raftBptContract = getTokenContract(RAFT_BPT_TOKEN, this.provider);
-    this.airdropContract = MerkleDistributor__factory.connect(RaftConfig.networkConfig.raftAirdropAddress, provider);
+    this.airdropContract = MerkleDistributorWithDeadline__factory.connect(
+      RaftConfig.networkConfig.raftAirdropAddress,
+      provider,
+    );
     this.claimAndStakeContract = ClaimRaftAndStake__factory.connect(
       RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
       provider,
@@ -175,6 +178,12 @@ export class RaftToken {
 
   public getClaimableAmount(): Decimal {
     return this.claimableAmount;
+  }
+
+  public async getClaimingDeadline(): Promise<Date> {
+    const endTimeInSecond = await this.airdropContract.endTime();
+
+    return new Date(Number(endTimeInSecond) * 1000);
   }
 
   private getTotalVeRaftBalanceFromPoint(point: VeRaftBalancePoint, supplyAtTimestamp: number): bigint {
