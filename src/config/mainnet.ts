@@ -231,8 +231,8 @@ export const mainnetConfig: NetworkConfig = {
   tokens: tokensConfig,
   daiAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   testNetwork: false,
-  raftAirdropAddress: '0x730c8eb6d0422708a29e67a8998f1605d136c301',
-  claimRaftStakeVeRaftAddress: '0x2617a78be426115137d9c4f512c4cc702d8752a0',
+  raftAirdropAddress: '0xA6e715089A5B6E503c40830F958F9E43A2F2da62',
+  claimRaftStakeVeRaftAddress: '0xf952f4c81101e577BbbF792A5B654E788ec03059',
   balancerWeightedPoolId: '0xe91888a1d08e37598867d213a4acb5692071bb3a0002000000000000000005f9',
   feeDistributorAddress: '0x636c04cfb9e242e7ea8986c6cd0eaa8175cacc21',
 };
