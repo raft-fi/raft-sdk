@@ -8,7 +8,6 @@ import { RaftConfig } from '../config';
 import {
   ClaimRaftAndStake,
   ClaimRaftAndStake__factory,
-  ERC20,
   ERC20Permit,
   FeeDistributor,
   FeeDistributor__factory,
@@ -16,14 +15,7 @@ import {
   MerkleDistributorWithDeadline__factory,
   VotingEscrow,
 } from '../typechain';
-import {
-  EMPTY_PERMIT_SIGNATURE,
-  buildTransactionWithGasLimit,
-  createPermitSignature,
-  getApproval,
-  getTokenContract,
-  isEoaAddress,
-} from '../utils';
+import { EMPTY_PERMIT_SIGNATURE, buildTransactionWithGasLimit, getTokenContract } from '../utils';
 import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions, VERAFT_TOKEN } from '../types';
 import { SECONDS_IN_WEEK, SECONDS_PER_YEAR } from '../constants';
 
@@ -87,7 +79,7 @@ export type ClaimRaftStakeBptPrefetch = {
   raftAllowance?: Decimal;
   bptAllowance?: Decimal;
 };
-export type StakeBptStepType = 'approve' | 'stake-new' | 'stake-increase' | 'stake-extend';
+export type StakeBptStepType = 'approve' | 'stake-new' | 'stake-increase' | 'stake-extend' | 'stake-increase-extend';
 export type StakeBptStep = {
   type: StakeBptStepType;
   action: () => Promise<TransactionResponse>;
@@ -663,7 +655,7 @@ export class RaftToken {
     bptAmount: Decimal,
     unlockTime: Date,
     signer: Signer,
-    options: StakeBptPrefetch = {},
+    options: StakeBptPrefetch & TransactionWithFeesOptions = {},
   ): AsyncGenerator<StakeBptStep, void, void> {
     let { userVeRaftBalance, bptAllowance } = options;
 
@@ -700,11 +692,22 @@ export class RaftToken {
         action,
       };
     } else {
-      if (currentUnlockedTime && currentUnlockedTime.getTime() > unlockTime.getTime()) {
+      if (currentUnlockedTime && currentUnlockedTime > unlockTime) {
         throw new Error('Unlock time cannot be earlier than the current one');
       }
 
-      if (bptAmount.gt(0)) {
+      const isIncreaseStake = bptAmount.gt(0);
+      const isExtendStake = currentUnlockedTime && RaftToken.isExtendingStakeBpt(currentUnlockedTime, unlockTime);
+
+      if (isIncreaseStake && isExtendStake) {
+        // increase lock amount and extend lock period
+        const action = () => this.increaseAndExtendStakeBptForVeRaft(bptAmount, unlockTime, signer);
+
+        yield {
+          type: 'stake-increase-extend',
+          action,
+        };
+      } else if (isIncreaseStake) {
         // increase lock amount
         const action = () => this.increaseStakeBptForVeRaft(bptAmount, signer);
 
@@ -712,9 +715,7 @@ export class RaftToken {
           type: 'stake-increase',
           action,
         };
-      }
-
-      if (currentUnlockedTime && currentUnlockedTime.getTime() < unlockTime.getTime()) {
+      } else if (isExtendStake) {
         // extend lock period
         const action = () => this.extendStakeBptForVeRaft(unlockTime, signer);
 
@@ -763,94 +764,6 @@ export class RaftToken {
     return sendTransaction();
   }
 
-  public async claimRaftAndStakeBptForVeRaft(
-    unlockTime: number,
-    slippage: Decimal,
-    signer: Signer,
-    options: TransactionWithFeesOptions = {},
-  ): Promise<TransactionResponse> {
-    if (this.merkleTreeIndex === null || this.merkleTreeIndex === undefined || !this.merkleProof) {
-      throw new Error('User is not on whitelist to claim RAFT!');
-    }
-
-    const { gasLimitMultiplier = Decimal.ONE } = options;
-    const index = BigInt(this.merkleTreeIndex);
-    const amount = this.claimableAmount.toBigInt(Decimal.PRECISION);
-
-    const poolData = await this.getBalancerPoolData();
-    const bptBptAmountFromRaft = await this.getBptAmountFromRaft(this.claimableAmount, {
-      poolData,
-    });
-
-    if (!poolData || !bptBptAmountFromRaft) {
-      throw new Error('Cannot query balancer pool data!');
-    }
-
-    // minBptAmountOut = calculated BPT out * (1 - slippage)
-    const minBptAmountOut = bptBptAmountFromRaft.mul(Decimal.ONE.sub(slippage));
-
-    const raftTokenContract = getTokenContract(RAFT_TOKEN, signer);
-    const bptTokenContract = getTokenContract(RAFT_BPT_TOKEN, signer);
-
-    let raftTokenPermitSignature = EMPTY_PERMIT_SIGNATURE;
-    let balancerLPTokenPermitSignature = EMPTY_PERMIT_SIGNATURE;
-    const isEoaWallet = await isEoaAddress(this.walletAddress, this.provider);
-
-    // if wallet is EOA, use approval; else use permit
-    if (isEoaWallet) {
-      // approve $RAFT token for approval amount
-      await getApproval(
-        this.claimableAmount,
-        this.walletAddress,
-        raftTokenContract as ERC20,
-        RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
-      );
-      // approve BPT token for approval amount
-      await getApproval(
-        bptBptAmountFromRaft,
-        this.walletAddress,
-        bptTokenContract as ERC20,
-        RaftConfig.networkConfig.tokens.veRAFT.address,
-      );
-    } else {
-      // sign permit for $RAFT token for approval amount
-      raftTokenPermitSignature = await createPermitSignature(
-        RAFT_TOKEN,
-        signer,
-        this.claimableAmount,
-        RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
-        raftTokenContract,
-      );
-      // sign permit for BPT token for approval amount
-      balancerLPTokenPermitSignature = await createPermitSignature(
-        RAFT_BPT_TOKEN,
-        signer,
-        this.claimableAmount,
-        RaftConfig.networkConfig.tokens.veRAFT.address,
-        bptTokenContract,
-      );
-    }
-
-    const { sendTransaction } = await buildTransactionWithGasLimit(
-      this.claimAndStakeContract.execute,
-      [
-        index,
-        this.walletAddress,
-        amount,
-        BigInt(unlockTime),
-        this.merkleProof,
-        minBptAmountOut.toBigInt(Decimal.PRECISION),
-        raftTokenPermitSignature,
-        balancerLPTokenPermitSignature,
-      ],
-      signer,
-      gasLimitMultiplier,
-      'raft',
-    );
-
-    return sendTransaction();
-  }
-
   public async stakeBptForVeRaft(bptAmount: Decimal, unlockTime: Date, signer: Signer): Promise<TransactionResponse> {
     const amount = bptAmount.toBigInt(Decimal.PRECISION);
     const unlockTimestamp = BigInt(Math.floor(unlockTime.getTime() / 1000));
@@ -870,8 +783,27 @@ export class RaftToken {
     return signer.sendTransaction(txnRequest);
   }
 
+  public async increaseAndExtendStakeBptForVeRaft(
+    bptAmount: Decimal,
+    unlockTime: Date,
+    signer: Signer,
+  ): Promise<TransactionResponse> {
+    const amount = bptAmount.toBigInt(Decimal.PRECISION);
+    const unlockTimestamp = BigInt(Math.floor(unlockTime.getTime() / 1000));
+    const txnRequest = await this.veContract.increase_amount_and_time.populateTransaction(amount, unlockTimestamp);
+    return signer.sendTransaction(txnRequest);
+  }
+
   public async withdrawVeRaft(signer: Signer): Promise<TransactionResponse> {
     const txnRequest = await this.veContract.withdraw.populateTransaction();
     return signer.sendTransaction(txnRequest);
+  }
+
+  public static isExtendingStakeBpt(currentUnlockedTime: Date, unlockTime: Date): boolean {
+    const currentUnlockedTimeInSecond = Math.floor(currentUnlockedTime.getTime() / 1000);
+    const unlockTimeInSecond = Math.floor(unlockTime.getTime() / 1000);
+    const roundedUnlockTimeInSecond = Math.floor(unlockTimeInSecond / SECONDS_IN_WEEK) * SECONDS_IN_WEEK;
+
+    return roundedUnlockTimeInSecond > currentUnlockedTimeInSecond;
   }
 }
