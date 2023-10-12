@@ -19,8 +19,8 @@ import { EMPTY_PERMIT_SIGNATURE, buildTransactionWithGasLimit, getTokenContract 
 import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions, VERAFT_TOKEN } from '../types';
 import { SECONDS_IN_WEEK, SECONDS_PER_YEAR } from '../constants';
 
-// annual give away = 10% of 1B evenly over 3 years
-const ANNUAL_GIVE_AWAY = new Decimal(1000000000).mul(0.1).div(3);
+// annual give away = 10% of 2.5B evenly over 3 years
+const ANNUAL_GIVE_AWAY = new Decimal(2500000000).mul(0.1).div(3);
 
 type PoolDataOption = {
   poolData?: SubgraphPoolBase | null;
