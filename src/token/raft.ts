@@ -91,7 +91,7 @@ export type StakeBptPrefetch = {
 
 export class RaftToken {
   private provider: Provider;
-  private walletAddress: string;
+  private walletAddress: string | null;
   private raftContract: ERC20Permit;
   private veContract: VotingEscrow;
   private raftBptContract: ERC20Permit;
@@ -107,7 +107,7 @@ export class RaftToken {
   private maxVeLockPeriod?: number | null;
   private poolData: SubgraphPoolBase | null;
 
-  public constructor(walletAddress: string, provider: Provider) {
+  public constructor(walletAddress: string | null, provider: Provider) {
     this.provider = provider;
     this.walletAddress = walletAddress;
     this.raftContract = getTokenContract(RAFT_TOKEN, this.provider);
@@ -129,7 +129,7 @@ export class RaftToken {
   }
 
   public setWhitelist(merkleTree: WhitelistMerkleTree): void {
-    if (!this.merkleTree) {
+    if (!this.merkleTree && this.walletAddress) {
       this.merkleTree = merkleTree;
 
       const claim = merkleTree.claims[this.walletAddress];
@@ -510,6 +510,17 @@ export class RaftToken {
   }
 
   public async getUserVeRaftBalance(): Promise<UserVeRaftBalance> {
+    if (!this.walletAddress) {
+      const totalSupply = await this.veContract.totalSupply();
+
+      return {
+        bptLockedBalance: Decimal.ZERO,
+        veRaftBalance: Decimal.ZERO,
+        unlockTime: null,
+        supply: new Decimal(totalSupply, Decimal.PRECISION),
+      };
+    }
+
     const [lockedBalance, veRaftBalance, totalSupply] = await Promise.all([
       this.veContract.locked(this.walletAddress) as Promise<BptLockedBalance>,
       this.veContract.balanceOf(this.walletAddress) as Promise<bigint>,
@@ -525,11 +536,19 @@ export class RaftToken {
   }
 
   public async getUserBptBalance(): Promise<Decimal> {
+    if (!this.walletAddress) {
+      return Decimal.ZERO;
+    }
+
     const balance = await this.raftBptContract.balanceOf(this.walletAddress);
     return new Decimal(balance, Decimal.PRECISION);
   }
 
   public async getUserRaftAllowance(): Promise<Decimal> {
+    if (!this.walletAddress) {
+      return Decimal.ZERO;
+    }
+
     const tokenAllowance = await this.raftContract.allowance(
       this.walletAddress,
       RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
@@ -538,6 +557,10 @@ export class RaftToken {
   }
 
   public async getUserBptAllowance(): Promise<Decimal> {
+    if (!this.walletAddress) {
+      return Decimal.ZERO;
+    }
+
     const tokenAllowance = await this.raftBptContract.allowance(
       this.walletAddress,
       RaftConfig.networkConfig.tokens.veRAFT.address,
@@ -546,6 +569,10 @@ export class RaftToken {
   }
 
   public async getClaimableRaftFromStakedBpt(): Promise<Decimal> {
+    if (!this.walletAddress) {
+      return Decimal.ZERO;
+    }
+
     const amount = await this.feeDistributorContract.claimToken.staticCall(
       this.walletAddress,
       RaftConfig.networkConfig.tokens.RAFT.address,
@@ -562,6 +589,10 @@ export class RaftToken {
   ): AsyncGenerator<ClaimRaftStakeBptStep, void, void> {
     const { gasLimitMultiplier = Decimal.ONE } = options;
     let { raftAllowance, bptAllowance } = options;
+
+    if (!this.walletAddress) {
+      throw new Error('Wallet is not connected to RaftToken');
+    }
 
     if (this.merkleTreeIndex === null || this.merkleTreeIndex === undefined || !this.merkleProof) {
       throw new Error('User is not on whitelist to claim RAFT!');
@@ -728,6 +759,10 @@ export class RaftToken {
   }
 
   public async claimRaft(signer: Signer, options: TransactionWithFeesOptions = {}): Promise<TransactionResponse> {
+    if (!this.walletAddress) {
+      throw new Error('Wallet is not connected to RaftToken');
+    }
+
     if (this.merkleTreeIndex === null || this.merkleTreeIndex === undefined || !this.merkleProof) {
       throw new Error('User is not on whitelist to claim RAFT!');
     }
@@ -752,6 +787,10 @@ export class RaftToken {
     options: TransactionWithFeesOptions = {},
   ): Promise<TransactionResponse> {
     const { gasLimitMultiplier = Decimal.ONE } = options;
+
+    if (!this.walletAddress) {
+      throw new Error('Wallet is not connected to RaftToken');
+    }
 
     const { sendTransaction } = await buildTransactionWithGasLimit(
       this.feeDistributorContract.claimToken,
