@@ -171,7 +171,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
     priceFeed: Decimal.ONE,
   },
   RR: {
-    address: '0x2ba26baE6dF1153e29813d7f926143f9c94402f3',
+    address: '0xd2c0c4A6296D416C5Eb6Ae41d17aC4Db4bDD5296',
     ticker: 'RR',
     decimals: 18,
     supportsPermit: false,
