@@ -34,6 +34,7 @@ import {
   CHAI_RATE_PRECISION,
   CHAI_TOKEN_ADDRESS,
   INDEX_INCREASE_PRECISION,
+  OLD_RR_CONTRACT,
   R_CHAI_PSM_ADDRESS,
   SECONDS_PER_YEAR,
 } from './constants';
@@ -240,7 +241,26 @@ export class Protocol {
     return this._debtSupply;
   }
 
+  public async fetchRTokenTotalSupply(): Promise<Decimal> {
+    const { decimals } = RaftConfig.networkConfig.tokens[R_TOKEN];
+    const contract = getTokenContract(R_TOKEN, this.provider);
+    const totalSupply = await contract.totalSupply();
+
+    try {
+      // on mainnet, we should remove total supply from old RR contract
+      const excludedSupply = await contract.balanceOf(OLD_RR_CONTRACT);
+      return new Decimal(totalSupply - excludedSupply, decimals);
+    } catch (error) {
+      // probably error throw on other networks
+      return new Decimal(totalSupply, decimals);
+    }
+  }
+
   public async fetchTokenTotalSupply(token: Exclude<Token, 'ETH'>): Promise<Decimal> {
+    if (token === R_TOKEN) {
+      return this.fetchRTokenTotalSupply();
+    }
+
     const { decimals } = RaftConfig.networkConfig.tokens[token];
     const contract = getTokenContract(token, this.provider);
     return new Decimal(await contract.totalSupply(), decimals);

@@ -40,3 +40,5 @@ export const CHAINLINK_DAI_USD_AGGREGATOR = '0xaed0c38402a5d19df6e4c03f4e2dced6e
 export const SWAP_ROUTER_MAX_SLIPPAGE: Record<SwapRouter, Decimal> = {
   '1inch': new Decimal(0.5),
 };
+
+export const OLD_RR_CONTRACT = '0x2ba26bae6df1153e29813d7f926143f9c94402f3';
