@@ -1,10 +1,5 @@
 import { Decimal } from '@tempusfinance/decimal';
-import {
-  MIN_COLLATERAL_RATIO,
-  MIN_NET_DEBT,
-  RAFT_COLLATERAL_TOKEN_PRECISION,
-  RAFT_DEBT_TOKEN_PRECISION,
-} from '../constants';
+import { MIN_COLLATERAL_RATIO, MIN_NET_DEBT, RAFT_DEBT_TOKEN_PRECISION } from '../constants';
 import { ContractRunner } from 'ethers';
 import { CollateralToken, SwapRouter, Token, UnderlyingCollateralToken } from '../types';
 import { ERC20Indexable, ERC20Indexable__factory } from '../typechain';
@@ -282,21 +277,40 @@ export class PositionWithRunner extends Position {
       return [];
     }
 
-    return response.position.transactions.map(transaction => ({
-      ...transaction,
-      collateralToken: transaction.collateralToken
+    return response.position.transactions.map(transaction => {
+      const collateralToken = transaction.collateralToken
         ? (RaftConfig.getTokenTicker(transaction.collateralToken) as CollateralToken)
-        : null,
-      collateralChange: transaction.collateralChange
-        ? Decimal.parse(BigInt(transaction.collateralChange), 0n, Decimal.PRECISION)
-        : null,
-      underlyingCollateralToken: RaftConfig.getTokenTicker(
+        : null;
+      const underlyingCollateralToken = RaftConfig.getTokenTicker(
         transaction.underlyingCollateralToken,
-      ) as UnderlyingCollateralToken,
-      underlyingCollateralChange: Decimal.parse(BigInt(transaction.underlyingCollateralChange), 0n, Decimal.PRECISION),
-      debtChange: Decimal.parse(BigInt(transaction.debtChange), 0n, Decimal.PRECISION),
-      timestamp: new Date(Number(transaction.timestamp) * 1000),
-    }));
+      ) as UnderlyingCollateralToken;
+
+      const collateralTokenDecimals = collateralToken
+        ? RaftConfig.networkConfig.tokens[collateralToken].decimals
+        : Decimal.PRECISION;
+      const underlyingCollateralTokenDecimals = underlyingCollateralToken
+        ? RaftConfig.networkConfig.tokens[underlyingCollateralToken].decimals
+        : Decimal.PRECISION;
+
+      const collateralChange = transaction.collateralChange
+        ? Decimal.parse(BigInt(transaction.collateralChange), 0n, collateralTokenDecimals)
+        : null;
+      const underlyingCollateralChange = transaction.underlyingCollateralChange
+        ? Decimal.parse(BigInt(transaction.underlyingCollateralChange), 0n, underlyingCollateralTokenDecimals)
+        : Decimal.ZERO;
+      const debtChange = Decimal.parse(BigInt(transaction.debtChange), 0n, RAFT_DEBT_TOKEN_PRECISION);
+      const timestamp = new Date(Number(transaction.timestamp) * 1000);
+
+      return {
+        ...transaction,
+        collateralToken,
+        underlyingCollateralToken,
+        collateralChange,
+        underlyingCollateralChange,
+        debtChange,
+        timestamp,
+      } as PositionTransaction;
+    });
   }
 
   /**
@@ -314,7 +328,8 @@ export class PositionWithRunner extends Position {
   public async fetchCollateral(): Promise<Decimal> {
     const userAddress = await this.getUserAddress();
     const collateral = await this.indexCollateralToken.balanceOf(userAddress);
-    this.setCollateral(new Decimal(collateral, RAFT_COLLATERAL_TOKEN_PRECISION));
+    const decimals = RaftConfig.networkConfig.tokens[this.underlyingCollateralToken].decimals;
+    this.setCollateral(new Decimal(collateral, decimals));
 
     return this.getCollateral();
   }
