@@ -22,6 +22,10 @@ export class PriceFeed {
   public async getPrice(token: Token): Promise<Decimal> {
     const { priceFeed } = RaftConfig.networkConfig.tokens[token];
 
+    if (priceFeed === null) {
+      return Decimal.ZERO;
+    }
+
     if (priceFeed instanceof Decimal) {
       return priceFeed;
     }
@@ -52,7 +56,11 @@ export class PriceFeed {
   public async getConversionRate(token: CollateralToken | RRToken): Promise<Decimal> {
     const { priceFeed } = RaftConfig.networkConfig.tokens[token];
 
-    if (priceFeed instanceof Decimal || (typeof priceFeed === 'string' && isUnderlyingCollateralToken(priceFeed))) {
+    if (
+      priceFeed === null ||
+      priceFeed instanceof Decimal ||
+      (typeof priceFeed === 'string' && isUnderlyingCollateralToken(priceFeed))
+    ) {
       return Decimal.ONE;
     }
 

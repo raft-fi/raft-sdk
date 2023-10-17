@@ -4,6 +4,9 @@ import { SwapRouter, UnderlyingCollateralToken } from './types';
 // Time constants
 
 export const SECONDS_IN_MINUTE = 60;
+export const SECONDS_IN_HOUR = 60 * SECONDS_IN_MINUTE;
+export const SECONDS_IN_DAY = 24 * SECONDS_IN_HOUR;
+export const SECONDS_IN_WEEK = 7 * SECONDS_IN_DAY;
 export const SECONDS_PER_YEAR = 60 * 60 * 24 * 365.2425; // One Gregorian year has 365.2425 days
 
 // Protocol constants
@@ -37,3 +40,5 @@ export const CHAINLINK_DAI_USD_AGGREGATOR = '0xaed0c38402a5d19df6e4c03f4e2dced6e
 export const SWAP_ROUTER_MAX_SLIPPAGE: Record<SwapRouter, Decimal> = {
   '1inch': new Decimal(0.5),
 };
+
+export const OLD_RR_CONTRACT = '0x2ba26bae6df1153e29813d7f926143f9c94402f3';

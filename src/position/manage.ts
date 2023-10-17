@@ -1,6 +1,13 @@
 import { AddressLike, Signer, TransactionResponse } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { CollateralToken, R_TOKEN, Token, TransactionWithFeesOptions, UnderlyingCollateralToken } from '../types';
+import {
+  CollateralToken,
+  R_TOKEN,
+  Token,
+  Erc20TokenContract,
+  TransactionWithFeesOptions,
+  UnderlyingCollateralToken,
+} from '../types';
 import {
   EMPTY_PERMIT_SIGNATURE,
   buildTransactionWithGasLimit,
@@ -14,7 +21,7 @@ import {
 import { RaftConfig, SupportedCollateralTokens } from '../config';
 import { getTokenAllowance } from '../allowance';
 import { ERC20PermitSignatureStruct, PositionManager } from '../typechain/PositionManager';
-import { ERC20, ERC20Permit, WstETH } from '../typechain';
+import { ERC20Permit } from '../typechain';
 
 export interface ManagePositionStepType {
   name: 'whitelist' | 'approve' | 'permit' | 'manage';
@@ -204,7 +211,7 @@ export abstract class BasePositionManaging {
   private async getNeededSteps<U extends UnderlyingCollateralToken>(
     collateralChange: Decimal,
     debtChange: Decimal,
-    collateralTokenContract: ERC20 | ERC20Permit | WstETH,
+    collateralTokenContract: Erc20TokenContract,
     underlyingCollateralToken: U,
     positionManagerAddress: string,
     checkIfDelegateWhitelisted: (delegate: AddressLike) => Promise<boolean>,
@@ -266,8 +273,8 @@ export abstract class BasePositionManaging {
     };
   }
 
-  protected getAbsValueAndIsIncrease(value: Decimal): [bigint, boolean] {
-    return [value.abs().value, value.gt(Decimal.ZERO)];
+  protected getAbsValueAndIsIncrease(value: Decimal, decimals: number = Decimal.PRECISION): [bigint, boolean] {
+    return [value.abs().toBigInt(decimals), value.gt(Decimal.ZERO)];
   }
 }
 
@@ -293,7 +300,7 @@ export class InterestRatePositionManaging extends BasePositionManaging {
       [
         RaftConfig.getTokenAddress(collateralToken),
         this.user,
-        ...this.getAbsValueAndIsIncrease(collateralChange),
+        ...this.getAbsValueAndIsIncrease(collateralChange, RaftConfig.networkConfig.tokens[collateralToken].decimals),
         ...this.getAbsValueAndIsIncrease(debtChange),
         maxFeePercentage.value,
         collateralPermitSignature,
@@ -324,7 +331,7 @@ export class UnderlyingCollateralTokenPositionManaging extends BasePositionManag
       [
         RaftConfig.getTokenAddress(collateralToken),
         this.user,
-        ...this.getAbsValueAndIsIncrease(collateralChange),
+        ...this.getAbsValueAndIsIncrease(collateralChange, RaftConfig.networkConfig.tokens[collateralToken].decimals),
         ...this.getAbsValueAndIsIncrease(debtChange),
         maxFeePercentage.value,
         collateralPermitSignature,
@@ -382,7 +389,7 @@ export class StEthPositionManaging extends BasePositionManaging {
     const { sendTransaction } = await buildTransactionWithGasLimit(
       getPositionManagerContract('stETH', positionManagerAddress, this.user).managePositionStETH,
       [
-        ...this.getAbsValueAndIsIncrease(collateralChange),
+        ...this.getAbsValueAndIsIncrease(collateralChange, RaftConfig.networkConfig.tokens.stETH.decimals),
         ...this.getAbsValueAndIsIncrease(debtChange),
         maxFeePercentage.value,
         rPermitSignature,

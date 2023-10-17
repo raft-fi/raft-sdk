@@ -50,7 +50,7 @@ export type TokenConfig = {
   ticker: Token;
   decimals: number;
   supportsPermit: boolean;
-  priceFeed: Decimal | UnderlyingCollateralToken | FallbackPriceFeed;
+  priceFeed: Decimal | UnderlyingCollateralToken | FallbackPriceFeed | null;
 };
 
 export interface NetworkConfig {
@@ -68,8 +68,7 @@ export interface NetworkConfig {
   daiAddress: string;
   raftAirdropAddress: string;
   claimRaftStakeVeRaftAddress: string;
-  // https://docs.balancer.fi/concepts/governance/veBAL/
-  veRaftAddress: string;
   // 80/20 balancer weighted pool for RAFT/R
   balancerWeightedPoolId: string;
+  feeDistributorAddress: string;
 }

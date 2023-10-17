@@ -1,10 +1,9 @@
 import { Provider } from 'ethers';
 import { Decimal } from '@tempusfinance/decimal';
-import { Token } from './types';
-import { ERC20, ERC20Permit, WstETH } from './typechain';
+import { Erc20TokenContract, Token } from './types';
+import { VotingEscrow } from './typechain';
 import { getTokenContract } from './utils';
 import { RaftConfig } from './config';
-import { RSavingsRate } from './typechain/RSavingsRate';
 
 export class Balance {
   protected readonly token: Token;
@@ -12,7 +11,7 @@ export class Balance {
   private balance: Decimal | null = null;
   private walletAddress: string;
   private provider: Provider;
-  private tokenContract: ERC20Permit | ERC20 | WstETH | RSavingsRate;
+  private tokenContract: Erc20TokenContract | VotingEscrow;
 
   /**
    * Creates a new representation of a balance.

@@ -8,25 +8,19 @@ import { RaftConfig } from '../config';
 import {
   ClaimRaftAndStake,
   ClaimRaftAndStake__factory,
-  ERC20,
   ERC20Permit,
-  MerkleDistributor,
-  MerkleDistributor__factory,
+  FeeDistributor,
+  FeeDistributor__factory,
+  MerkleDistributorWithDeadline,
+  MerkleDistributorWithDeadline__factory,
   VotingEscrow,
-  VotingEscrow__factory,
 } from '../typechain';
-import {
-  EMPTY_PERMIT_SIGNATURE,
-  buildTransactionWithGasLimit,
-  createPermitSignature,
-  getApproval,
-  getTokenContract,
-  isEoaAddress,
-} from '../utils';
-import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions } from '../types';
+import { EMPTY_PERMIT_SIGNATURE, buildTransactionWithGasLimit, getTokenContract } from '../utils';
+import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions, VERAFT_TOKEN } from '../types';
+import { SECONDS_IN_WEEK, SECONDS_PER_YEAR } from '../constants';
 
-// annual give away = 10% of 1B evenly over 3 years
-const ANNUAL_GIVE_AWAY = new Decimal(1000000000).mul(0.1).div(3);
+// annual give away = 10% of 2.5B evenly over 3 years
+const ANNUAL_GIVE_AWAY = new Decimal(2500000000).mul(0.1).div(3);
 
 type PoolDataOption = {
   poolData?: SubgraphPoolBase | null;
@@ -67,7 +61,25 @@ type WhitelistMerkleTree = {
   claims: Record<string, WhitelistMerkleTreeItem>;
 };
 
-export type StakeBptStepType = 'approve' | 'stake-new' | 'stake-increase' | 'stake-extend';
+export interface AprEstimationOptions {
+  totalAnnualShare?: Decimal;
+  userAnnualShare?: Decimal;
+  userVeRaftBalance?: UserVeRaftBalance;
+  poolData?: SubgraphPoolBase | null;
+}
+export interface ClaimRaftStakeBptStepType {
+  name: 'approve' | 'claim-and-stake';
+  token?: typeof RAFT_TOKEN | typeof RAFT_BPT_TOKEN;
+}
+export interface ClaimRaftStakeBptStep {
+  type: ClaimRaftStakeBptStepType;
+  action: () => Promise<TransactionResponse>;
+}
+export type ClaimRaftStakeBptPrefetch = {
+  raftAllowance?: Decimal;
+  bptAllowance?: Decimal;
+};
+export type StakeBptStepType = 'approve' | 'stake-new' | 'stake-increase' | 'stake-extend' | 'stake-increase-extend';
 export type StakeBptStep = {
   type: StakeBptStepType;
   action: () => Promise<TransactionResponse>;
@@ -79,11 +91,13 @@ export type StakeBptPrefetch = {
 
 export class RaftToken {
   private provider: Provider;
-  private walletAddress: string;
+  private walletAddress: string | null;
+  private raftContract: ERC20Permit;
   private veContract: VotingEscrow;
   private raftBptContract: ERC20Permit;
-  private airdropContract: MerkleDistributor;
+  private airdropContract: MerkleDistributorWithDeadline;
   private claimAndStakeContract: ClaimRaftAndStake;
+  private feeDistributorContract: FeeDistributor;
   private merkleTree?: WhitelistMerkleTree;
   private merkleProof?: WhitelistMerkleProof | null;
   private merkleTreeIndex?: number | null;
@@ -91,21 +105,31 @@ export class RaftToken {
   private annualGiveAway: Decimal = ANNUAL_GIVE_AWAY;
   private minVeLockPeriod?: number | null;
   private maxVeLockPeriod?: number | null;
+  private poolData: SubgraphPoolBase | null;
 
-  public constructor(walletAddress: string, provider: Provider) {
+  public constructor(walletAddress: string | null, provider: Provider) {
     this.provider = provider;
     this.walletAddress = walletAddress;
-    this.veContract = VotingEscrow__factory.connect(RaftConfig.networkConfig.veRaftAddress, provider);
+    this.raftContract = getTokenContract(RAFT_TOKEN, this.provider);
+    this.veContract = getTokenContract(VERAFT_TOKEN, provider);
     this.raftBptContract = getTokenContract(RAFT_BPT_TOKEN, this.provider);
-    this.airdropContract = MerkleDistributor__factory.connect(RaftConfig.networkConfig.raftAirdropAddress, provider);
+    this.airdropContract = MerkleDistributorWithDeadline__factory.connect(
+      RaftConfig.networkConfig.raftAirdropAddress,
+      provider,
+    );
     this.claimAndStakeContract = ClaimRaftAndStake__factory.connect(
       RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
       provider,
     );
+    this.feeDistributorContract = FeeDistributor__factory.connect(
+      RaftConfig.networkConfig.feeDistributorAddress,
+      provider,
+    );
+    this.poolData = null;
   }
 
   public setWhitelist(merkleTree: WhitelistMerkleTree): void {
-    if (!this.merkleTree) {
+    if (!this.merkleTree && this.walletAddress) {
       this.merkleTree = merkleTree;
 
       const claim = merkleTree.claims[this.walletAddress];
@@ -148,28 +172,110 @@ export class RaftToken {
     return this.claimableAmount;
   }
 
+  public async getClaimingDeadline(): Promise<Date> {
+    const endTimeInSecond = await this.airdropContract.endTime();
+
+    return new Date(Number(endTimeInSecond) * 1000);
+  }
+
   private getTotalVeRaftBalanceFromPoint(point: VeRaftBalancePoint, supplyAtTimestamp: number): bigint {
     return point.bias + point.slope * (BigInt(supplyAtTimestamp) - point.ts);
   }
 
   /**
-   * Returns the avg total supply of veRAFT.
-   * @param unlockTime The unlock time for the staking.
-   * @returns Total supply of veRAFT.
+   * Returns the total annual veRAFT share (avg veRAFT supply)
+   * @returns Total annual veRAFT share.
    */
-  public async fetchVeRaftAvgTotalSupply(unlockTime: Date): Promise<Decimal> {
+  public async calculateTotalVeRaftAnnualShare(): Promise<Decimal> {
     const currentTimeInSecond = Math.floor(Date.now() / 1000);
-    const avgStakingPeriodInSecond = Math.floor((Math.floor(unlockTime.getTime() / 1000) - currentTimeInSecond) / 2);
-
-    if (avgStakingPeriodInSecond <= 0) {
-      return Decimal.ZERO;
-    }
+    const oneYearAfterInSecond = currentTimeInSecond + SECONDS_PER_YEAR;
 
     const epoch = await this.veContract.epoch();
     const lastPoint = (await this.veContract.point_history(epoch)) as VeRaftBalancePoint;
+    const totalSupply = this.getTotalVeRaftBalanceFromPoint(lastPoint, currentTimeInSecond);
+    const totalSupplyOneYearAfter = this.getTotalVeRaftBalanceFromPoint(lastPoint, oneYearAfterInSecond);
 
-    const totalSupply = this.getTotalVeRaftBalanceFromPoint(lastPoint, currentTimeInSecond + avgStakingPeriodInSecond);
-    return new Decimal(totalSupply, Decimal.PRECISION);
+    /*
+     * veRAFT
+     *    ^
+     *    |\
+     *    | \
+     *    |  \
+     *    |   \
+     *    |    \
+     *    |     \
+     *    |      \
+     *    |       \
+     *    |        \
+     *    |        |\
+     *    |        | \
+     *    |        |  \
+     *    |        |   \
+     *  0 +--------+------> time
+     *      1 year
+     */
+    // x-axis: time, y-axis: veRAFT, then annual share = area of trapezoid
+    const totalShare = (totalSupply + totalSupplyOneYearAfter) / 2n;
+
+    return new Decimal(totalShare, Decimal.PRECISION);
+  }
+
+  /**
+   * Returns the user annual veRAFT share (avg user veRAFT supply)
+   * @param veRaftBalance User current veRAFT balance
+   * @param unlockTime The unlock time for the staking.
+   * @returns User annual veRAFT share.
+   */
+  public calculateUserVeRaftAnnualShare(veRaftBalance: Decimal, unlockTime: Date | null): Decimal {
+    if (!unlockTime || veRaftBalance.isZero()) {
+      return Decimal.ZERO;
+    }
+
+    const currentTimeInSecond = Math.floor(Date.now() / 1000);
+    const unlockTimeInSecond = Math.floor(unlockTime.getTime() / 1000);
+    const yearPortion = new Decimal(unlockTimeInSecond - currentTimeInSecond).div(SECONDS_PER_YEAR);
+
+    if (yearPortion.gt(1)) {
+      // unlock time > 1 year
+      const veRaftBalanceOneYearAfter = veRaftBalance.div(yearPortion);
+
+      /*
+       * veRAFT
+       *    ^
+       *    |\
+       *    | \
+       *    |  \
+       *    |   \
+       *    |    \
+       *    |     \
+       *    |      \
+       *    |       \
+       *    |        \
+       *    |        |\
+       *    |        | \
+       *    |        |  \
+       *    |        |   \
+       *  0 +--------+------> time
+       *      1 year
+       */
+      // x-axis: time, y-axis: veRAFT, then annual share = area of trapezoid
+      return veRaftBalance.add(veRaftBalanceOneYearAfter).div(2);
+    }
+
+    /*
+     * veRAFT
+     *    ^
+     *    |\
+     *    | \
+     *    |  \
+     *    |   \
+     *    |    \
+     *    |     \
+     *  0 +--------+------> time
+     *      1 year
+     */
+    // x-axis: time, y-axis: veRAFT, then annual share = area of triangle
+    return veRaftBalance.mul(yearPortion).div(2);
   }
 
   /**
@@ -208,65 +314,103 @@ export class RaftToken {
    * Returns the estimated staking APR for the input.
    * @param bptAmount The stake amount of BPT.
    * @param unlockTime The unlock time for the staking.
-   * @param options.veRaftAvgTotalSupply The avg total supply of veRAFT. If not provided, will query.
+   * @param options.totalAnnualShare Total annual veRAFT share
+   * @param options.userAnnualShare User annual veRAFT share
+   * @param options.userVeRaftBalance Current user veRaft position
+   * @param options.poolData Balancer pool data
    * @returns The estimated staking APR.
    */
-  public async estimateStakingApr(bptAmount: Decimal, unlockTime: Date): Promise<Decimal> {
-    const stakingPeriodInSecond = Math.floor((unlockTime.getTime() - Date.now()) / 1000);
+  public async estimateStakingApr(
+    bptAmount: Decimal,
+    unlockTime: Date,
+    options: AprEstimationOptions = {},
+  ): Promise<Decimal> {
+    let { totalAnnualShare, userAnnualShare, userVeRaftBalance, poolData } = options;
 
-    if (stakingPeriodInSecond <= 0) {
+    if (!totalAnnualShare) {
+      totalAnnualShare = await this.calculateTotalVeRaftAnnualShare();
+    }
+
+    if (!userVeRaftBalance) {
+      userVeRaftBalance = await this.getUserVeRaftBalance();
+    }
+
+    if (!userAnnualShare) {
+      userAnnualShare = this.calculateUserVeRaftAnnualShare(
+        userVeRaftBalance?.veRaftBalance ?? Decimal.ZERO,
+        userVeRaftBalance?.unlockTime,
+      );
+    }
+
+    if (!poolData) {
+      poolData = await this.getBalancerPoolData();
+    }
+
+    if (!poolData) {
       return Decimal.ZERO;
     }
 
-    const [veRaftAvgTotalSupply, maxVeLockPeriod] = await Promise.all([
-      this.fetchVeRaftAvgTotalSupply(unlockTime),
-      this.getMaxVeLockPeriod(),
-    ]);
+    // use this to estimate the RAFT/BPT rate without too much price impact
+    const raftBptRaft = await this.getBptAmountFromRaft(new Decimal(1), { poolData });
+
+    if (!raftBptRaft) {
+      return Decimal.ZERO;
+    }
+
     const annualGiveAway = this.getAnnualGiveAway();
+    const totalAnnualShareWithoutUser = totalAnnualShare.sub(userAnnualShare);
+    const userTotalBptAmount = bptAmount.add(userVeRaftBalance?.bptLockedBalance ?? Decimal.ZERO);
 
-    if (maxVeLockPeriod <= 0 || annualGiveAway.isZero()) {
+    if (userTotalBptAmount.isZero()) {
       return Decimal.ZERO;
     }
 
-    const periodPortion = stakingPeriodInSecond / maxVeLockPeriod;
+    const userStakedRaftAmount = userTotalBptAmount.mul(raftBptRaft);
+    const userTotalVeRaftAmount = await this.calculateVeRaftAmount(userTotalBptAmount, unlockTime);
+    const newUserAnnualShare = this.calculateUserVeRaftAnnualShare(userTotalVeRaftAmount, unlockTime);
+    const newTotalAnnualShare = totalAnnualShareWithoutUser.add(newUserAnnualShare);
 
-    // avg veRAFT = staked BPT * period portion / 2
-    const newVeRaftAvgAmount = bptAmount.mul(periodPortion).div(2);
-    const newVeRaftAvgTotalAmount = veRaftAvgTotalSupply.add(newVeRaftAvgAmount);
+    if (newTotalAnnualShare.isZero()) {
+      return Decimal.ZERO;
+    }
 
-    // estimated APR = new avg veRAFT / total avg veRAFT * annual give away / staked BPT
-    return newVeRaftAvgAmount.div(newVeRaftAvgTotalAmount).mul(annualGiveAway).div(bptAmount);
+    // estimated APR = user annual veRAFT share / total annual veRAFT share * annual give away / staked BPT in RAFT
+    return newUserAnnualShare.div(newTotalAnnualShare).mul(annualGiveAway).div(userStakedRaftAmount);
   }
 
   public async getBalancerPoolData(): Promise<SubgraphPoolBase | null> {
-    const query = gql`
-      query GetPoolData($poolId: String!) {
-        pool(id: $poolId) {
-          id
-          address
-          poolType
-          swapFee
-          swapEnabled
-          totalWeight
-          totalShares
-          tokens {
+    if (!this.poolData) {
+      const query = gql`
+        query GetPoolData($poolId: String!) {
+          pool(id: $poolId) {
+            id
             address
-            balance
-            decimals
-            priceRate
-            weight
+            poolType
+            swapFee
+            swapEnabled
+            totalWeight
+            totalShares
+            tokens {
+              address
+              balance
+              decimals
+              priceRate
+              weight
+            }
+            tokensList
           }
-          tokensList
         }
-      }
-    `;
+      `;
 
-    const poolId = RaftConfig.networkConfig.balancerWeightedPoolId;
-    const response = await request<PoolDataQuery>(RaftConfig.balancerSubgraphEndpoint, query, {
-      poolId,
-    });
+      const poolId = RaftConfig.networkConfig.balancerWeightedPoolId;
+      const response = await request<PoolDataQuery>(RaftConfig.balancerSubgraphEndpoint, query, {
+        poolId,
+      });
 
-    return response.pool ?? null;
+      this.poolData = response.pool ?? null;
+    }
+
+    return this.poolData;
   }
 
   /**
@@ -288,13 +432,31 @@ export class RaftToken {
 
     const pool = WeightedPool.fromPool(poolData);
     const poolPairData = pool.parsePoolPairData(poolData.tokensList[0], poolData.tokensList[1]);
-    const tokenIn = new OldBigNumber(raftAmount.toString());
 
-    // https://docs.balancer.fi/guides/arbitrageurs/get-spot-price.html
-    // current spot price
-    const priceBefore = pool._spotPriceAfterSwapExactTokenInForTokenOut(poolPairData, new OldBigNumber(0));
-    // spot price after
-    const priceAfter = pool._spotPriceAfterSwapExactTokenInForTokenOut(poolPairData, tokenIn);
+    let priceBefore: OldBigNumber | null = null;
+    let priceAfter: OldBigNumber | null = null;
+
+    if (poolData.tokensList[0] === RaftConfig.networkConfig.tokens.RAFT.address) {
+      const tokenIn = new OldBigNumber(raftAmount.toString());
+
+      // https://docs.balancer.fi/guides/arbitrageurs/get-spot-price.html
+      // current spot price
+      priceBefore = pool._spotPriceAfterSwapExactTokenInForTokenOut(poolPairData, new OldBigNumber(0));
+      // spot price after
+      priceAfter = pool._spotPriceAfterSwapExactTokenInForTokenOut(poolPairData, tokenIn);
+    } else if (poolData.tokensList[1] === RaftConfig.networkConfig.tokens.RAFT.address) {
+      const tokenOut = new OldBigNumber(raftAmount.toString());
+
+      // https://docs.balancer.fi/guides/arbitrageurs/get-spot-price.html
+      // current spot price
+      priceBefore = pool._spotPriceAfterSwapTokenInForExactTokenOut(poolPairData, new OldBigNumber(0));
+      // spot price after
+      priceAfter = pool._spotPriceAfterSwapTokenInForExactTokenOut(poolPairData, tokenOut);
+    }
+
+    if (!priceBefore || !priceAfter) {
+      return null;
+    }
 
     const priceBeforeDecimal = new Decimal(priceBefore.toString());
     const priceAfterDecimal = new Decimal(priceAfter.toString());
@@ -335,7 +497,30 @@ export class RaftToken {
     return new Decimal(bptOut.toBigInt(), Decimal.PRECISION);
   }
 
+  public async calculateVeRaftAmount(bptAmount: Decimal, unlockTime: Date): Promise<Decimal> {
+    const currentTimeInSecond = Math.floor(Date.now() / 1000);
+    const unlockTimeInSecond = Math.floor(unlockTime.getTime() / 1000);
+    const periodInSecond = unlockTimeInSecond - currentTimeInSecond;
+    // period is floored by week (VotingEscrow.vy#L77)
+    const trimmedPeriodInSecond = Math.floor(periodInSecond / SECONDS_IN_WEEK) * SECONDS_IN_WEEK;
+
+    const maxVeLockPeriod = await this.getMaxVeLockPeriod();
+
+    return new Decimal(trimmedPeriodInSecond).div(maxVeLockPeriod).mul(bptAmount);
+  }
+
   public async getUserVeRaftBalance(): Promise<UserVeRaftBalance> {
+    if (!this.walletAddress) {
+      const totalSupply = await this.veContract.totalSupply();
+
+      return {
+        bptLockedBalance: Decimal.ZERO,
+        veRaftBalance: Decimal.ZERO,
+        unlockTime: null,
+        supply: new Decimal(totalSupply, Decimal.PRECISION),
+      };
+    }
+
     const [lockedBalance, veRaftBalance, totalSupply] = await Promise.all([
       this.veContract.locked(this.walletAddress) as Promise<BptLockedBalance>,
       this.veContract.balanceOf(this.walletAddress) as Promise<bigint>,
@@ -351,23 +536,157 @@ export class RaftToken {
   }
 
   public async getUserBptBalance(): Promise<Decimal> {
+    if (!this.walletAddress) {
+      return Decimal.ZERO;
+    }
+
     const balance = await this.raftBptContract.balanceOf(this.walletAddress);
     return new Decimal(balance, Decimal.PRECISION);
   }
 
-  public async getUserBptAllowance(): Promise<Decimal> {
-    const tokenAllowance = await this.raftBptContract.allowance(
+  public async getUserRaftAllowance(): Promise<Decimal> {
+    if (!this.walletAddress) {
+      return Decimal.ZERO;
+    }
+
+    const tokenAllowance = await this.raftContract.allowance(
       this.walletAddress,
-      RaftConfig.networkConfig.veRaftAddress,
+      RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
     );
     return new Decimal(tokenAllowance, Decimal.PRECISION);
+  }
+
+  public async getUserBptAllowance(): Promise<Decimal> {
+    if (!this.walletAddress) {
+      return Decimal.ZERO;
+    }
+
+    const tokenAllowance = await this.raftBptContract.allowance(
+      this.walletAddress,
+      RaftConfig.networkConfig.tokens.veRAFT.address,
+    );
+    return new Decimal(tokenAllowance, Decimal.PRECISION);
+  }
+
+  public async getClaimableRaftFromStakedBpt(): Promise<Decimal> {
+    if (!this.walletAddress) {
+      return Decimal.ZERO;
+    }
+
+    const amount = await this.feeDistributorContract.claimToken.staticCall(
+      this.walletAddress,
+      RaftConfig.networkConfig.tokens.RAFT.address,
+    );
+
+    return new Decimal(amount, Decimal.PRECISION);
+  }
+
+  public async *getClaimRaftAndStakeBptSteps(
+    unlockTime: Date,
+    slippage: Decimal,
+    signer: Signer,
+    options: ClaimRaftStakeBptPrefetch & TransactionWithFeesOptions = {},
+  ): AsyncGenerator<ClaimRaftStakeBptStep, void, void> {
+    const { gasLimitMultiplier = Decimal.ONE } = options;
+    let { raftAllowance, bptAllowance } = options;
+
+    if (!this.walletAddress) {
+      throw new Error('Wallet is not connected to RaftToken');
+    }
+
+    if (this.merkleTreeIndex === null || this.merkleTreeIndex === undefined || !this.merkleProof) {
+      throw new Error('User is not on whitelist to claim RAFT!');
+    }
+
+    if (!raftAllowance) {
+      raftAllowance = await this.getUserRaftAllowance();
+    }
+
+    if (!bptAllowance) {
+      bptAllowance = await this.getUserBptAllowance();
+    }
+
+    const unlockTimeInSec = Math.floor(unlockTime.getTime() / 1000);
+    const poolData = await this.getBalancerPoolData();
+    const bptBptAmountFromRaft = await this.getBptAmountFromRaft(this.claimableAmount, {
+      poolData,
+    });
+
+    if (!poolData || !bptBptAmountFromRaft) {
+      throw new Error('Cannot query balancer pool data!');
+    }
+
+    // minBptAmountOut = calculated BPT out * (1 - slippage)
+    const minBptAmountOut = bptBptAmountFromRaft.mul(Decimal.ONE.sub(slippage));
+
+    // approve $RAFT token for approval amount
+    if (this.claimableAmount.gt(raftAllowance)) {
+      const raftTokenContract = getTokenContract(RAFT_TOKEN, signer);
+
+      const action = () =>
+        raftTokenContract.approve(
+          RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
+          this.claimableAmount.toBigInt(Decimal.PRECISION),
+        );
+
+      yield {
+        type: {
+          name: 'approve',
+          token: RAFT_TOKEN,
+        },
+        action,
+      };
+    }
+
+    // approve BPT token for approval amount
+    if (bptBptAmountFromRaft.gt(bptAllowance)) {
+      const bptTokenContract = getTokenContract(RAFT_BPT_TOKEN, signer);
+
+      const action = () =>
+        bptTokenContract.approve(
+          RaftConfig.networkConfig.tokens.veRAFT.address,
+          bptBptAmountFromRaft.toBigInt(Decimal.PRECISION),
+        );
+
+      yield {
+        type: {
+          name: 'approve',
+          token: RAFT_BPT_TOKEN,
+        },
+        action,
+      };
+    }
+
+    const { sendTransaction } = await buildTransactionWithGasLimit(
+      this.claimAndStakeContract.execute,
+      [
+        BigInt(this.merkleTreeIndex),
+        this.walletAddress,
+        this.claimableAmount.toBigInt(Decimal.PRECISION),
+        BigInt(unlockTimeInSec),
+        this.merkleProof,
+        minBptAmountOut.toBigInt(Decimal.PRECISION),
+        EMPTY_PERMIT_SIGNATURE,
+        EMPTY_PERMIT_SIGNATURE,
+      ],
+      signer,
+      gasLimitMultiplier,
+      'raft',
+    );
+
+    yield {
+      type: {
+        name: 'claim-and-stake',
+      },
+      action: sendTransaction,
+    };
   }
 
   public async *getStakeBptSteps(
     bptAmount: Decimal,
     unlockTime: Date,
     signer: Signer,
-    options: StakeBptPrefetch = {},
+    options: StakeBptPrefetch & TransactionWithFeesOptions = {},
   ): AsyncGenerator<StakeBptStep, void, void> {
     let { userVeRaftBalance, bptAllowance } = options;
 
@@ -380,7 +699,7 @@ export class RaftToken {
       // ask for BPT token approval
       const bptTokenContract = getTokenContract(RAFT_BPT_TOKEN, signer);
       const action = () =>
-        bptTokenContract.approve(RaftConfig.networkConfig.veRaftAddress, bptAmount.toBigInt(Decimal.PRECISION));
+        bptTokenContract.approve(RaftConfig.networkConfig.tokens.veRAFT.address, bptAmount.toBigInt(Decimal.PRECISION));
 
       yield {
         type: 'approve',
@@ -404,11 +723,22 @@ export class RaftToken {
         action,
       };
     } else {
-      if (currentUnlockedTime && currentUnlockedTime.getTime() > unlockTime.getTime()) {
+      if (currentUnlockedTime && currentUnlockedTime > unlockTime) {
         throw new Error('Unlock time cannot be earlier than the current one');
       }
 
-      if (bptAmount.gt(0)) {
+      const isIncreaseStake = bptAmount.gt(0);
+      const isExtendStake = currentUnlockedTime && RaftToken.isExtendingStakeBpt(currentUnlockedTime, unlockTime);
+
+      if (isIncreaseStake && isExtendStake) {
+        // increase lock amount and extend lock period
+        const action = () => this.increaseAndExtendStakeBptForVeRaft(bptAmount, unlockTime, signer);
+
+        yield {
+          type: 'stake-increase-extend',
+          action,
+        };
+      } else if (isIncreaseStake) {
         // increase lock amount
         const action = () => this.increaseStakeBptForVeRaft(bptAmount, signer);
 
@@ -416,9 +746,7 @@ export class RaftToken {
           type: 'stake-increase',
           action,
         };
-      }
-
-      if (currentUnlockedTime && currentUnlockedTime.getTime() < unlockTime.getTime()) {
+      } else if (isExtendStake) {
         // extend lock period
         const action = () => this.extendStakeBptForVeRaft(unlockTime, signer);
 
@@ -431,6 +759,10 @@ export class RaftToken {
   }
 
   public async claimRaft(signer: Signer, options: TransactionWithFeesOptions = {}): Promise<TransactionResponse> {
+    if (!this.walletAddress) {
+      throw new Error('Wallet is not connected to RaftToken');
+    }
+
     if (this.merkleTreeIndex === null || this.merkleTreeIndex === undefined || !this.merkleProof) {
       throw new Error('User is not on whitelist to claim RAFT!');
     }
@@ -450,86 +782,19 @@ export class RaftToken {
     return sendTransaction();
   }
 
-  public async claimRaftAndStakeBptForVeRaft(
-    unlockTime: number,
-    slippage: Decimal,
+  public async claimRaftFromStakedBpt(
     signer: Signer,
     options: TransactionWithFeesOptions = {},
   ): Promise<TransactionResponse> {
-    if (this.merkleTreeIndex === null || this.merkleTreeIndex === undefined || !this.merkleProof) {
-      throw new Error('User is not on whitelist to claim RAFT!');
-    }
-
     const { gasLimitMultiplier = Decimal.ONE } = options;
-    const index = BigInt(this.merkleTreeIndex);
-    const amount = this.claimableAmount.toBigInt(Decimal.PRECISION);
 
-    const poolData = await this.getBalancerPoolData();
-    const bptBptAmountFromRaft = await this.getBptAmountFromRaft(this.claimableAmount, {
-      poolData,
-    });
-
-    if (!poolData || !bptBptAmountFromRaft) {
-      throw new Error('Cannot query balancer pool data!');
-    }
-
-    // minBptAmountOut = calculated BPT out * (1 - slippage)
-    const minBptAmountOut = bptBptAmountFromRaft.mul(Decimal.ONE.sub(slippage));
-
-    const raftTokenContract = getTokenContract(RAFT_TOKEN, signer);
-    const bptTokenContract = getTokenContract(RAFT_BPT_TOKEN, signer);
-
-    let raftTokenPermitSignature = EMPTY_PERMIT_SIGNATURE;
-    let balancerLPTokenPermitSignature = EMPTY_PERMIT_SIGNATURE;
-    const isEoaWallet = await isEoaAddress(this.walletAddress, this.provider);
-
-    // if wallet is EOA, use approval; else use permit
-    if (isEoaWallet) {
-      // approve $RAFT token for approval amount
-      await getApproval(
-        this.claimableAmount,
-        this.walletAddress,
-        raftTokenContract as ERC20,
-        RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
-      );
-      // approve BPT token for approval amount
-      await getApproval(
-        bptBptAmountFromRaft,
-        this.walletAddress,
-        bptTokenContract as ERC20,
-        RaftConfig.networkConfig.veRaftAddress,
-      );
-    } else {
-      // sign permit for $RAFT token for approval amount
-      raftTokenPermitSignature = await createPermitSignature(
-        RAFT_TOKEN,
-        signer,
-        this.claimableAmount,
-        RaftConfig.networkConfig.claimRaftStakeVeRaftAddress,
-        raftTokenContract,
-      );
-      // sign permit for BPT token for approval amount
-      balancerLPTokenPermitSignature = await createPermitSignature(
-        RAFT_BPT_TOKEN,
-        signer,
-        this.claimableAmount,
-        RaftConfig.networkConfig.veRaftAddress,
-        bptTokenContract,
-      );
+    if (!this.walletAddress) {
+      throw new Error('Wallet is not connected to RaftToken');
     }
 
     const { sendTransaction } = await buildTransactionWithGasLimit(
-      this.claimAndStakeContract.execute,
-      [
-        index,
-        this.walletAddress,
-        amount,
-        BigInt(unlockTime),
-        this.merkleProof,
-        minBptAmountOut.toBigInt(Decimal.PRECISION),
-        raftTokenPermitSignature,
-        balancerLPTokenPermitSignature,
-      ],
+      this.feeDistributorContract.claimToken,
+      [this.walletAddress, RaftConfig.networkConfig.tokens.RAFT.address],
       signer,
       gasLimitMultiplier,
       'raft',
@@ -557,8 +822,27 @@ export class RaftToken {
     return signer.sendTransaction(txnRequest);
   }
 
+  public async increaseAndExtendStakeBptForVeRaft(
+    bptAmount: Decimal,
+    unlockTime: Date,
+    signer: Signer,
+  ): Promise<TransactionResponse> {
+    const amount = bptAmount.toBigInt(Decimal.PRECISION);
+    const unlockTimestamp = BigInt(Math.floor(unlockTime.getTime() / 1000));
+    const txnRequest = await this.veContract.increase_amount_and_time.populateTransaction(amount, unlockTimestamp);
+    return signer.sendTransaction(txnRequest);
+  }
+
   public async withdrawVeRaft(signer: Signer): Promise<TransactionResponse> {
     const txnRequest = await this.veContract.withdraw.populateTransaction();
     return signer.sendTransaction(txnRequest);
+  }
+
+  public static isExtendingStakeBpt(currentUnlockedTime: Date, unlockTime: Date): boolean {
+    const currentUnlockedTimeInSecond = Math.floor(currentUnlockedTime.getTime() / 1000);
+    const unlockTimeInSecond = Math.floor(unlockTime.getTime() / 1000);
+    const roundedUnlockTimeInSecond = Math.floor(unlockTimeInSecond / SECONDS_IN_WEEK) * SECONDS_IN_WEEK;
+
+    return roundedUnlockTimeInSecond > currentUnlockedTimeInSecond;
   }
 }

@@ -150,11 +150,18 @@ const tokensConfig: Record<Token, TokenConfig> = {
     priceFeed: 'swETH',
   },
   RAFT: {
-    address: '0x0000000000000000000000000000000000000000', // TODO: update address
+    address: '0x4c5cb5d87709387f8821709f7a6664f00dcf0c93',
     ticker: 'RAFT',
     decimals: 18,
     supportsPermit: true,
-    priceFeed: Decimal.ONE, // TODO: update price feed
+    priceFeed: null,
+  },
+  veRAFT: {
+    address: '0x45d117011da1d49ba86af6ced94126488084186f',
+    ticker: 'veRAFT',
+    decimals: 18,
+    supportsPermit: false,
+    priceFeed: null,
   },
   R: {
     address: '0x183015a9ba6ff60230fdeadc3f43b3d788b13e21',
@@ -164,7 +171,7 @@ const tokensConfig: Record<Token, TokenConfig> = {
     priceFeed: Decimal.ONE,
   },
   RR: {
-    address: '0x2ba26baE6dF1153e29813d7f926143f9c94402f3',
+    address: '0xd2c0c4A6296D416C5Eb6Ae41d17aC4Db4bDD5296',
     ticker: 'RR',
     decimals: 18,
     supportsPermit: false,
@@ -174,11 +181,11 @@ const tokensConfig: Record<Token, TokenConfig> = {
     },
   },
   'B-80RAFT-20R': {
-    address: '0x0000000000000000000000000000000000000000', // TODO: update address
+    address: '0xe91888a1d08e37598867d213a4acb5692071bb3a',
     ticker: 'B-80RAFT-20R',
     decimals: 18,
     supportsPermit: true,
-    priceFeed: Decimal.ONE, // TODO: update price feed
+    priceFeed: null,
   },
 };
 
@@ -224,11 +231,8 @@ export const mainnetConfig: NetworkConfig = {
   tokens: tokensConfig,
   daiAddress: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   testNetwork: false,
-  // TODO: wait for deployment
-  raftAirdropAddress: '0x0000000000000000000000000000000000000000',
-  claimRaftStakeVeRaftAddress: '0x0000000000000000000000000000000000000000',
-  // TODO: update this to veRAFT
-  veRaftAddress: '0xC128a9954e6c874eA3d62ce62B468bA073093F25',
-  // TODO: update this to RAFT/R pool
-  balancerWeightedPoolId: '0x5c6ee304399dbdb9c8ef030ab642b10820db8f56000200000000000000000014',
+  raftAirdropAddress: '0xA6e715089A5B6E503c40830F958F9E43A2F2da62',
+  claimRaftStakeVeRaftAddress: '0xf952f4c81101e577BbbF792A5B654E788ec03059',
+  balancerWeightedPoolId: '0xe91888a1d08e37598867d213a4acb5692071bb3a0002000000000000000005f9',
+  feeDistributorAddress: '0x636c04cfb9e242e7ea8986c6cd0eaa8175cacc21',
 };

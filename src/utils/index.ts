@@ -24,6 +24,7 @@ export {
   isRRToken,
   isRToken,
   isUnderlyingCollateralToken,
+  isVeRaftToken,
   isWrappableCappedCollateralToken,
   isWrappedCappedUnderlyingCollateralToken,
   getInterestRateDebtTokenContract,
