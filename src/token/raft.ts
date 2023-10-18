@@ -79,6 +79,9 @@ export type ClaimRaftStakeBptPrefetch = {
   raftAllowance?: Decimal;
   bptAllowance?: Decimal;
 };
+export type ClaimRaftStakeBptOptions = {
+  bptApprovalMultiplier?: Decimal;
+};
 export type StakeBptStepType = 'approve' | 'stake-new' | 'stake-increase' | 'stake-extend' | 'stake-increase-extend';
 export type StakeBptStep = {
   type: StakeBptStepType;
@@ -585,9 +588,9 @@ export class RaftToken {
     unlockTime: Date,
     slippage: Decimal,
     signer: Signer,
-    options: ClaimRaftStakeBptPrefetch & TransactionWithFeesOptions = {},
+    options: ClaimRaftStakeBptPrefetch & TransactionWithFeesOptions & ClaimRaftStakeBptOptions = {},
   ): AsyncGenerator<ClaimRaftStakeBptStep, void, void> {
-    const { gasLimitMultiplier = Decimal.ONE } = options;
+    const { gasLimitMultiplier = Decimal.ONE, bptApprovalMultiplier = Decimal.ONE } = options;
     let { raftAllowance, bptAllowance } = options;
 
     if (!this.walletAddress) {
@@ -641,11 +644,13 @@ export class RaftToken {
     // approve BPT token for approval amount
     if (bptBptAmountFromRaft.gt(bptAllowance)) {
       const bptTokenContract = getTokenContract(RAFT_BPT_TOKEN, signer);
+      // add multiplier for BPT approval becoz it's possible that when txn proceed it requires more than approved amount
+      const approvalAmount = bptBptAmountFromRaft.mul(bptApprovalMultiplier);
 
       const action = () =>
         bptTokenContract.approve(
           RaftConfig.networkConfig.tokens.veRAFT.address,
-          bptBptAmountFromRaft.toBigInt(Decimal.PRECISION),
+          approvalAmount.toBigInt(Decimal.PRECISION),
         );
 
       yield {
