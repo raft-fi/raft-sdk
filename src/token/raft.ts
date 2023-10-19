@@ -22,12 +22,33 @@ import { SECONDS_IN_WEEK, SECONDS_PER_YEAR } from '../constants';
 // annual give away = 10% of 2.5B evenly over 3 years
 const ANNUAL_GIVE_AWAY = new Decimal(2500000000).mul(0.1).div(3);
 
+export type StakingTransactionType =
+  | 'DEPOSIT_FOR'
+  | 'CREATE_LOCK'
+  | 'INCREASE_LOCK_AMOUNT'
+  | 'INCREASE_UNLOCK_TIME'
+  | 'WITHDRAW';
+
 type PoolDataOption = {
   poolData?: SubgraphPoolBase | null;
 };
 
 type PoolDataQuery = {
   pool: SubgraphPoolBase | null;
+};
+
+type StakingTransactionsQuery = {
+  position: {
+    stakings: StakingTransactionQuery[];
+  } | null;
+};
+type StakingTransactionQuery = {
+  id: string;
+  provider: string;
+  type: StakingTransactionType;
+  amount: string;
+  unlockTime: string | null;
+  timestamp: string;
 };
 
 type VeRaftBalancePoint = {
@@ -47,6 +68,15 @@ export type UserVeRaftBalance = {
   veRaftBalance: Decimal;
   unlockTime: Date | null;
   supply: Decimal;
+};
+
+export type StakingTransaction = {
+  id: string;
+  provider: string;
+  type: StakingTransactionType;
+  amount: Decimal;
+  unlockTime: Date | null;
+  timestamp: Date;
 };
 
 type WhitelistMerkleProof = [string, string];
@@ -582,6 +612,47 @@ export class RaftToken {
     );
 
     return new Decimal(amount, Decimal.PRECISION);
+  }
+
+  public async getStakingTransactions(): Promise<StakingTransaction[]> {
+    if (!this.walletAddress) {
+      return [];
+    }
+
+    const query = gql`
+      query GetTransactions($ownerAddress: String!) {
+        position(id: $ownerAddress) {
+          stakings(orderBy: timestamp, orderDirection: desc) {
+            id
+            type
+            provider
+            amount
+            unlockTime
+            timestamp
+          }
+        }
+      }
+    `;
+
+    const response = await request<StakingTransactionsQuery>(RaftConfig.subgraphEndpoint, query, {
+      ownerAddress: this.walletAddress.toLowerCase(),
+    });
+
+    if (!response.position?.stakings) {
+      return [];
+    }
+
+    return response.position.stakings.map(
+      transaction =>
+        ({
+          id: transaction.id,
+          provider: transaction.provider,
+          type: transaction.type,
+          amount: Decimal.parse(BigInt(transaction.amount), 0n, Decimal.PRECISION),
+          unlockTime: transaction.timestamp ? new Date(Number(transaction.timestamp) * 1000) : null,
+          timestamp: new Date(Number(transaction.timestamp) * 1000),
+        } as StakingTransaction),
+    );
   }
 
   public async *getClaimRaftAndStakeBptSteps(

@@ -31,7 +31,9 @@ export { PriceFeed } from './price';
 export { Protocol } from './protocol';
 export {
   RaftToken,
+  type StakingTransactionType,
   type UserVeRaftBalance,
+  type StakingTransaction,
   type ClaimRaftStakeBptStepType,
   type ClaimRaftStakeBptStep,
   type ClaimRaftStakeBptPrefetch,
