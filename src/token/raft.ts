@@ -16,7 +16,7 @@ import {
   VotingEscrow,
 } from '../typechain';
 import { EMPTY_PERMIT_SIGNATURE, buildTransactionWithGasLimit, getTokenContract } from '../utils';
-import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions, VERAFT_TOKEN } from '../types';
+import { RAFT_BPT_TOKEN, RAFT_TOKEN, Token, TransactionWithFeesOptions, VERAFT_TOKEN } from '../types';
 import { SECONDS_IN_WEEK, SECONDS_PER_YEAR } from '../constants';
 
 // annual give away = 10% of 2.5B evenly over 3 years
@@ -27,7 +27,8 @@ export type StakingTransactionType =
   | 'CREATE_LOCK'
   | 'INCREASE_LOCK_AMOUNT'
   | 'INCREASE_UNLOCK_TIME'
-  | 'WITHDRAW';
+  | 'WITHDRAW'
+  | 'CLAIM';
 
 type PoolDataOption = {
   poolData?: SubgraphPoolBase | null;
@@ -46,6 +47,7 @@ type StakingTransactionQuery = {
   id: string;
   provider: string;
   type: StakingTransactionType;
+  token: string;
   amount: string;
   unlockTime: string | null;
   timestamp: string;
@@ -74,6 +76,7 @@ export type StakingTransaction = {
   id: string;
   provider: string;
   type: StakingTransactionType;
+  token: Token | null;
   amount: Decimal;
   unlockTime: Date | null;
   timestamp: Date;
@@ -626,6 +629,7 @@ export class RaftToken {
             id
             type
             provider
+            token
             amount
             unlockTime
             timestamp
@@ -648,6 +652,7 @@ export class RaftToken {
           id: transaction.id,
           provider: transaction.provider,
           type: transaction.type,
+          token: RaftConfig.getTokenTicker(transaction.token),
           amount: Decimal.parse(BigInt(transaction.amount), 0n, Decimal.PRECISION),
           unlockTime: transaction.timestamp ? new Date(Number(transaction.timestamp) * 1000) : null,
           timestamp: new Date(Number(transaction.timestamp) * 1000),
