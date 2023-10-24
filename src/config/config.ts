@@ -16,10 +16,19 @@ const networkIds: Record<SupportedNetwork, number> = {
   base: 8453,
 };
 
+export interface RaftConfigEndpointOptions {
+  subgraphEndpoint?: string;
+  balancerSubgraphEndpoint?: string;
+  oneInchEndpoint?: string;
+  oneInchApiKey?: string;
+}
+
 export class RaftConfig {
   private static _network: SupportedNetwork = 'mainnet';
   private static _subgraphEndpoint = '';
   private static _balancerSubgraphEndpoint = '';
+  private static _oneInchEndpoint = '';
+  private static _oneInchApiKey = '';
 
   public static setNetwork(network: SupportedNetwork) {
     this._network = network;
@@ -31,6 +40,27 @@ export class RaftConfig {
 
   public static setBalancerSubgraphEndpoint(balancerSubgraphEndpoint: string) {
     this._balancerSubgraphEndpoint = balancerSubgraphEndpoint;
+  }
+
+  public static set1inchEndpoint(oneInchEndpoint: string, oneInchApiKey: string) {
+    this._oneInchEndpoint = oneInchEndpoint;
+    this._oneInchApiKey = oneInchApiKey;
+  }
+
+  public static setEndpointOptions(options: RaftConfigEndpointOptions) {
+    const { subgraphEndpoint, balancerSubgraphEndpoint, oneInchEndpoint, oneInchApiKey } = options;
+
+    if (subgraphEndpoint) {
+      this.setSubgraphEndpoint(subgraphEndpoint);
+    }
+
+    if (balancerSubgraphEndpoint) {
+      this.setBalancerSubgraphEndpoint(balancerSubgraphEndpoint);
+    }
+
+    if (oneInchEndpoint && oneInchApiKey) {
+      this.set1inchEndpoint(oneInchEndpoint, oneInchApiKey);
+    }
   }
 
   static get network(): SupportedNetwork {
@@ -55,6 +85,14 @@ export class RaftConfig {
 
   static get balancerSubgraphEndpoint(): string {
     return this._balancerSubgraphEndpoint;
+  }
+
+  static get oneInchEndpoint(): string {
+    return this._oneInchEndpoint;
+  }
+
+  static get oneInchApiKey(): string {
+    return this._oneInchApiKey;
   }
 
   static getTokenAddress(token: Token): string {
