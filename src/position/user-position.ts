@@ -513,8 +513,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       );
 
       const amountOut = new Decimal(
-        BigInt(rateSwapCalldata.data.toTokenAmount),
-        rateSwapCalldata.data.toToken.decimals,
+        BigInt(rateSwapCalldata.data.toAmount),
+        RaftConfig.networkConfig.tokens[this.underlyingCollateralToken].decimals,
       );
       const oneInchRate = spotSwap.div(amountOut);
 
@@ -595,7 +595,10 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
         .getAbiCoder()
         .encode(['uint256', 'bytes'], [fromAmountOffset, swapCalldata.data.tx.data]);
 
-      const oneInchAmountOut = new Decimal(BigInt(swapCalldata.data.toTokenAmount), swapCalldata.data.toToken.decimals);
+      const oneInchAmountOut = new Decimal(
+        BigInt(swapCalldata.data.toAmount),
+        RaftConfig.networkConfig.tokens[isDebtIncrease ? this.underlyingCollateralToken : R_TOKEN].decimals,
+      );
       const minReturn = oneInchAmountOut.mul(Decimal.ONE.sub(slippage));
 
       let collateralToSwap: Decimal;
