@@ -654,7 +654,7 @@ export class RaftToken {
           type: transaction.type,
           token: RaftConfig.getTokenTicker(transaction.token),
           amount: Decimal.parse(BigInt(transaction.amount), 0n, Decimal.PRECISION),
-          unlockTime: transaction.timestamp ? new Date(Number(transaction.timestamp) * 1000) : null,
+          unlockTime: transaction.timestamp ? new Date(Number(transaction.unlockTime) * 1000) : null,
           timestamp: new Date(Number(transaction.timestamp) * 1000),
         } as StakingTransaction),
     );
