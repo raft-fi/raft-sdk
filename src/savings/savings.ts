@@ -23,12 +23,12 @@ export class Savings {
     // so we can pass a zero address
     return new Decimal(
       await this.rSavingsRateContract.maxDeposit(ethers.ZeroAddress),
-      RaftConfig.networkConfig.tokens.RR.decimals,
+      RaftConfig.networkConfig.tokens.R.decimals,
     );
   }
 
   async getTvl(): Promise<Decimal> {
-    return new Decimal(await this.rSavingsRateContract.totalAssets(), RaftConfig.networkConfig.tokens.RR.decimals);
+    return new Decimal(await this.rSavingsRateContract.totalAssets(), RaftConfig.networkConfig.tokens.R.decimals);
   }
 
   async getYieldReserve(): Promise<Decimal> {
@@ -52,8 +52,5 @@ export class Savings {
 
 export function isSupportedSavingsNetwork(value: string): value is SupportedSavingsNetwork {
   const networks: string[] = [...SUPPORTED_SAVINGS_NETWORKS];
-  if (networks.includes(value)) {
-    return true;
-  }
-  return false;
+  return networks.includes(value);
 }
