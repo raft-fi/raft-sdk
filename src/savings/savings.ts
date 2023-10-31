@@ -31,6 +31,16 @@ export class Savings {
     return new Decimal(await this.rSavingsRateContract.totalAssets(), RaftConfig.networkConfig.tokens.RR.decimals);
   }
 
+  async getYieldReserve(): Promise<Decimal> {
+    const rToken = getTokenContract('R', this.providerOrSigner);
+    const rBalance = new Decimal(
+      await rToken.balanceOf(RaftConfig.networkConfig.tokens.RR.address),
+      RaftConfig.networkConfig.tokens.R.decimals,
+    );
+    const tvl = await this.getTvl();
+    return rBalance.sub(tvl);
+  }
+
   async getCurrentYield(): Promise<Decimal> {
     const issuanceRate = new Decimal(
       await this.rSavingsRateContract.issuanceRate(),
