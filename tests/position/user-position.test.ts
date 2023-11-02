@@ -12,6 +12,7 @@ import { CollateralToken, UnderlyingCollateralToken, VaultV1 } from '../../src/t
 import { getWstEthToStEthRate } from '../../src/price';
 import { SWAP_ROUTER_MAX_SLIPPAGE } from '../../src/constants';
 import { ERC20Indexable, ERC20Indexable__factory } from '../../src/typechain';
+import axios from 'axios';
 
 vi.mock('../../src/allowance', async () => ({
   ...(await vi.importActual<typeof import('../../src/allowance')>('../../src/allowance')),
@@ -794,6 +795,19 @@ describe('UserPosition', () => {
         const getWstEthToStEthRateMock = vi.fn().mockResolvedValue(new Decimal(1.1));
 
         vi.spyOn(ERC20Indexable__factory, 'connect').mockReturnValue({} as unknown as ERC20Indexable);
+        vi.spyOn(axios, 'get').mockResolvedValue({
+          data: {
+            toAmount: '488858025379029290',
+            tx: {
+              from: '0x10fbb5a361aa1a35bf2d0a262e24125fd39d33d8',
+              to: '0x1111111254eeb25477b68fb85ed929f73a960582',
+              data: '0xe449022e00000000000000000000000000000000000000000000003635c9adc5dea00000000000000000000000000000000000000000000000000000061b1867d57bfdd900000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000002000000000000000000000000190ed02adaf1ef8039fcd3f006b42553467d50458000000000000000000000004622df6fb2d9bee0dcdacf545acdb6a2b2f4f8638b1ccac8',
+              value: '0',
+              gas: 0,
+              gasPrice: '30918062535',
+            },
+          },
+        });
         (getWstEthToStEthRate as Mock).mockImplementation(getWstEthToStEthRateMock);
         (getPositionManagerContract as Mock).mockReturnValue({
           managePosition: null,

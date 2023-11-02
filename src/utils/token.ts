@@ -1,5 +1,5 @@
 import { ContractRunner } from 'ethers';
-import { RaftConfig } from '../config';
+import { RaftConfig, SupportedNetwork } from '../config';
 import {
   ERC20,
   ERC20Indexable,
@@ -145,11 +145,12 @@ export function getUnderlyingCollateralTokenFromRaftToken(
 export function getTokenContract<T extends Token | RaftCollateralToken | RaftDebtToken>(
   token: T,
   runner: ContractRunner,
+  network: SupportedNetwork = RaftConfig.network,
 ): TokenContractTypes[T] {
   if (isRaftCollateralToken(token)) {
     const underlyingToken = getUnderlyingCollateralTokenFromRaftToken(token);
     return ERC20Indexable__factory.connect(
-      RaftConfig.networkConfig.raftCollateralTokens[underlyingToken],
+      RaftConfig.getNetworkConfig(network).raftCollateralTokens[underlyingToken],
       runner,
     ) as TokenContractTypes[T];
   }
@@ -157,13 +158,13 @@ export function getTokenContract<T extends Token | RaftCollateralToken | RaftDeb
   if (isRaftDebtToken(token)) {
     const underlyingToken = getUnderlyingCollateralTokenFromRaftToken(token);
     return ERC20Indexable__factory.connect(
-      RaftConfig.networkConfig.raftDebtTokens[underlyingToken],
+      RaftConfig.getNetworkConfig(network).raftDebtTokens[underlyingToken],
       runner,
     ) as TokenContractTypes[T];
   }
 
-  const tokenConfig = RaftConfig.networkConfig.tokens[token as Token];
-  const tokenAddress = RaftConfig.getTokenAddress(token);
+  const tokenConfig = RaftConfig.getNetworkConfig(network).tokens[token as Token];
+  const tokenAddress = RaftConfig.getTokenAddress(token, network);
 
   if (isVeRaftToken(token)) {
     return VotingEscrow__factory.connect(tokenAddress, runner) as TokenContractTypes[T];

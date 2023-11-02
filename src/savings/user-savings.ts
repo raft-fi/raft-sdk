@@ -17,7 +17,7 @@ import {
 import { ERC20Permit } from '../typechain';
 import { RaftConfig } from '../config';
 import { getTokenAllowance } from '../allowance';
-import { Savings } from './savings';
+import { Savings, SupportedSavingsNetwork } from './savings';
 
 export interface ManageSavingsStepType {
   name: 'approve' | 'permit' | 'manageSavings';
@@ -67,11 +67,11 @@ export class UserSavings extends Savings {
   private user: Signer;
   private rToken: ERC20Permit;
 
-  constructor(user: Signer) {
-    super(user);
+  constructor(user: Signer, network: SupportedSavingsNetwork = 'mainnet') {
+    super(user, network);
 
     this.user = user;
-    this.rToken = getTokenContract(R_TOKEN, this.user);
+    this.rToken = getTokenContract(R_TOKEN, this.user, network);
   }
 
   public async *getManageSavingsSteps(
@@ -122,7 +122,7 @@ export class UserSavings extends Savings {
       );
     }
 
-    const absAmountValue = amount.abs().toBigInt(RaftConfig.networkConfig.tokens.R.decimals);
+    const absAmountValue = amount.abs().toBigInt(RaftConfig.getNetworkConfig(this.network).tokens.R.decimals);
     let builtTransactionData: BuiltTransactionData;
 
     // If amount is greater then zero, user wants to deposit, otherwise call withdraw
@@ -178,19 +178,19 @@ export class UserSavings extends Savings {
   public async currentSavings(): Promise<Decimal> {
     const userSavings = await this.rSavingsRateContract.maxWithdraw(this.user);
 
-    return new Decimal(userSavings, RaftConfig.networkConfig.tokens.R.decimals);
+    return new Decimal(userSavings, RaftConfig.getNetworkConfig(this.network).tokens.R.decimals);
   }
 
   async fetchTokenBalance() {
     const balance = await this.rToken.balanceOf(this.user);
 
-    return new Decimal(balance, RaftConfig.networkConfig.tokens.R.decimals);
+    return new Decimal(balance, RaftConfig.getNetworkConfig(this.network).tokens.R.decimals);
   }
 
   async fetchAllowance() {
     const allowance = await this.rToken.allowance(this.user, await this.rSavingsRateContract.getAddress());
 
-    return new Decimal(allowance, RaftConfig.networkConfig.tokens.RR.decimals);
+    return new Decimal(allowance, RaftConfig.getNetworkConfig(this.network).tokens.RR.decimals);
   }
 
   async getSavingsTransactions(): Promise<SavingsTransaction[]> {

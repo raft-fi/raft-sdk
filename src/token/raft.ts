@@ -16,11 +16,19 @@ import {
   VotingEscrow,
 } from '../typechain';
 import { EMPTY_PERMIT_SIGNATURE, buildTransactionWithGasLimit, getTokenContract } from '../utils';
-import { RAFT_BPT_TOKEN, RAFT_TOKEN, TransactionWithFeesOptions, VERAFT_TOKEN } from '../types';
+import { RAFT_BPT_TOKEN, RAFT_TOKEN, Token, TransactionWithFeesOptions, VERAFT_TOKEN } from '../types';
 import { SECONDS_IN_WEEK, SECONDS_PER_YEAR } from '../constants';
 
 // annual give away = 10% of 2.5B evenly over 3 years
 const ANNUAL_GIVE_AWAY = new Decimal(2500000000).mul(0.1).div(3);
+
+export type StakingTransactionType =
+  | 'DEPOSIT_FOR'
+  | 'CREATE_LOCK'
+  | 'INCREASE_LOCK_AMOUNT'
+  | 'INCREASE_UNLOCK_TIME'
+  | 'WITHDRAW'
+  | 'CLAIM';
 
 type PoolDataOption = {
   poolData?: SubgraphPoolBase | null;
@@ -28,6 +36,21 @@ type PoolDataOption = {
 
 type PoolDataQuery = {
   pool: SubgraphPoolBase | null;
+};
+
+type StakingTransactionsQuery = {
+  position: {
+    stakings: StakingTransactionQuery[];
+  } | null;
+};
+type StakingTransactionQuery = {
+  id: string;
+  provider: string;
+  type: StakingTransactionType;
+  token: string;
+  amount: string;
+  unlockTime: string | null;
+  timestamp: string;
 };
 
 type VeRaftBalancePoint = {
@@ -47,6 +70,16 @@ export type UserVeRaftBalance = {
   veRaftBalance: Decimal;
   unlockTime: Date | null;
   supply: Decimal;
+};
+
+export type StakingTransaction = {
+  id: string;
+  provider: string;
+  type: StakingTransactionType;
+  token: Token | null;
+  amount: Decimal;
+  unlockTime: Date | null;
+  timestamp: Date;
 };
 
 type WhitelistMerkleProof = [string, string];
@@ -78,6 +111,9 @@ export interface ClaimRaftStakeBptStep {
 export type ClaimRaftStakeBptPrefetch = {
   raftAllowance?: Decimal;
   bptAllowance?: Decimal;
+};
+export type ClaimRaftStakeBptOptions = {
+  bptApprovalMultiplier?: Decimal;
 };
 export type StakeBptStepType = 'approve' | 'stake-new' | 'stake-increase' | 'stake-extend' | 'stake-increase-extend';
 export type StakeBptStep = {
@@ -581,13 +617,56 @@ export class RaftToken {
     return new Decimal(amount, Decimal.PRECISION);
   }
 
+  public async getStakingTransactions(): Promise<StakingTransaction[]> {
+    if (!this.walletAddress) {
+      return [];
+    }
+
+    const query = gql`
+      query GetTransactions($ownerAddress: String!) {
+        position(id: $ownerAddress) {
+          stakings(orderBy: timestamp, orderDirection: desc) {
+            id
+            type
+            provider
+            token
+            amount
+            unlockTime
+            timestamp
+          }
+        }
+      }
+    `;
+
+    const response = await request<StakingTransactionsQuery>(RaftConfig.subgraphEndpoint, query, {
+      ownerAddress: this.walletAddress.toLowerCase(),
+    });
+
+    if (!response.position?.stakings) {
+      return [];
+    }
+
+    return response.position.stakings.map(
+      transaction =>
+        ({
+          id: transaction.id,
+          provider: transaction.provider,
+          type: transaction.type,
+          token: RaftConfig.getTokenTicker(transaction.token),
+          amount: Decimal.parse(BigInt(transaction.amount), 0n, Decimal.PRECISION),
+          unlockTime: transaction.timestamp ? new Date(Number(transaction.unlockTime) * 1000) : null,
+          timestamp: new Date(Number(transaction.timestamp) * 1000),
+        } as StakingTransaction),
+    );
+  }
+
   public async *getClaimRaftAndStakeBptSteps(
     unlockTime: Date,
     slippage: Decimal,
     signer: Signer,
-    options: ClaimRaftStakeBptPrefetch & TransactionWithFeesOptions = {},
+    options: ClaimRaftStakeBptPrefetch & TransactionWithFeesOptions & ClaimRaftStakeBptOptions = {},
   ): AsyncGenerator<ClaimRaftStakeBptStep, void, void> {
-    const { gasLimitMultiplier = Decimal.ONE } = options;
+    const { gasLimitMultiplier = Decimal.ONE, bptApprovalMultiplier = Decimal.ONE } = options;
     let { raftAllowance, bptAllowance } = options;
 
     if (!this.walletAddress) {
@@ -641,11 +720,13 @@ export class RaftToken {
     // approve BPT token for approval amount
     if (bptBptAmountFromRaft.gt(bptAllowance)) {
       const bptTokenContract = getTokenContract(RAFT_BPT_TOKEN, signer);
+      // add multiplier for BPT approval becoz it's possible that when txn proceed it requires more than approved amount
+      const approvalAmount = bptBptAmountFromRaft.mul(bptApprovalMultiplier);
 
       const action = () =>
         bptTokenContract.approve(
           RaftConfig.networkConfig.tokens.veRAFT.address,
-          bptBptAmountFromRaft.toBigInt(Decimal.PRECISION),
+          approvalAmount.toBigInt(Decimal.PRECISION),
         );
 
       yield {

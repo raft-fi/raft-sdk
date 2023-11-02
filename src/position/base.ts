@@ -364,13 +364,9 @@ export class PositionWithRunner extends Position {
           amountToSwap,
           slippage,
         );
-        const fromTokenAmount = new Decimal(
-          BigInt(swapCalldata.data.fromTokenAmount),
-          swapCalldata.data.fromToken.decimals,
-        );
-        const toTokenAmount = new Decimal(BigInt(swapCalldata.data.toTokenAmount), swapCalldata.data.toToken.decimals);
+        const toTokenAmount = new Decimal(BigInt(swapCalldata.data.toAmount), swapCalldata.data.toToken.decimals);
 
-        return toTokenAmount.div(fromTokenAmount);
+        return toTokenAmount.div(amountToSwap);
       }
       default:
         throw new Error('Swap router not supported!');
@@ -384,16 +380,25 @@ export class PositionWithRunner extends Position {
     slippage: Decimal,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<AxiosResponse<any, any>> {
-    const swapCalldata = await axios.get('https://api-raft.1inch.io/v5.0/1/swap', {
+    const endpoint = RaftConfig.oneInchEndpoint;
+    const apiKey = RaftConfig.oneInchApiKey;
+    const baseUrl = `${endpoint}/swap/v5.2/1`;
+
+    const swapCalldata = await axios.get(`${baseUrl}/swap`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
       params: {
-        fromTokenAddress,
-        toTokenAddress,
+        src: fromTokenAddress,
+        dst: toTokenAddress,
         amount: amount.value,
-        fromAddress: '0x10fbb5a361aa1a35bf2d0a262e24125fd39d33d8', // 1inch AMM contract TODO - Move to network config
+        from: '0x10fbb5a361aa1a35bf2d0a262e24125fd39d33d8', // 1inch AMM contract TODO - Move to network config
         slippage: slippage.mul(100).toTruncated(2),
         disableEstimate: true,
       },
     });
+
     return swapCalldata;
   }
 }
