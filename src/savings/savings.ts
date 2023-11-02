@@ -11,11 +11,13 @@ export const SUPPORTED_SAVINGS_NETWORKS: SupportedSavingsNetwork[] = ['mainnet',
 
 export class Savings {
   protected providerOrSigner: ContractRunner;
+  protected network: SupportedSavingsNetwork;
   protected rSavingsRateContract: RSavingsRate;
 
-  constructor(providerOrSigner: ContractRunner) {
+  constructor(providerOrSigner: ContractRunner, network: SupportedSavingsNetwork = 'mainnet') {
     this.providerOrSigner = providerOrSigner;
-    this.rSavingsRateContract = getTokenContract('RR', this.providerOrSigner);
+    this.network = network;
+    this.rSavingsRateContract = getTokenContract('RR', this.providerOrSigner, network);
   }
 
   async maxDeposit(): Promise<Decimal> {
@@ -23,19 +25,22 @@ export class Savings {
     // so we can pass a zero address
     return new Decimal(
       await this.rSavingsRateContract.maxDeposit(ethers.ZeroAddress),
-      RaftConfig.networkConfig.tokens.R.decimals,
+      RaftConfig.getNetworkConfig(this.network).tokens.R.decimals,
     );
   }
 
   async getTvl(): Promise<Decimal> {
-    return new Decimal(await this.rSavingsRateContract.totalAssets(), RaftConfig.networkConfig.tokens.R.decimals);
+    return new Decimal(
+      await this.rSavingsRateContract.totalAssets(),
+      RaftConfig.getNetworkConfig(this.network).tokens.R.decimals,
+    );
   }
 
   async getYieldReserve(): Promise<Decimal> {
-    const rToken = getTokenContract('R', this.providerOrSigner);
+    const rToken = getTokenContract('R', this.providerOrSigner, this.network);
     const rBalance = new Decimal(
-      await rToken.balanceOf(RaftConfig.networkConfig.tokens.RR.address),
-      RaftConfig.networkConfig.tokens.R.decimals,
+      await rToken.balanceOf(RaftConfig.getNetworkConfig(this.network).tokens.RR.address),
+      RaftConfig.getNetworkConfig(this.network).tokens.R.decimals,
     );
     const tvl = await this.getTvl();
     return rBalance.sub(tvl);
@@ -44,7 +49,7 @@ export class Savings {
   async getCurrentYield(): Promise<Decimal> {
     const issuanceRate = new Decimal(
       await this.rSavingsRateContract.issuanceRate(),
-      RaftConfig.networkConfig.tokens.RR.decimals,
+      RaftConfig.getNetworkConfig(this.network).tokens.RR.decimals,
     );
     return issuanceRate.mul(SECONDS_PER_YEAR);
   }

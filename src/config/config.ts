@@ -95,13 +95,17 @@ export class RaftConfig {
     return this._oneInchApiKey;
   }
 
-  static getTokenAddress(token: Token): string {
-    return this.networkConfig.tokens[token].address;
+  static getNetworkConfig(network: SupportedNetwork): NetworkConfig {
+    return networkConfig[network];
   }
 
-  static getTokenTicker(address: string): Token | null {
+  static getTokenAddress(token: Token, network: SupportedNetwork = this._network): string {
+    return this.getNetworkConfig(network).tokens[token].address;
+  }
+
+  static getTokenTicker(address: string, network: SupportedNetwork = this._network): Token | null {
     const tokenTicker = TOKENS.find(
-      ticker => this.networkConfig.tokens[ticker].address.toLowerCase() === address.toLowerCase(),
+      ticker => this.getNetworkConfig(network).tokens[ticker].address.toLowerCase() === address.toLowerCase(),
     );
 
     if (tokenTicker === 'wstETH-v1') {
