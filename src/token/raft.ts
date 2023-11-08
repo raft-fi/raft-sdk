@@ -69,7 +69,6 @@ export type UserVeRaftBalance = {
   bptLockedBalance: Decimal;
   veRaftBalance: Decimal;
   unlockTime: Date | null;
-  supply: Decimal;
 };
 
 export type StakingTransaction = {
@@ -368,13 +367,13 @@ export class RaftToken {
     }
 
     if (!userVeRaftBalance) {
-      userVeRaftBalance = await this.getUserVeRaftBalance();
+      userVeRaftBalance = (await this.getUserVeRaftBalance()) ?? undefined;
     }
 
     if (!userAnnualShare) {
       userAnnualShare = this.calculateUserVeRaftAnnualShare(
         userVeRaftBalance?.veRaftBalance ?? Decimal.ZERO,
-        userVeRaftBalance?.unlockTime,
+        userVeRaftBalance?.unlockTime ?? null,
       );
     }
 
@@ -545,44 +544,35 @@ export class RaftToken {
     return new Decimal(trimmedPeriodInSecond).div(maxVeLockPeriod).mul(bptAmount);
   }
 
-  public async getUserVeRaftBalance(): Promise<UserVeRaftBalance> {
+  public async getUserVeRaftBalance(): Promise<UserVeRaftBalance | null> {
     if (!this.walletAddress) {
-      const totalSupply = await this.veContract.totalSupply();
-
-      return {
-        bptLockedBalance: Decimal.ZERO,
-        veRaftBalance: Decimal.ZERO,
-        unlockTime: null,
-        supply: new Decimal(totalSupply, Decimal.PRECISION),
-      };
+      return null;
     }
 
-    const [lockedBalance, veRaftBalance, totalSupply] = await Promise.all([
+    const [lockedBalance, veRaftBalance] = await Promise.all([
       this.veContract.locked(this.walletAddress) as Promise<BptLockedBalance>,
       this.veContract.balanceOf(this.walletAddress) as Promise<bigint>,
-      this.veContract.totalSupply(),
     ]);
 
     return {
       bptLockedBalance: new Decimal(lockedBalance.amount, Decimal.PRECISION),
       veRaftBalance: new Decimal(veRaftBalance, Decimal.PRECISION),
       unlockTime: lockedBalance.end ? new Date(Number(lockedBalance.end) * 1000) : null,
-      supply: new Decimal(totalSupply, Decimal.PRECISION),
     };
   }
 
-  public async getUserBptBalance(): Promise<Decimal> {
+  public async getUserBptBalance(): Promise<Decimal | null> {
     if (!this.walletAddress) {
-      return Decimal.ZERO;
+      return null;
     }
 
     const balance = await this.raftBptContract.balanceOf(this.walletAddress);
     return new Decimal(balance, Decimal.PRECISION);
   }
 
-  public async getUserRaftAllowance(): Promise<Decimal> {
+  public async getUserRaftAllowance(): Promise<Decimal | null> {
     if (!this.walletAddress) {
-      return Decimal.ZERO;
+      return null;
     }
 
     const tokenAllowance = await this.raftContract.allowance(
@@ -592,9 +582,9 @@ export class RaftToken {
     return new Decimal(tokenAllowance, Decimal.PRECISION);
   }
 
-  public async getUserBptAllowance(): Promise<Decimal> {
+  public async getUserBptAllowance(): Promise<Decimal | null> {
     if (!this.walletAddress) {
-      return Decimal.ZERO;
+      return null;
     }
 
     const tokenAllowance = await this.raftBptContract.allowance(
@@ -604,9 +594,9 @@ export class RaftToken {
     return new Decimal(tokenAllowance, Decimal.PRECISION);
   }
 
-  public async getClaimableRaftFromStakedBpt(): Promise<Decimal> {
+  public async getClaimableRaftFromStakedBpt(): Promise<Decimal | null> {
     if (!this.walletAddress) {
-      return Decimal.ZERO;
+      return null;
     }
 
     const amount = await this.feeDistributorContract.claimToken.staticCall(
@@ -678,11 +668,11 @@ export class RaftToken {
     }
 
     if (!raftAllowance) {
-      raftAllowance = await this.getUserRaftAllowance();
+      raftAllowance = (await this.getUserRaftAllowance()) ?? Decimal.ZERO;
     }
 
     if (!bptAllowance) {
-      bptAllowance = await this.getUserBptAllowance();
+      bptAllowance = (await this.getUserBptAllowance()) ?? Decimal.ZERO;
     }
 
     const unlockTimeInSec = Math.floor(unlockTime.getTime() / 1000);
@@ -771,8 +761,12 @@ export class RaftToken {
   ): AsyncGenerator<StakeBptStep, void, void> {
     let { userVeRaftBalance, bptAllowance } = options;
 
+    if (!this.walletAddress) {
+      throw new Error('Wallet is not connected to RaftToken');
+    }
+
     if (!bptAllowance) {
-      bptAllowance = await this.getUserBptAllowance();
+      bptAllowance = (await this.getUserBptAllowance()) ?? Decimal.ZERO;
     }
 
     // veRAFT contract doesnt accept permit
@@ -789,11 +783,11 @@ export class RaftToken {
     }
 
     if (!userVeRaftBalance) {
-      userVeRaftBalance = await this.getUserVeRaftBalance();
+      userVeRaftBalance = (await this.getUserVeRaftBalance()) ?? undefined;
     }
 
-    const lockedBptAmount = userVeRaftBalance.bptLockedBalance;
-    const currentUnlockedTime = userVeRaftBalance.unlockTime;
+    const lockedBptAmount = userVeRaftBalance?.bptLockedBalance ?? Decimal.ZERO;
+    const currentUnlockedTime = userVeRaftBalance?.unlockTime ?? null;
 
     if (lockedBptAmount.isZero()) {
       // new stake
