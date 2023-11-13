@@ -121,6 +121,8 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
    * @returns The position of the user or null.
    */
   public static async fromUser<C extends UnderlyingCollateralToken>(user: Signer): Promise<UserPosition<C> | null> {
+    const walletAddress = (await user.getAddress()).toLowerCase();
+
     const query = gql`
       query getPosition($positionId: String!) {
         position(id: $positionId) {
@@ -131,7 +133,7 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       }
     `;
     const variables = {
-      positionId: (await user.getAddress()).toLowerCase(),
+      positionId: walletAddress,
     };
 
     const response = await request<{ position: UserPositionResponse | null }>(
@@ -139,7 +141,16 @@ export class UserPosition<T extends UnderlyingCollateralToken> extends PositionW
       query,
       variables,
     );
-    const underlyingCollateralTokenAddress = response.position?.underlyingCollateralToken;
+    let underlyingCollateralTokenAddress = response.position?.underlyingCollateralToken;
+
+    // Subgraph data for rETH (v1) for these holders is rekt, because they tried to close v1 position by sending tx to v2 position manager.
+    // We can remove this code once both of these wallets close their positions.
+    if (
+      walletAddress === '0x71f12a5b0e60d2ff8a87fd34e7dcff3c10c914b0' ||
+      walletAddress === '0x444058aecc3117ec602dedd1c1eeecbd64c90720'
+    ) {
+      underlyingCollateralTokenAddress = RaftConfig.getTokenAddress('wcrETH-v1');
+    }
 
     if (!underlyingCollateralTokenAddress) {
       return null;
